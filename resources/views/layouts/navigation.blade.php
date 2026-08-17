@@ -1,108 +1,54 @@
-<nav x-data="{ open: false }" class="bg-blue-900 border-b border-white/10 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-18 py-1">
-            <div class="flex">
-                <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}" class="transition transform hover:scale-105">
-                        <x-application-logo class="block h-10 w-auto fill-current text-white" />
-                    </a>
-                </div>
+@php
+    $user = auth()->user();
+    $items = [
+        ['label' => 'Dashboard', 'route' => 'dashboard', 'active' => 'dashboard', 'icon' => 'M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-12h8V3h-8v6Z'],
+        ['label' => 'Events', 'route' => 'events.index', 'active' => ['events.*', 'reports.*'], 'icon' => 'M6 2v3m12-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z'],
+    ];
 
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" 
-                        class="text-white hover:text-red-400 active:border-red-500">
-                        {{-- I removed the <span> here to stop the text from repeating --}}
-                        {{ __('Dashboard') }}
-                    </x-nav-link>
+    if ($user->hasAnyRole(['admin', 'manager'])) {
+        $items[] = ['label' => 'Team', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'icon' => 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.26a4 4 0 0 1 0 7.75'];
+    }
+    if ($user->hasRole('admin')) {
+        $items[] = ['label' => 'Companies', 'route' => 'companies.index', 'active' => 'companies.*', 'icon' => 'M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1'];
+    }
+    if ($user->hasRole('manager')) {
+        $items[] = ['label' => 'Billing', 'route' => 'billing.index', 'active' => 'billing.*', 'icon' => 'M3 6h18v12H3V6Zm0 4h18M7 15h3'];
+        $items[] = ['label' => 'Organization', 'route' => 'organization.branding.edit', 'active' => 'organization.*', 'icon' => 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.3 7.3 0 0 0-.1-1l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.8-1L14.6 3h-4L10 6a8 8 0 0 0-1.8 1L5.7 6 3.7 9.4l2 1.6a7.3 7.3 0 0 0 0 2L3.7 14.6l2 3.4 2.5-1a8 8 0 0 0 1.8 1l.6 3h4l.6-3a8 8 0 0 0 1.8-1l2.5 1 2-3.4-2-1.6a7.3 7.3 0 0 0 .1-1Z'];
+    }
+@endphp
 
-                    {{-- Only Admin sees the Registered Users list --}}
-                    @role('admin')
-                        <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
-                            {{ __('Manage Regulars') }}
-                        </x-nav-link>
-                    @endrole
-                </div>
-            </div>
+<div x-cloak x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm lg:hidden"></div>
 
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
-                <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="inline-flex items-center px-4 py-2 border border-transparent text-sm leading-4 font-medium rounded-full text-white bg-white/10 hover:bg-white/20 focus:outline-none transition ease-in-out duration-150">
-                            <div class="flex items-center">
-                                <div class="h-8 w-8 rounded-full bg-red-600 flex items-center justify-center me-2 shadow-inner">
-                                    {{ substr(Auth::user()->name, 0, 1) }}
-                                </div>
-                                {{ Auth::user()->name }}
-                            </div>
-
-                            <div class="ms-1">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </button>
-                    </x-slot>
-
-                    <x-slot name="content">
-                        <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
-                        </x-dropdown-link>
-
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault();
-                                                this.closest('form').submit();" class="text-red-600 font-semibold">
-                                {{ __('Log Out') }}
-                            </x-dropdown-link>
-                        </form>
-                    </x-slot>
-                </x-dropdown>
-            </div>
-
-            <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-white/10 focus:outline-none transition duration-150">
-                    <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-        </div>
+<aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#071426] text-white shadow-2xl transition-transform duration-300 lg:translate-x-0">
+    <div class="flex h-20 items-center justify-between border-b border-white/10 px-6">
+        <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+            <span class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-xl font-black shadow-lg shadow-blue-950">A</span>
+            <span><span class="block text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300">Asah Apex</span><span class="block text-base font-extrabold">Attendance</span></span>
+        </a>
+        <button type="button" @click="sidebarOpen = false" class="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/10 lg:hidden" aria-label="Close navigation">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
     </div>
 
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden bg-blue-800 border-t border-white/10">
-        <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" class="text-white">
-                {{ __('Dashboard') }}
-            </x-responsive-nav-link>
-        </div>
+    <div class="px-5 pb-3 pt-6"><p class="px-3 text-[10px] font-extrabold uppercase tracking-[0.22em] text-slate-500">Workspace</p></div>
+    <nav class="flex-1 space-y-1 overflow-y-auto px-4">
+        @foreach($items as $item)
+            @php $isActive = collect((array) $item['active'])->contains(fn ($pattern) => request()->routeIs($pattern)); @endphp
+            <a href="{{ route($item['route']) }}" @click="sidebarOpen = false" class="group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition {{ $isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/40' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $item['icon'] }}" /></svg>
+                {{ $item['label'] }}
+            </a>
+        @endforeach
+    </nav>
 
-        <div class="pt-4 pb-1 border-t border-white/10">
-            <div class="px-4 flex items-center">
-                <div class="h-10 w-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold me-3">
-                    {{ substr(Auth::user()->name, 0, 1) }}
-                </div>
-                <div>
-                    <div class="font-medium text-base text-white">{{ Auth::user()->name }}</div>
-                    <div class="font-medium text-sm text-blue-200">{{ Auth::user()->email }}</div>
-                </div>
-            </div>
-
-            <div class="mt-3 space-y-1">
-                <x-responsive-nav-link :href="route('profile.edit')" class="text-white">
-                    {{ __('Profile') }}
-                </x-responsive-nav-link>
-
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault();
-                                        this.closest('form').submit();" class="text-red-400">
-                        {{ __('Log Out') }}
-                    </x-responsive-nav-link>
-                </form>
-            </div>
-        </div>
+    <div class="border-t border-white/10 p-4">
+        <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /></svg>Profile
+        </a>
+        <form method="POST" action="{{ route('logout') }}">@csrf
+            <button class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-red-300 hover:bg-red-500/10 hover:text-red-200">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M10 17l5-5-5-5m5 5H3m10-9h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></svg>Log out
+            </button>
+        </form>
     </div>
-</nav>
+</aside>
