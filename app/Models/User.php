@@ -2,28 +2,29 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-
-#[Fillable(['name', 'email', 'password', 'phone', 'category', 'role'])]
+#[Fillable(['name', 'email', 'email_verified_at', 'password', 'phone', 'member_id', 'category', 'role', 'company_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, HasRoles, Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    public function routeNotificationForArkesel(): ?string
+    {
+        $phone = preg_replace('/\D+/', '', $this->phone ?? '') ?? '';
+
+        return $phone === '' ? null : (str_starts_with($phone, '233') ? $phone : '233'.ltrim($phone, '0'));
+    }
+
     protected function casts(): array
     {
         return [
@@ -32,13 +33,18 @@ class User extends Authenticatable
         ];
     }
 
-    public function attendances()
+    public function company(): BelongsTo
     {
-        return $this->hasMany(Attendance::class);
+        return $this->belongsTo(Company::class);
     }
 
-    public function events()
+    public function linkedParticipant(): HasOne
     {
-        return $this->belongsToMany(Event::class);
+        return $this->hasOne(Participant::class, 'linked_user_id');
+    }
+
+    public function events(): BelongsToMany
+    {
+        return $this->belongsToMany(Event::class, 'event_staff')->withTimestamps();
     }
 }

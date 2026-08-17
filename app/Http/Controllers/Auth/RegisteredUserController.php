@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 
 class RegisteredUserController extends Controller
 {
@@ -29,34 +30,38 @@ class RegisteredUserController extends Controller
      * @throws ValidationException
      */
     public function store(Request $request): RedirectResponse
-{
-    $request->validate([
-        'name' => ['required', 'string', 'max:255'],
-        'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-        'password' => ['required', 'confirmed', Rules\Password::defaults()],
-    ]);
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ]);
 
-    $user = User::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'password' => Hash::make($request->password),
-        'category' => 'regular',
-        'role' => 'regular',
-    ]);
+        $currentUser = Auth::user();
 
-    $user->assignRole('regular');
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'category' => 'staff',
+            'role' => 'usher',
+            // If logged-in user is not a super admin, automatically assign their company id
+            'company_id' => ($currentUser && ! $currentUser->hasRole('admin')) ? $currentUser->company_id : null,
+        ]);
 
-    event(new Registered($user));
+        $user->assignRole(Role::findOrCreate('usher'));
 
-    // CHECK: If you are already logged in as an Admin, don't log in as the new user
-    if (Auth::check() && Auth::user()->hasRole('admin')) {
-        return redirect()->route('admin.users.index')
-            ->with('status', 'New user registered successfully!');
+        event(new Registered($user));
+
+        // If an authorized manager or admin is creating this person, keep them logged in and redirect
+        if (Auth::check() && ($currentUser->hasRole('admin') || $currentUser->hasRole('manager'))) {
+            return redirect()->route('admin.users.index')
+                ->with('success', 'New user registered successfully to your company!');
+        }
+
+        // Otherwise, log in the new user (normal guest registration workflow)
+        Auth::login($user);
+
+        return redirect(route('dashboard', absolute: false));
     }
-
-    // Otherwise, log in the new user (normal guest registration)
-    Auth::login($user);
-
-    return redirect(route('dashboard', absolute: false));
-}
 }

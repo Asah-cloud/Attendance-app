@@ -50,9 +50,9 @@
             
             <div class="flex items-center justify-center gap-2">
                 <span class="text-[10px] font-bold text-gray-300 uppercase tracking-widest">New Operator?</span>
-                <a href="{{ route('register') }}" class="text-[10px] font-black text-gray-600 hover:text-blue-600 uppercase tracking-widest transition">
-                    {{ __('Register Account') }}
-                </a>
+                <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                    {{ __('Need access? Contact your event organizer.') }}
+                </span>
             </div>
         </div>
     </form>
