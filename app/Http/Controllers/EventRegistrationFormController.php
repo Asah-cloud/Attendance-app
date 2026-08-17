@@ -1,0 +1,246 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Event;
+use App\Models\EventRegistration;
+use App\Models\EventRegistrationField;
+use App\Notifications\EventRegistrationSubmitted;
+use App\Services\ParticipantRegistrationService;
+use App\Services\RegistrationLifecycleService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class EventRegistrationFormController extends Controller
+{
+    public function registrations(Request $request, Event $event): View
+    {
+        $this->authorize('update', $event);
+        $status = $request->string('status')->toString();
+        $registrations = $event->registrations()
+            ->with('participant')
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->latest('registered_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('events.registrations', compact('event', 'registrations', 'status'));
+    }
+
+    public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
+            'category' => ['required', 'string', 'max:100'],
+        ]);
+
+        $registration = DB::transaction(function () use ($event, $validated, $participants): EventRegistration {
+            $event = Event::query()->lockForUpdate()->findOrFail($event->id);
+            $participant = $participants->resolveParticipant($event, $validated);
+            if ($event->registrations()->where('participant_id', $participant->id)->exists()) {
+                throw ValidationException::withMessages(['email' => 'This person already has a registration for this event.']);
+            }
+
+            $atCapacity = $event->registration_capacity !== null
+                && $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)->count() >= $event->registration_capacity;
+
+            return $event->registrations()->create([
+                'participant_id' => $participant->id,
+                'status' => $atCapacity ? EventRegistration::STATUS_WAITLISTED : EventRegistration::STATUS_CONFIRMED,
+                'approved_at' => $atCapacity ? null : now(),
+                'source' => 'manual',
+            ]);
+        });
+
+        $this->sendConfirmation($registration);
+
+        return back()->with('success', 'Attendee registered successfully.');
+    }
+
+    public function approve(Event $event, EventRegistration $registration, RegistrationLifecycleService $lifecycle): RedirectResponse
+    {
+        $this->authorizeRegistration($event, $registration);
+        $lifecycle->approve($registration);
+
+        return back()->with('success', 'Registration approved.');
+    }
+
+    public function reject(Event $event, EventRegistration $registration, RegistrationLifecycleService $lifecycle): RedirectResponse
+    {
+        $this->authorizeRegistration($event, $registration);
+        $lifecycle->reject($registration);
+
+        return back()->with('success', 'Registration rejected.');
+    }
+
+    public function cancelRegistration(Event $event, EventRegistration $registration, RegistrationLifecycleService $lifecycle): RedirectResponse
+    {
+        $this->authorizeRegistration($event, $registration);
+        $lifecycle->cancel($registration);
+
+        return back()->with('success', 'Registration cancelled.');
+    }
+
+    public function resend(Event $event, EventRegistration $registration): RedirectResponse
+    {
+        $this->authorizeRegistration($event, $registration);
+        if (! $registration->participant->email) {
+            return back()->withErrors(['registration' => 'This attendee does not have an email address.']);
+        }
+        $this->sendConfirmation($registration);
+
+        return back()->with('success', 'Confirmation sent again.');
+    }
+
+    public function export(Event $event): StreamedResponse
+    {
+        $this->authorize('update', $event);
+        $filename = Str::slug($event->title).'-registrations.csv';
+
+        return response()->streamDownload(function () use ($event): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Name', 'Email', 'Phone', 'Category', 'Status', 'Source', 'Registered At', 'Registration Code']);
+            $event->registrations()->with('participant')->latest('registered_at')->chunk(250, function ($registrations) use ($handle): void {
+                foreach ($registrations as $registration) {
+                    fputcsv($handle, [$registration->participant->name, $registration->participant->email, $registration->participant->phone, $registration->participant->category, $registration->status, $registration->source, $registration->registered_at?->toDateTimeString(), $registration->registration_code]);
+                }
+            });
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    public function edit(Event $event): View
+    {
+        $this->authorize('update', $event);
+        $event->ensureSystemRegistrationFields();
+
+        return view('events.registration-form', [
+            'event' => $event->fresh('registrationFields'),
+            'fieldTypes' => EventRegistrationField::CUSTOM_TYPES,
+        ]);
+    }
+
+    public function updateSettings(Request $request, Event $event, RegistrationLifecycleService $lifecycle): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $validated = $request->validate([
+            'registration_enabled' => ['required', 'boolean'],
+            'registration_opens_at' => ['nullable', 'date'],
+            'registration_closes_at' => ['nullable', 'date', 'after:registration_opens_at'],
+            'registration_capacity' => ['nullable', 'integer', 'min:1'],
+            'registration_requires_approval' => ['required', 'boolean'],
+            'registration_terms' => ['required', 'string', 'max:5000'],
+            'registration_terms_version' => ['required', 'string', 'max:50'],
+        ]);
+        $oldCapacity = $event->registration_capacity;
+        $event->update($validated);
+        if ($validated['registration_capacity'] !== $oldCapacity) {
+            $lifecycle->capacityChanged($event);
+        }
+
+        return back()->with('success', 'Registration settings updated.');
+    }
+
+    public function updateSystemField(Request $request, Event $event, EventRegistrationField $field): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        abort_unless($field->event_id === $event->id && $field->is_system, 404);
+        $validated = $request->validate(['label' => ['required', 'string', 'max:255']]);
+        $field->update(['label' => $validated['label'], 'is_required' => true, 'is_active' => true]);
+
+        return back()->with('success', 'System field label updated.');
+    }
+
+    public function storeField(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $validated = $request->validate([
+            'label' => ['required', 'string', 'max:255'],
+            'field_type' => ['required', Rule::in(EventRegistrationField::CUSTOM_TYPES)],
+            'is_required' => ['nullable', 'boolean'],
+            'options' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $options = $this->options($validated['options'] ?? null);
+
+        if (in_array($validated['field_type'], ['select', 'radio'], true) && count($options) < 2) {
+            return back()->withErrors(['options' => 'Select and radio fields require at least two options.'])->withInput();
+        }
+
+        $event->registrationFields()->create([
+            'field_key' => 'custom_'.Str::uuid(),
+            'label' => $validated['label'],
+            'field_type' => $validated['field_type'],
+            'is_system' => false,
+            'is_required' => $request->boolean('is_required'),
+            'options' => $options ?: null,
+            'display_order' => ((int) $event->registrationFields()->max('display_order')) + 10,
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Custom field added.');
+    }
+
+    public function destroyField(Event $event, EventRegistrationField $field): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        abort_unless($field->event_id === $event->id, 404);
+        abort_if($field->is_system, 422, 'System fields cannot be removed.');
+        $field->delete();
+
+        return back()->with('success', 'Custom field removed.');
+    }
+
+    public function printQr(Event $event): View
+    {
+        $this->authorize('update', $event);
+
+        return view('events.registration-qr', compact('event'));
+    }
+
+    public function downloadQr(Event $event): Response
+    {
+        $this->authorize('update', $event);
+        $svg = QrCode::format('svg')->size(1000)->generate(route('events.register', $event));
+        $filename = Str::slug($event->title).'-registration-qr.svg';
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function options(?string $options): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', $options ?? ''))
+            ->map(fn ($option) => trim($option))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function authorizeRegistration(Event $event, EventRegistration $registration): void
+    {
+        $this->authorize('update', $event);
+        abort_unless($registration->event_id === $event->id, 404);
+    }
+
+    private function sendConfirmation(EventRegistration $registration): void
+    {
+        $registration->loadMissing(['event', 'participant']);
+        if ($registration->participant->email || $registration->participant->phone) {
+            $registration->participant->notify(new EventRegistrationSubmitted($registration));
+        }
+    }
+}
