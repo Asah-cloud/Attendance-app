@@ -2,6 +2,15 @@
 
 return [
 
+    'arkesel' => [
+        'enabled' => env('ARKESEL_ENABLED', false),
+        'key' => env('ARKESEL_API_KEY'),
+        'sender' => env('ARKESEL_SENDER_ID', 'Attendance'),
+        'url' => env('ARKESEL_API_URL', 'https://sms.arkesel.com/api/v2/sms/send'),
+        'callback_url' => env('ARKESEL_CALLBACK_URL'),
+        'sandbox' => env('ARKESEL_SANDBOX', true),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

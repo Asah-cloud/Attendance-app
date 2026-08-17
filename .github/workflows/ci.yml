@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer audit --locked
+      - run: cp .env.example .env
+      - run: php artisan key:generate
+      - run: php artisan test
+      - run: vendor/bin/pint --test
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run build
