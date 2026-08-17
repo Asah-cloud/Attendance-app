@@ -9,12 +9,12 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-  public function up()
-{
-    Schema::table('attendances', function (Blueprint $table) {
-        $table->integer('day_number')->default(1)->after('user_id');
-    });
-}
+    public function up()
+    {
+        Schema::table('attendances', function (Blueprint $table) {
+            $table->integer('day_number')->default(1)->after('user_id');
+        });
+    }
 
     /**
      * Reverse the migrations.
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('attendances', function (Blueprint $table) {
-            //
+            $table->dropColumn('day_number');
         });
     }
 };

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('phone')->nullable()->unique();
 
-            $table->string('role')->defualt('user'); // admin, marker, user
+            $table->string('role')->default('regular');
             $table->string('category')->default('regular'); // executive, apostle prophet etc
             $table->string('member_id')->nullable()->unique();
 
