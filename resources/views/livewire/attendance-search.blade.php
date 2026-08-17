@@ -9,25 +9,36 @@
         </div>
     @endif
 
-    {{-- Search Input Section --}}
-    <div class="mb-8 relative group">
-        <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-            <svg class="h-6 w-6 text-gray-400 group-focus-within:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
+    {{-- Search & Walk-in Action Section --}}
+    <div class="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div class="relative group w-full md:flex-1">
+            <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                <svg class="h-6 w-6 text-gray-400 group-focus-within:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <input type="text"
+                   wire:model.live.debounce.300ms="search"
+                   placeholder="Search by name, category, or phone..."
+                   class="block w-full pl-14 pr-12 py-5 border-2 border-gray-100 rounded-2xl leading-5 bg-gray-50/50 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white text-lg transition-all shadow-sm">
+            
+            {{-- Loading Spinner for Search --}}
+            <div wire:loading wire:target="search" class="absolute inset-y-0 right-0 pr-5 flex items-center">
+                <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
         </div>
-        <input type="text"
-               wire:model.live.debounce.300ms="search"
-               placeholder="Search by name, category, or phone..."
-               class="block w-full pl-14 pr-12 py-5 border-2 border-gray-100 rounded-2xl leading-5 bg-gray-50/50 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white text-lg transition-all shadow-sm">
-        
-        {{-- Loading Spinner for Search --}}
-        <div wire:loading wire:target="search" class="absolute inset-y-0 right-0 pr-5 flex items-center">
-            <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-        </div>
+
+        {{-- Walk-in Form Trigger Button --}}
+        @can('update', $event)
+        <button type="button" wire:click="$dispatch('openWalkInModal')" class="w-full md:w-auto h-full px-6 py-5 bg-blue-900 border border-blue-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-md hover:bg-blue-950 transition-all transform hover:-translate-y-0.5 active:scale-95 whitespace-nowrap flex items-center justify-center gap-2">
+            <span>➕ Add Walk-in Member</span>
+        </button>
+        @else
+        <a href="{{ route('events.scanner', $event) }}" class="flex w-full items-center justify-center whitespace-nowrap rounded-2xl bg-blue-900 px-6 py-5 text-sm font-black uppercase tracking-wider text-white shadow-md hover:bg-blue-950 md:w-auto">Open QR scanner</a>
+        @endcan
     </div>
 
     {{-- Table Section --}}
@@ -50,7 +61,7 @@
                 <tbody class="bg-white divide-y divide-gray-50">
                     @forelse($users as $user)
                         @php $isPresent = in_array($user->id, $attendedUserIds); @endphp
-                        <tr wire:key="user-{{ $user->id }}-day-{{ $day }}" 
+                        <tr wire:key="user-{{ $user->id }}-day-{{ $selectedDay }}" 
                             class="transition-all duration-200 {{ $isPresent ? 'bg-green-50/30' : 'hover:bg-blue-50/50' }}">
                             
                             <td class="px-8 py-5 whitespace-nowrap">
@@ -67,6 +78,13 @@
                                         </div>
                                     </div>
                                 </div>
+                                @can('update', $event)
+                                <button type="button" wire:click="deleteUser({{ $user->id }})" 
+        wire:confirm="Are you sure you want to permanently delete this member?"
+        class="text-xs text-red-500 hover:text-red-700 font-bold ml-2">
+    Delete
+</button>
+                                @endcan
                             </td>
 
                             <td class="px-8 py-5 whitespace-nowrap">
@@ -77,6 +95,7 @@
                             </td>
 
                             <td class="px-8 py-5 whitespace-nowrap text-center">
+                                @can('update', $event)
                                 @if($isPresent)
                                     <div class="flex flex-col items-center gap-2">
                                         <span class="inline-flex items-center px-6 py-2 rounded-xl text-xs font-black bg-green-600 text-white shadow-lg shadow-green-100 animate-in fade-in zoom-in duration-300">
@@ -106,6 +125,9 @@
                                         </span>
                                     </button>
                                 @endif
+                                @else
+                                    <span class="inline-flex rounded-xl bg-slate-100 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">{{ $isPresent ? 'Present' : 'Use QR scanner' }}</span>
+                                @endcan
                             </td>
                         </tr>
                     @empty
@@ -134,4 +156,9 @@
             </div>
         @endif
     </div>
+
+    {{-- Walk-in Modal Subcomponent --}}
+    @can('update', $event)
+        <livewire:add-walk-in-modal :event="$event" />
+    @endcan
 </div>

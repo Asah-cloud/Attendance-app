@@ -1,112 +1,62 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-                <h2 class="font-bold text-2xl text-white leading-tight">
-                    {{ __('Church Events') }}
-                </h2>
-                <p class="text-blue-100 text-sm mt-1">Manage and track attendance for all services</p>
-            </div>
-            
-            @role('admin')
-                <a href="{{ route('events.create') }}" class="inline-flex items-center px-6 py-3 bg-white text-blue-800 rounded-xl font-bold text-sm shadow-lg hover:bg-red-50 hover:text-red-700 transition-all transform hover:-translate-y-1 active:scale-95">
-                    <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    Create New Event
-                </a>
-            @endrole
+    <x-slot name="header">Events</x-slot>
+
+    @if(session('success'))<div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>@endif
+    @if(session('error'))<div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-800">{{ session('error') }}</div>@endif
+
+    @role('admin')
+        <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div><p class="text-sm font-semibold text-blue-600">Platform events</p><h2 class="mt-1 text-3xl font-black tracking-tight">Company event workspaces</h2><p class="mt-2 text-sm text-slate-500">Review events by company or create a new company workspace.</p></div>
+            <div class="flex flex-wrap gap-3"><a href="{{ route('companies.index') }}" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50">View companies</a><a href="{{ route('companies.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Add company</a></div>
         </div>
-    </x-slot>
 
-    <div class="py-10">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {{-- Search & Filter Section (Visual Placeholder) --}}
-            <div class="mb-6 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-blue-900">Active Schedule</h3>
-            </div>
+        <div class="space-y-5">
+            @forelse($companies as $company)
+                <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex flex-col justify-between gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center">
+                        <div class="flex items-center gap-4">
+                            @if($company->logo_path)<img src="{{ Storage::url($company->logo_path) }}" alt="{{ $company->name }} logo" class="h-12 w-12 rounded-xl border border-slate-200 object-contain p-1">@else<div class="grid h-12 w-12 place-items-center rounded-xl bg-blue-50 text-lg font-black text-blue-700">{{ strtoupper(substr($company->name, 0, 1)) }}</div>@endif
+                            <div><h3 class="text-lg font-black">{{ $company->name }}</h3><p class="mt-1 text-xs text-slate-500">{{ $company->events->count() }} of {{ $company->event_limit }} event slots used · {{ $company->users->filter(fn ($user) => $user->hasRole('manager'))->count() }} managers</p></div>
+                        </div>
+                        <div class="flex gap-2"><a href="{{ route('companies.edit', $company) }}" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-extrabold text-slate-700">Edit company</a><a href="{{ route('events.create', ['company_id' => $company->id]) }}" class="rounded-lg bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-700">Create event</a></div>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        @forelse($company->events as $event)
+                            <div class="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center"><div class="min-w-0 flex-1"><p class="truncate text-sm font-extrabold">{{ $event->title }}</p><p class="mt-1 text-xs text-slate-500">{{ $event->event_date->format('M j, Y') }}{{ $event->location ? ' · '.$event->location : '' }}</p></div><span class="w-fit rounded-full px-3 py-1 text-[10px] font-black uppercase {{ $event->status === 'active' ? 'bg-emerald-50 text-emerald-700' : ($event->status === 'upcoming' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600') }}">{{ $event->status }}</span><div class="flex gap-2"><a href="{{ route('events.attendance', $event) }}" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-extrabold text-white">Open attendance</a><a href="{{ route('events.edit', $event) }}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-extrabold text-slate-600">Edit</a></div></div>
+                        @empty <p class="px-6 py-8 text-center text-sm text-slate-500">No events created for this company.</p> @endforelse
+                    </div>
+                </section>
+            @empty <div class="rounded-2xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-500">No companies have been created yet.</div> @endforelse
+        </div>
+    @endrole
 
-            <div class="bg-white overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.04)] sm:rounded-2xl border border-gray-100">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50/50 border-b border-gray-100 text-[11px] uppercase text-gray-400 font-black tracking-widest">
-                                <th class="p-6">Event Details</th>
-                                <th class="p-6">Live Status</th>
-                                <th class="p-6">Calendar</th>
-                                <th class="p-6 text-right">Management</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50">
-                            @foreach($events as $event)
-                            <tr class="hover:bg-blue-50/30 transition-colors group">
-                                <td class="p-6">
-                                    <div class="flex items-center">
-                                        <div class="h-10 w-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold me-4 group-hover:bg-blue-600 group-hover:text-white transition">
-                                            {{ substr($event->title, 0, 1) }}
-                                        </div>
-                                        <div>
-                                            <div class="font-bold text-gray-900 text-lg">{{ $event->title }}</div>
-                                            <div class="text-xs text-gray-400 italic font-medium">{{ Str::limit($event->description, 60) }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="p-6">
-                                    @php $status = strtolower($event->status); @endphp
-                                    <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter border
-                                        {{ $status === 'active' ? 'bg-green-50 text-green-600 border-green-100' : '' }}
-                                        {{ $status === 'upcoming' ? 'bg-blue-50 text-blue-600 border-blue-100' : '' }}
-                                        {{ $status === 'closed' ? 'bg-red-50 text-red-600 border-red-100' : '' }}">
-                                        ● {{ $status }}
-                                    </span>
-                                </td>
-                                <td class="p-6 text-sm">
-                                    <div class="flex flex-col">
-                                        <span class="text-gray-700 font-bold uppercase text-xs">
-                                            {{ \Carbon\Carbon::parse($event->event_date)->format('D, M d') }}
-                                        </span>
-                                        @if($event->end_date)
-                                            <span class="text-gray-400 text-[11px]">Ends {{ \Carbon\Carbon::parse($event->end_date)->format('M d, Y') }}</span>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td class="p-6">
-                                    <div class="flex justify-end items-center gap-4">
-                                        {{-- Attendance Button --}}
-                                        <a href="{{ route('events.attendance', $event->id) }}" 
-                                           class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-xl font-bold text-[11px] uppercase tracking-wider shadow-md hover:shadow-blue-200 hover:scale-105 transition-all">
-                                            <svg class="w-4 h-4 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                                            </svg>
-                                            Take Attendance
-                                        </a>
-
-                                        @role('admin')
-                                        <a href="{{ route('events.edit', $event->id) }}" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                            </svg>
-                                        </a>
-                                        @endrole
-
-                                        @role('admin')
-                                        <form action="{{ route('events.destroy', $event->id) }}" method="POST" onsubmit="return confirm('Are you sure?')">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                            </button>
-                                        </form>
-                                        @endrole
-                                    </div>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+    @hasanyrole('manager|usher')
+        @role('manager')
+            <section class="mb-7 overflow-hidden rounded-3xl bg-gradient-to-r from-[#071426] to-blue-900 p-6 text-white shadow-xl sm:p-8">
+                <div class="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
+                    <div class="flex min-w-0 items-center gap-5">
+                        @if(auth()->user()->company?->logo_path)<img src="{{ Storage::url(auth()->user()->company->logo_path) }}" alt="{{ auth()->user()->company->name }} logo" class="h-20 w-20 shrink-0 rounded-2xl bg-white object-contain p-2 shadow-lg">@else<div class="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white/10 text-3xl font-black">{{ strtoupper(substr(auth()->user()->company?->name ?? 'O', 0, 1)) }}</div>@endif
+                        <div class="min-w-0"><p class="text-xs font-extrabold uppercase tracking-[0.22em] text-blue-300">Event workspace</p><h2 class="mt-2 truncate text-2xl font-black sm:text-3xl">{{ auth()->user()->company?->name ?? 'Organization' }}</h2><p class="mt-2 text-sm text-blue-100">Manage events, registrations and attendance from one place.</p></div>
+                    </div>
+                    <div class="flex shrink-0 flex-wrap gap-3"><a href="{{ route('admin.register-person') }}" class="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-extrabold hover:bg-white/20">Add usher</a><a href="{{ route('events.create') }}" class="rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-blue-900 shadow-lg">Create event</a></div>
                 </div>
+            </section>
+        @else
+            <div class="mb-7"><p class="text-sm font-semibold text-blue-600">Attendance workspace</p><h2 class="mt-1 text-3xl font-black">Your assigned events</h2></div>
+        @endrole
+
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold text-slate-950">Event schedule</h3><p class="mt-1 text-xs text-slate-500">{{ $events->count() }} {{ Str::plural('event', $events->count()) }} available</p></div>
+            <div class="divide-y divide-slate-100">
+                @forelse($events as $event)
+                    @if(auth()->user()->hasRole('manager') || auth()->user()->can('view', $event))
+                        <article class="flex flex-col gap-4 px-6 py-5 transition hover:bg-slate-50 lg:flex-row lg:items-center">
+                            <div class="flex min-w-0 flex-1 items-center gap-4"><div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-50 text-lg font-black text-blue-700">{{ strtoupper(substr($event->title, 0, 1)) }}</div><div class="min-w-0"><h4 class="truncate text-base font-extrabold text-slate-900">{{ $event->title }}</h4><p class="mt-1 truncate text-xs text-slate-500">{{ $event->description ? Str::limit($event->description, 75) : 'No description provided' }}</p></div></div>
+                            <div class="flex flex-wrap items-center gap-3 lg:justify-end"><span class="rounded-full px-3 py-1.5 text-[10px] font-black uppercase {{ $event->status === 'active' ? 'bg-emerald-50 text-emerald-700' : ($event->status === 'upcoming' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600') }}">{{ $event->status }}</span><span class="text-xs font-bold text-slate-500">{{ $event->event_date->format('M j, Y') }}</span><a href="{{ route('events.attendance', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-blue-700">Take attendance</a>@role('manager')<a href="{{ route('events.edit', $event) }}" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-white">Edit</a>@endrole</div>
+                        </article>
+                    @endif
+                @empty <div class="px-6 py-14 text-center"><p class="text-sm font-bold text-slate-700">No events yet</p><p class="mt-2 text-xs text-slate-500">Create an event to begin collecting registrations and attendance.</p>@role('manager')<a href="{{ route('events.create') }}" class="mt-5 inline-block rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Create your first event</a>@endrole</div> @endforelse
             </div>
         </div>
-    </div>
+    @endhasanyrole
 </x-app-layout>

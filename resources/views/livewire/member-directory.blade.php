@@ -17,8 +17,7 @@
                    placeholder="Search name or email..." 
                    class="text-xs border-gray-200 rounded-xl focus:ring-blue-500 w-64 shadow-sm">
             
-            {{-- We keep the button for design, but it's no longer a "submit" button --}}
-            <button type="button" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all">
+            <button type="button" wire:click="searchNow" wire:loading.attr="disabled" wire:target="searchNow" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:cursor-wait disabled:opacity-60">
                 Search
             </button>
         </div>

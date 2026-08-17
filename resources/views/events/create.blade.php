@@ -1,16 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center gap-3">
-            <div class="p-2 bg-white/20 rounded-lg">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-            </div>
-            <h2 class="font-bold text-2xl text-white leading-tight">
-                {{ __('Setup New Event') }}
-            </h2>
-        </div>
-    </x-slot>
+    <x-slot name="header">Create Event</x-slot>
 
     <div class="py-12 bg-[#fcfcfd]">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
@@ -38,6 +27,10 @@
                 <form action="{{ route('events.store') }}" method="POST" class="p-8 space-y-8">
                     @csrf
                     
+                    {{-- Pass down the company id automatically if it exists --}}
+    @if(isset($company_id))
+        <input type="hidden" name="company_id" value="{{ $company_id }}">
+    @endif
                     {{-- Event Title --}}
                     <div class="group">
                         <label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 group-focus-within:text-blue-600 transition-colors">Event Title</label>

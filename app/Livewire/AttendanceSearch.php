@@ -2,8 +2,9 @@
 
 namespace App\Livewire;
 
-use App\Models\Event;
 use App\Models\Attendance;
+use App\Models\Event;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -12,35 +13,43 @@ class AttendanceSearch extends Component
     use WithPagination;
 
     public $event;
+
     public $search = '';
+
     public $attendedUserIds = [];
-    public $day = 1;
+
+    public $selectedDay = 1; // This is the property name we must use everywhere
 
     protected $queryString = [
-        'day' => ['except' => 1],
-        'search' => ['except' => '']
+        'selectedDay' => ['except' => 1],
+        'search' => ['except' => ''],
+    ];
+
+    protected $listeners = [
+        'refreshAttendeeList' => '$refresh',
     ];
 
     public function mount($event)
     {
-        $this->event = $event instanceof \App\Models\Event 
-            ? $event 
-            : \App\Models\Event::findOrFail($event);
+        $this->event = $event instanceof Event
+            ? $event
+            : Event::findOrFail($event);
 
-        $this->day = (int) request()->query('day', 1);
+        Gate::authorize('view', $this->event);
+
+        $this->selectedDay = (int) request()->query('day', 1);
         $this->loadAttendedUserIds();
     }
-    public function setDay($val) {
-        $this->day = $val === 'all' ? 'all' : (int)$val;
+
+    public function setDay($val)
+    {
+        $this->selectedDay = $val === 'all' ? 'all' : (int) $val;
         $this->loadAttendedUserIds();
         $this->resetPage();
     }
 
-    /**
-     * Fix: Ensures that if the 'day' property changes via 
-     * URL or internal update, we refresh the list immediately.
-     */
-    public function updatedDay()
+    // Fixed method name to match property updates
+    public function updatedSelectedDay()
     {
         $this->loadAttendedUserIds();
         $this->resetPage();
@@ -48,10 +57,14 @@ class AttendanceSearch extends Component
 
     public function loadAttendedUserIds()
     {
-        $this->attendedUserIds = Attendance::where('event_id', $this->event->id)
-            ->where('day', $this->day)
-            ->pluck('user_id')
-            ->toArray();
+        $query = Attendance::query()->where('event_id', $this->event->id);
+
+        // Changed $this->day to $this->selectedDay
+        if ($this->selectedDay !== 'all') {
+            $query->where('day', $this->selectedDay);
+        }
+
+        $this->attendedUserIds = $query->pluck('participant_id')->toArray();
     }
 
     public function updatingSearch()
@@ -59,31 +72,41 @@ class AttendanceSearch extends Component
         $this->resetPage();
     }
 
-    public function toggleAttendance($userId)
+    public function toggleAttendance(int $participantId)
     {
-        if ($this->event->status === 'closed') {
-            session()->flash('error', 'This event is closed.');
+        Gate::authorize('update', $this->event);
+        $this->event->confirmedParticipants()->findOrFail($participantId);
+
+        if ($this->selectedDay === 'all') {
+            session()->flash('error', 'Select a specific event day before changing attendance.');
+
+            return;
+        }
+        if (! $this->event->canMarkAttendanceForDay((int) $this->selectedDay)) {
+            session()->flash('error', 'Attendance can only be changed for a day that has started while the event is active.');
+
             return;
         }
 
-        if ($this->event->status === 'upcoming') {
-            session()->flash('error', 'Event has not started yet.');
-            return;
+        // Changed $this->day to $this->selectedDay
+        $currentDay = $this->selectedDay;
+
+        $query = Attendance::query()
+            ->where('event_id', $this->event->id)
+            ->where('participant_id', $participantId);
+
+        if ($currentDay !== 'all') {
+            $query->where('day', $currentDay);
         }
 
-        $currentDay = $this->day;
-
-        $attendance = Attendance::where('event_id', $this->event->id)
-            ->where('user_id', $userId)
-            ->where('day', $currentDay)
-            ->first();
+        $attendance = $query->first();
 
         if ($attendance) {
-            $attendance->delete();
+            $attendance->id ? Attendance::destroy($attendance->id) : null;
         } else {
             Attendance::create([
                 'event_id' => $this->event->id,
-                'user_id' => $userId,
+                'participant_id' => $participantId,
                 'day' => $currentDay,
             ]);
         }
@@ -91,16 +114,25 @@ class AttendanceSearch extends Component
         $this->loadAttendedUserIds();
     }
 
+    public function deleteUser(int $participantId)
+    {
+        Gate::authorize('update', $this->event);
+        $this->event->confirmedParticipants()->findOrFail($participantId);
+        $this->event->registrations()->where('participant_id', $participantId)->delete();
+        session()->flash('message', '🗑️ Member removed successfully.');
+    }
+
     public function render()
     {
+        Gate::authorize('view', $this->event);
         $words = explode(' ', trim($this->search));
 
-        $users = $this->event->users()
-            ->where(function($q) use ($words) {
+        $users = $this->event->confirmedParticipants()
+            ->where(function ($q) use ($words) {
                 foreach ($words as $word) {
-                    if (!empty($word)) {
-                        $wordLower = '%' . strtolower($word) . '%';
-                        $q->where(function($sub) use ($wordLower) {
+                    if (! empty($word)) {
+                        $wordLower = '%'.strtolower($word).'%';
+                        $q->where(function ($sub) use ($wordLower) {
                             $sub->whereRaw('LOWER(name) LIKE ?', [$wordLower])
                                 ->orWhere('phone', 'like', $wordLower)
                                 ->orWhereRaw('LOWER(category) LIKE ?', [$wordLower]);
@@ -110,6 +142,8 @@ class AttendanceSearch extends Component
             })
             ->paginate(15);
 
+        // We automatically pass public properties to the view,
+        // so $selectedDay is now available natively inside your blade view.
         return view('livewire.attendance-search', [
             'users' => $users,
         ]);

@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Attendance extends Model
 {
     // Add 'day' to this list
-    protected $fillable = ['user_id', 'event_id', 'status', 'day', 'day_number'];
+    protected $fillable = ['participant_id', 'event_id', 'status', 'day', 'marked_by'];
 
-    public function user()
+    public function participant()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Participant::class);
     }
 
     public function event()

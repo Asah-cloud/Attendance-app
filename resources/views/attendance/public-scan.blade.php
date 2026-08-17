@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Event Check-in | {{ $event->title }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <x-compiled-assets />
     <style>
         @keyframes slideIn {
             from { opacity: 0; transform: translateY(-10px); }
@@ -55,12 +55,9 @@
         @endif
 
         {{-- Main Form --}}
-        <form action="{{ route('attendance.check', $event->id) }}" method="POST" class="space-y-8">
+        <form action="{{ URL::signedRoute('attendance.check', ['event' => $event->id, 'day' => request('day', 1)]) }}" method="POST" class="space-y-8">
             @csrf
             
-            {{-- CRITICAL: This hidden input carries the day from the URL into the POST request --}}
-            <input type="hidden" name="day" value="{{ request('day', 1) }}">
-
             <div class="relative group">
                 <label class="block text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4 text-center">
                     Identity Verification

@@ -2,8 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\UsersImport;
+use App\Models\Company;
 use App\Models\Event;
+use App\Services\RegistrationLifecycleService;
+// Added these for the import to work
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EventController extends Controller
 {
@@ -12,86 +21,184 @@ class EventController extends Controller
      */
     public function index()
     {
-        //
-        $events = Event::latest()->get();
+        $user = auth()->user();
+        $companies = collect(); // Default empty collection for non-admins
 
-        return view('events.index', compact('events'));
-    }
+        if ($user->hasRole('admin')) {
+            // Super Admin sees all companies with their nested relationships
+            $companies = Company::with(['events', 'users'])->get();
+            $events = Event::orderBy('created_at', 'desc')->get();
+        } elseif ($user->hasRole('manager')) {
+            // Managers only see events belonging to their specific company
+            $events = Event::where('company_id', $user->company_id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            // Ushers only see events they have been assigned to work.
+            $events = $user->events()
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
 
-        public function show(Event $event)
-    {
-        // If someone accidentally lands on /events/1, send them to the attendance page
-        return redirect()->route('events.attendance', $event->id);
+        return view('events.index', compact('events', 'companies'));
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Handle the Excel Import
      */
-    public function create()
+    public function import(Request $request, Event $event)
     {
-        return view('events.create');
+        $this->authorize('update', $event);
+
+        // 1. Validate the file
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv|max:2048',
+        ]);
+
+        try {
+            // 2. Run the import using your UsersImport class
+            Excel::import(new UsersImport($event), $request->file('file'));
+
+            return back()->with('success', 'Participants imported successfully!');
+        } catch (\Throwable $exception) {
+            Log::error('Participant import failed.', [
+                'event_id' => $event->id,
+                'exception' => $exception,
+            ]);
+
+            return back()->with('error', 'The import could not be completed. Check the file format and try again.');
+        }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    public function show(Event $event)
+    {
+        $this->authorize('view', $event);
+
+        return redirect("/events/{$event->id}/attendance");
+    }
+
+    public function create(Request $request)
+    {
+        // Capture company_id if passed from the "+ Assign Event Sheet" link
+        $user = $request->user();
+        $company_id = $user->hasRole('admin')
+            ? $request->query('company_id')
+            : $user->company_id;
+
+        if ($company_id && ! Company::query()->whereKey($company_id)->exists()) {
+            abort(404);
+        }
+
+        return view('events.create', compact('company_id'));
+    }
+
     public function store(Request $request)
     {
-        //
+        $user = auth()->user();
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'event_date' => 'required|date|after_or_equal:today',
             'end_date' => 'nullable|date|after_or_equal:event_date',
             'description' => 'nullable|string',
             'day' => 'nullable|integer|min:1',
+            'company_id' => ['nullable', Rule::exists('companies', 'id')],
         ]);
 
-        Event::create($validated);
+        // Determine which company this event belongs to
+        $companyId = $user->hasRole('admin') ? $request->company_id : $user->company_id;
 
-        return redirect()->route('events.index')->with('success', 'Event created!');
+        if (! $companyId) {
+            return back()->withInput()->with('error', 'No company profile linked to your account workflow.');
+        }
+
+        $company = Company::findOrFail($companyId);
+
+        if (! $company->is_active || ($company->subscription_ends_at && $company->subscription_ends_at->endOfDay()->isPast())) {
+            return back()->withInput()->with('error', 'This company subscription is inactive or expired.');
+        }
+
+        // Enforce active subscription limits
+        $created = DB::transaction(function () use ($companyId, $validated) {
+            $company = Company::query()->lockForUpdate()->findOrFail($companyId);
+
+            if ($company->events()->count() >= $company->event_limit) {
+                return false;
+            }
+
+            $validated['company_id'] = $companyId;
+            Event::create($validated);
+
+            return true;
+        });
+
+        if (! $created) {
+            return back()->withInput()->with('error', "Cannot create event. {$company->name} has reached its event limit of {$company->event_limit}.");
+        }
+
+        return redirect('/events')->with('success', 'Event created!');
     }
+
     public function updateDay(Request $request, Event $event)
-{
-    $start = \Carbon\Carbon::parse($event->event_date)->startOfDay();
-    $end = $event->end_date ? \Carbon\Carbon::parse($event->end_date)->startOfDay() : $start;
-    $maxDays = $start->diffInDays($end) + 1;
+    {
+        $this->authorize('update', $event);
+        $start = Carbon::parse($event->event_date)->startOfDay();
+        $end = $event->end_date ? Carbon::parse($event->end_date)->startOfDay() : $start;
+        $maxDays = $start->diffInDays($end) + 1;
 
-    $validated = $request->validate([
-        'day' => "required|integer|min:1|max:{$maxDays}"
-    ]);
+        $validated = $request->validate([
+            'day' => "required|integer|min:1|max:{$maxDays}",
+        ]);
 
-    $event->update(['day' => $validated['day']]);
+        $event->update(['day' => $validated['day']]);
 
-    return back()->with('success', "Switched to Day {$validated['day']} successfully.");
-}
+        return back()->with('success', "Switched to Day {$validated['day']} successfully.");
+    }
 
+    public function edit(Event $event)
+    {
+        $this->authorize('update', $event);
 
-// Show the edit form
-public function edit(Event $event)
-{
-    return view('events.edit', compact('event'));
-}
+        return view('events.edit', compact('event'));
+    }
 
-// Save the updated data
-public function update(Request $request, Event $event)
-{
-    $validated = $request->validate([
-        'title' => 'required|string|max:255',
-        'event_date' => 'required|date',
-        'end_date' => 'nullable|date|after_or_equal:event_date',
-        'description' => 'nullable|string',
-        'location' => 'nullable|string',
-    ]);
+    public function update(Request $request, Event $event, RegistrationLifecycleService $lifecycle)
+    {
+        $this->authorize('update', $event);
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'event_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:event_date',
+            'description' => 'nullable|string',
+            'location' => 'nullable|string',
+        ]);
 
-    $event->update($validated);
+        $detailsChanged = $event->event_date?->toDateString() !== $validated['event_date']
+            || $event->end_date?->toDateString() !== ($validated['end_date'] ?? null)
+            || (string) $event->location !== (string) ($validated['location'] ?? null);
+        $event->update($validated);
 
-    return redirect()->route('events.index')->with('success', 'Event updated successfully!');
-}
+        if ($detailsChanged) {
+            $event->registrations()->update(['reminder_sent_at' => null]);
+            $lifecycle->eventChanged($event->fresh());
+        }
 
-    // Delete the event
-public function destroy(Event $event)
-{
-    $event->delete();
-    return redirect()->route('events.index')->with('success', 'Event and its records deleted.');
-}
+        return redirect('/events')->with('success', 'Event updated successfully!');
+    }
+
+    public function cancel(Event $event, RegistrationLifecycleService $lifecycle)
+    {
+        $this->authorize('delete', $event);
+        $lifecycle->cancelEvent($event);
+
+        return redirect('/events')->with('success', 'Event cancelled and attendees notified.');
+    }
+
+    public function destroy(Event $event)
+    {
+        $this->authorize('delete', $event);
+        $event->delete();
+
+        return redirect('/events')->with('success', 'Event and its records deleted.');
+    }
 }
