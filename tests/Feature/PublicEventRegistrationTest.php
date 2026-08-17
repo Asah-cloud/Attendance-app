@@ -1,0 +1,235 @@
+<?php
+
+use App\Models\Company;
+use App\Models\Event;
+use App\Models\EventRegistration;
+use App\Models\Participant;
+use App\Models\User;
+use App\Notifications\EventRegistrationSubmitted;
+use Illuminate\Support\Facades\Notification;
+use Spatie\Permission\Models\Role;
+
+beforeEach(function () {
+    foreach (['admin', 'manager', 'usher'] as $role) {
+        Role::findOrCreate($role);
+    }
+});
+
+function publicRegistrationEvent(array $overrides = []): Event
+{
+    $company = Company::create(['name' => fake()->unique()->company()]);
+    $event = Event::create(array_merge([
+        'company_id' => $company->id,
+        'title' => 'Public Registration Event',
+        'event_date' => now()->addWeek(),
+        'registration_enabled' => true,
+        'registration_opens_at' => now()->subHour(),
+        'registration_closes_at' => now()->addDay(),
+        'registration_terms' => 'I agree that my details may be used to administer this event.',
+        'registration_terms_version' => '2026-08',
+    ], $overrides));
+    $event->ensureSystemRegistrationFields();
+
+    return $event;
+}
+
+function registrationPayload(array $overrides = []): array
+{
+    return array_merge([
+        'name' => 'Public Attendee',
+        'email' => 'public@example.com',
+        'phone' => '+233 20 123 4567',
+        'category' => 'Guest',
+        'consent' => '1',
+    ], $overrides);
+}
+
+it('allows managers to configure their event form while protecting system fields', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)
+        ->get(route('events.registration-form.edit', $event))
+        ->assertOk()
+        ->assertSee('Protected system fields')
+        ->assertSee('Copy link')
+        ->assertSee(route('events.register', $event));
+
+    $this->actingAs($manager)
+        ->get(route('events.registration-form.print-qr', $event))
+        ->assertOk()
+        ->assertSee('Scan to register for this event');
+
+    $this->actingAs($manager)
+        ->get(route('events.registration-form.download-qr', $event))
+        ->assertOk()
+        ->assertHeader('content-type', 'image/svg+xml');
+
+    expect($event->registrationFields()->where('is_system', true)->count())->toBe(5);
+    $systemField = $event->registrationFields()->where('field_key', 'email')->firstOrFail();
+
+    $this->actingAs($manager)
+        ->delete(route('events.registration-fields.destroy', [$event, $systemField]))
+        ->assertStatus(422);
+
+    $this->actingAs($manager)
+        ->post(route('events.registration-fields.store', $event), [
+            'label' => 'T-shirt size',
+            'field_type' => 'select',
+            'is_required' => '1',
+            'options' => "Small\nMedium\nLarge",
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('event_registration_fields', [
+        'event_id' => $event->id,
+        'label' => 'T-shirt size',
+        'is_system' => false,
+        'is_required' => true,
+    ]);
+});
+
+it('prevents managers from editing another company registration form', function () {
+    $event = publicRegistrationEvent();
+    $otherCompany = Company::create(['name' => 'Other']);
+    $manager = User::factory()->create(['company_id' => $otherCompany->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)->get(route('events.registration-form.edit', $event))->assertForbidden();
+});
+
+it('rejects disabled and closed registration forms', function () {
+    $disabled = publicRegistrationEvent(['registration_enabled' => false]);
+    $closed = publicRegistrationEvent([
+        'registration_opens_at' => now()->subDays(2),
+        'registration_closes_at' => now()->subDay(),
+    ]);
+
+    $this->get(route('events.register', $disabled))->assertNotFound();
+    $this->post(route('events.register.store', $closed), registrationPayload())
+        ->assertSessionHasErrors('registration');
+    $this->assertDatabaseCount('event_registrations', 0);
+});
+
+it('registers publicly with normalized details custom answers consent and notification', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent();
+    $field = $event->registrationFields()->create([
+        'field_key' => 'custom_tshirt',
+        'label' => 'T-shirt size',
+        'field_type' => 'select',
+        'is_required' => true,
+        'options' => ['Small', 'Medium', 'Large'],
+        'display_order' => 50,
+    ]);
+
+    $response = $this->post(route('events.register.store', $event), registrationPayload([
+        'custom' => [$field->field_key => 'Medium'],
+    ]));
+
+    $registration = EventRegistration::with('participant')->firstOrFail();
+    $response->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+
+    expect($registration->status)->toBe('confirmed')
+        ->and($registration->registration_code)->toHaveLength(40)
+        ->and($registration->participant->phone)->toBe('201234567')
+        ->and($registration->custom_answers)->toBe(['custom_tshirt' => 'Medium'])
+        ->and($registration->consented_at)->not->toBeNull()
+        ->and($registration->terms_version)->toBe('2026-08');
+    Notification::assertSentTo($registration->participant, EventRegistrationSubmitted::class);
+});
+
+it('prevents duplicate registration and reuses the existing participant', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent();
+
+    $this->post(route('events.register.store', $event), registrationPayload());
+    $this->post(route('events.register.store', $event), registrationPayload(['phone' => '0201234567']))
+        ->assertSessionHasErrors('email');
+
+    expect(Participant::where('email', 'public@example.com')->count())->toBe(1)
+        ->and(EventRegistration::count())->toBe(1);
+});
+
+it('waitlists registrations after capacity is reached', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent(['registration_capacity' => 1]);
+
+    $this->post(route('events.register.store', $event), registrationPayload());
+    $this->post(route('events.register.store', $event), registrationPayload([
+        'name' => 'Second Attendee',
+        'email' => 'second@example.com',
+        'phone' => '0209999999',
+    ]));
+
+    expect(EventRegistration::orderBy('id')->pluck('status')->all())->toBe(['confirmed', 'waitlisted']);
+});
+
+it('marks registrations pending when manager approval is required', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent(['registration_requires_approval' => true]);
+
+    $this->post(route('events.register.store', $event), registrationPayload());
+
+    expect(EventRegistration::firstOrFail()->status)->toBe('pending');
+});
+
+it('allows cancellation through the private registration code', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent();
+    $this->post(route('events.register.store', $event), registrationPayload());
+    $registration = EventRegistration::firstOrFail();
+
+    $this->get(route('registrations.confirmation', $registration->registration_code))
+        ->assertOk()
+        ->assertSee('Public Registration Event');
+    $this->post(route('registrations.cancel', $registration->registration_code))
+        ->assertSessionHas('success');
+
+    expect($registration->fresh()->status)->toBe('cancelled')
+        ->and($registration->fresh()->cancelled_at)->not->toBeNull();
+});
+
+it('lets organizers manage registrations, export them, and resend confirmations', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent(['registration_requires_approval' => true]);
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $this->post(route('events.register.store', $event), registrationPayload());
+    $registration = EventRegistration::with('participant')->firstOrFail();
+
+    $this->actingAs($manager)->patch(route('events.registrations.approve', [$event, $registration]))->assertSessionHas('success');
+    expect($registration->fresh()->status)->toBe('confirmed');
+
+    $this->actingAs($manager)->post(route('events.registrations.resend', [$event, $registration]))->assertSessionHas('success');
+    Notification::assertSentTo($registration->participant, EventRegistrationSubmitted::class);
+
+    $this->actingAs($manager)->patch(route('events.registrations.reject', [$event, $registration]))->assertSessionHas('success');
+    expect($registration->fresh()->status)->toBe('rejected');
+
+    $this->actingAs($manager)->patch(route('events.registrations.cancel', [$event, $registration]))->assertSessionHas('success');
+    expect($registration->fresh()->status)->toBe('cancelled')
+        ->and($registration->fresh()->cancelled_at)->not->toBeNull();
+
+    $this->actingAs($manager)->post(route('events.registrations.store', $event), [
+        'name' => 'Manual Attendee', 'email' => 'manual@example.com', 'phone' => '', 'category' => 'Member',
+    ])->assertSessionHas('success');
+    $this->assertDatabaseHas('participants', ['email' => 'manual@example.com']);
+    $this->assertDatabaseHas('event_registrations', ['event_id' => $event->id, 'source' => 'manual', 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->get(route('events.registrations.export', $event))
+        ->assertOk()->assertDownload();
+});
+
+it('prevents managers from controlling another company registrations', function () {
+    $event = publicRegistrationEvent();
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Attendee', 'email' => 'attendee@example.com']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'pending']);
+    $otherCompany = Company::create(['name' => 'Other organizer']);
+    $manager = User::factory()->create(['company_id' => $otherCompany->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)->patch(route('events.registrations.approve', [$event, $registration]))->assertForbidden();
+    $this->actingAs($manager)->get(route('events.registrations.export', $event))->assertForbidden();
+});
