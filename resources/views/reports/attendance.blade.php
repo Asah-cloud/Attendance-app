@@ -1,9 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        Reports
+        <div class="hidden">
             <div>
                 <div class="flex items-center gap-2">
-                    <h2 class="font-black text-2xl text-gray-900 uppercase tracking-tight">
+                    <h2 class="font-extrabold text-2xl text-white tracking-tight">
                         {{ __('Event Analytics') }}
                     </h2>
                     @if($selectedDay === 'all')
@@ -12,7 +13,7 @@
                         </span>
                     @endif
                 </div>
-                <p class="text-sm text-gray-500 font-medium mt-1">Detailed attendance breakdown and registry logs</p>
+                <p class="text-sm text-slate-300 font-medium mt-1">Detailed attendance breakdown and registry logs</p>
             </div>
             
             <div class="flex items-center gap-3 print:hidden">
@@ -39,6 +40,10 @@
 
     <div class="py-12 bg-gray-50/50 min-h-screen">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="mb-6 flex flex-col justify-between gap-4 print:hidden sm:flex-row sm:items-center">
+                <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance analytics</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">Detailed attendance breakdown and registry logs.</p></div>
+                <div class="flex flex-wrap gap-2"><a href="{{ route('events.attendance', ['event' => $event->id, 'day' => ($selectedDay === 'all' ? 1 : $selectedDay)]) }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:border-blue-300 hover:text-blue-700">Back to attendance</a><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
+            </div>
             
             {{-- Print-Only Header (Hidden on Web) --}}
             <div class="hidden print:block mb-8 border-b-4 border-gray-900 pb-4">
@@ -80,14 +85,12 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 
                 {{-- Present Members List --}}
-                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in slide-in-from-left-4 duration-500">
-                    <div class="px-6 py-5 bg-green-600 flex justify-between items-center">
+                <div x-data="{ open: true }" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in slide-in-from-left-4 duration-500">
+                    <button type="button" @click="open = !open" :aria-expanded="open.toString()" class="w-full px-6 py-5 bg-green-600 flex justify-between items-center text-left hover:bg-green-700">
                         <h3 class="font-black text-white uppercase text-xs tracking-widest">Present Registry</h3>
-                        <span class="bg-white/20 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">
-                            {{ $selectedDay === 'all' ? 'All Days' : 'Day '.$selectedDay }}
-                        </span>
-                    </div>
-                    <div class="overflow-x-auto">
+                        <span class="flex items-center gap-2 bg-white/20 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">{{ $selectedDay === 'all' ? 'All Days' : 'Day '.$selectedDay }}<svg class="h-4 w-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg></span>
+                    </button>
+                    <div x-cloak x-show="open" x-transition class="overflow-x-auto">
                         <table class="w-full text-left">
                             <thead>
                                 <tr class="bg-gray-50/50 text-[10px] uppercase text-gray-400 font-black border-b border-gray-50">
@@ -125,14 +128,12 @@
                 </div>
 
                 {{-- Absent Members List --}}
-                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in slide-in-from-right-4 duration-500">
-                    <div class="px-6 py-5 bg-red-600 flex justify-between items-center">
+                <div x-data="{ open: false }" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in slide-in-from-right-4 duration-500">
+                    <button type="button" @click="open = !open" :aria-expanded="open.toString()" class="w-full px-6 py-5 bg-red-600 flex justify-between items-center text-left hover:bg-red-700">
                         <h3 class="font-black text-white uppercase text-xs tracking-widest">Absent Registry</h3>
-                        <span class="bg-white/20 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">
-                            Incomplete
-                        </span>
-                    </div>
-                    <div class="overflow-x-auto">
+                        <span class="flex items-center gap-2 bg-white/20 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">{{ $absentUsers->count() }} people<svg class="h-4 w-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg></span>
+                    </button>
+                    <div x-cloak x-show="open" x-transition class="overflow-x-auto">
                         <table class="w-full text-left">
                             <thead>
                                 <tr class="bg-gray-50/50 text-[10px] uppercase text-gray-400 font-black border-b border-gray-50">

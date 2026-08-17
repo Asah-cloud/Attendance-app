@@ -4,68 +4,102 @@ namespace App\Http\Controllers;
 
 use App\Exports\AttendanceExport;
 use App\Models\Event;
-use Maatwebsite\Excel\Facades\Excel;
+use App\Services\ApplicationCache;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
-    public function show(Event $event, Request $request)
-{
-    $selectedDay = $request->query('day', 1);
+    public function __construct(private readonly ApplicationCache $cache) {}
 
-    if ($selectedDay === 'all') {
-        // 1. Get users who attended at least ONCE during the entire event
-        $presentUsers = $event->users()
-            ->whereHas('attendances', function ($query) use ($event) {
-                $query->where('event_id', $event->id);
-            })
-            ->with(['attendances' => function($q) use ($event) {
-                $q->where('event_id', $event->id)->orderBy('day', 'asc');
-            }])
-            ->get();
+    public function show(Event $event, $day = 1)
+    {
+        $this->authorize('view', $event);
+        // Use the route parameter directly instead of request query
+        $selectedDay = $this->validatedDay($event, $day);
 
-        // 2. Absent users are those who never showed up on ANY day
-        $presentIds = $presentUsers->pluck('id');
-        $absentUsers = $event->users()
-            ->whereNotIn('users.id', $presentIds)
-            ->get();
-            
-    } else {
-        // Standard single-day logic (Fixed for PostgreSQL ambiguity)
-        $presentUsers = $event->users()
-            ->whereHas('attendances', function ($query) use ($event, $selectedDay) {
-                $query->where('event_id', $event->id)
-                      ->where('day', $selectedDay);
-            })
-            ->with(['attendances' => function($q) use ($event, $selectedDay) {
-                $q->where('event_id', $event->id)->where('day', $selectedDay);
-            }])
-            ->get();
+        $data = $this->cache->rememberEvent($event->id, "attendance-report:{$selectedDay}", function () use ($event, $selectedDay): array {
+            if ($selectedDay === 'all') {
+                // 1. Get users who attended at least ONCE during the entire event
+                $presentUsers = $event->confirmedParticipants()
+                    ->whereHas('attendances', function ($query) use ($event) {
+                        $query->where('event_id', $event->id);
+                    })
+                    ->with(['attendances' => function ($q) use ($event) {
+                        $q->where('event_id', $event->id)->orderBy('day', 'asc');
+                    }])
+                    ->get();
 
-        $presentIds = $presentUsers->pluck('id');
-        $absentUsers = $event->users()
-            ->whereNotIn('users.id', $presentIds)
-            ->get();
+                // 2. Absent users are those who never showed up on ANY day
+                $presentIds = $presentUsers->pluck('id');
+                $absentUsers = $event->confirmedParticipants()
+                    ->whereNotIn('participants.id', $presentIds)
+                    ->get();
+
+            } else {
+                // Standard single-day logic (Fixed for PostgreSQL ambiguity)
+                $presentUsers = $event->confirmedParticipants()
+                    ->whereHas('attendances', function ($query) use ($event, $selectedDay) {
+                        $query->where('event_id', $event->id)
+                            ->where('day', $selectedDay);
+                    })
+                    ->with(['attendances' => function ($q) use ($event, $selectedDay) {
+                        $q->where('event_id', $event->id)->where('day', $selectedDay);
+                    }])
+                    ->get();
+
+                $presentIds = $presentUsers->pluck('id');
+                $absentUsers = $event->confirmedParticipants()
+                    ->whereNotIn('participants.id', $presentIds)
+                    ->get();
+            }
+
+            return [
+                'presentUsers' => $presentUsers,
+                'absentUsers' => $absentUsers,
+                'totalExpected' => $event->confirmedParticipants()->count(),
+            ];
+        }, ApplicationCache::REPORT_TTL);
+
+        ['presentUsers' => $presentUsers, 'absentUsers' => $absentUsers, 'totalExpected' => $totalExpected] = $data;
+
+        return view('reports.attendance', compact('event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay'));
     }
 
-    $totalExpected = $event->users()->count();
-
-    return view('reports.attendance', compact('event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay'));
-}
-
-    public function exportExcel(Event $event, Request $request)
+    public function exportExcel(Event $event, $day = 'all')
     {
-        $day = $request->query('day', 'all');
-        $fileName = 'Attendance_' . str_replace(' ', '_', $event->title) . '_Day_' . $day . '.xlsx';
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        // Accepts route parameter directly to match Excel route settings
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.xlsx';
 
         return Excel::download(new AttendanceExport($event, $day), $fileName);
     }
 
-    public function exportCsv(Event $event, Request $request)
+    public function exportCsv(Event $event, $day = 'all')
     {
-        $day = $request->query('day', 'all');
-        $fileName = 'Attendance_' . str_replace(' ', '_', $event->title) . '_Day_' . $day . '.csv';
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        // Accepts route parameter directly to match CSV route settings
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.csv';
 
         return Excel::download(new AttendanceExport($event, $day), $fileName, \Maatwebsite\Excel\Excel::CSV);
+    }
+
+    private function validatedDay(Event $event, mixed $day): int|string
+    {
+        if ($day === 'all') {
+            return 'all';
+        }
+
+        $day = filter_var($day, FILTER_VALIDATE_INT);
+        $totalDays = $event->event_date->diffInDays($event->end_date ?? $event->event_date) + 1;
+
+        if ($day === false || $day < 1 || $day > $totalDays) {
+            throw ValidationException::withMessages(['day' => 'The selected event day is invalid.']);
+        }
+
+        return $day;
     }
 }

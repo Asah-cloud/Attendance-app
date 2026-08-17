@@ -1,13 +1,14 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center print:hidden">
+        Summary Report
+        <div class="hidden">
             <div class="flex items-center gap-3">
                 <div class="p-2 bg-purple-600 rounded-lg shadow-lg shadow-purple-200 text-white">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                     </svg>
                 </div>
-                <h2 class="font-black text-xl text-gray-900 uppercase tracking-tight">
+                <h2 class="font-extrabold text-xl text-white tracking-tight">
                     {{ __('Final Performance Summary') }}
                 </h2>
             </div>
@@ -40,7 +41,7 @@
 
             {{-- 2. Performance Stats --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div class="group bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between hover:-translate-y-1 hover:shadow-xl">
                     <div>
                         <p class="text-gray-400 text-[10px] uppercase font-black tracking-widest">Active Engagement</p>
                         <p class="text-5xl font-black text-gray-900 mt-2 tracking-tighter">{{ $presentUsers->count() }}</p>
@@ -50,7 +51,7 @@
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     </div>
                 </div>
-                <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div class="group bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between hover:-translate-y-1 hover:shadow-xl">
                     <div>
                         <p class="text-gray-400 text-[10px] uppercase font-black tracking-widest">Non-Attendance</p>
                         <p class="text-5xl font-black text-gray-900 mt-2 tracking-tighter">{{ $absentUsers->count() }}</p>
@@ -63,11 +64,12 @@
             </div>
 
             {{-- 3. Detailed Attendance Table --}}
-            <div class="bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100">
-                <div class="px-8 py-6 bg-gray-50/50 border-b border-gray-100">
-                    <h3 class="font-black text-gray-900 uppercase text-xs tracking-widest italic">Member Consistency Rankings</h3>
-                </div>
-                <div class="overflow-x-auto">
+            <div x-data="{ open: false }" class="bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100">
+                <button type="button" @click="open = !open" :aria-expanded="open.toString()" class="flex w-full items-center justify-between px-8 py-6 bg-gray-50/50 border-b border-gray-100 text-left hover:bg-blue-50">
+                    <span><span class="block font-black text-gray-900 uppercase text-xs tracking-widest">Member Consistency Rankings</span><span class="mt-1 block text-xs text-slate-500">{{ $presentUsers->count() }} attendees · click to open or close</span></span>
+                    <svg class="h-5 w-5 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg>
+                </button>
+                <div x-cloak x-show="open" x-transition class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-white text-gray-400 text-[10px] uppercase font-black border-b border-gray-100">

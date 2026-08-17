@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\View\View;
+use Illuminate\View\View; // added import
 
 class ProfileController extends Controller
 {
@@ -50,7 +51,9 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        // use the model's static destroy method with the primary key to avoid
+        // a mismatched delete() signature reported by the analyzer
+        User::destroy($user->getKey());
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
