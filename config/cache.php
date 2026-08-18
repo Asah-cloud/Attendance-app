@@ -1,5 +1,14 @@
 <?php
 
+use App\Models\Attendance;
+use App\Models\Company;
+use App\Models\Event;
+use App\Models\EventRegistration;
+use App\Models\Participant;
+use App\Models\SubscriptionPayment;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 return [
@@ -123,8 +132,22 @@ return [
     | storage. By default, no PHP classes will be unserialized from your
     | cache to prevent gadget chain attacks if your APP_KEY is leaked.
     |
+    | App\Services\ApplicationCache caches Eloquent models/collections for
+    | the dashboard and reports, so those specific classes are allowlisted
+    | here instead of disabling the protection app-wide.
+    |
     */
 
-    'serializable_classes' => false,
+    'serializable_classes' => [
+        Collection::class,
+        EloquentCollection::class,
+        Pivot::class,
+        Company::class,
+        Event::class,
+        Participant::class,
+        EventRegistration::class,
+        SubscriptionPayment::class,
+        Attendance::class,
+    ],
 
 ];
