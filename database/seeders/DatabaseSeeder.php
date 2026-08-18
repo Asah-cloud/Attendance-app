@@ -30,11 +30,13 @@ class DatabaseSeeder extends Seeder
 
         $admin->assignRole('admin');
 
-        // 3. Update the Test User too
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'role' => 'usher',
-        ]);
+        // 3. Seed a test user for local development only
+        if (app()->environment('local')) {
+            User::factory()->create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'role' => 'usher',
+            ]);
+        }
     }
 }
