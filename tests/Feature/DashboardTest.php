@@ -66,7 +66,7 @@ it('allows a manager to update only their organization branding', function () {
 });
 
 it('prevents non managers from changing organization branding', function () {
-    $user = User::factory()->create(['role' => 'regular']);
+    $user = User::factory()->create(['role' => 'usher']);
 
     $this->actingAs($user)->patch(route('organization.branding.update'), [
         'name' => 'Unauthorized Change',

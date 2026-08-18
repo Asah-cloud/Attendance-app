@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\LogResendEmailEvents;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
@@ -10,6 +11,7 @@ use App\Models\Participant;
 use App\Models\SubscriptionPayment;
 use App\Services\ApplicationCache;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Paginator::useTailwind();
+
+        EventFacade::subscribe(LogResendEmailEvents::class);
 
         $invalidateEvent = function (Attendance|EventRegistration $record): void {
             $event = Event::query()->find($record->event_id);

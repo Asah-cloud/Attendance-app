@@ -104,9 +104,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'updateSystemField'])->name('events.registration-fields.update');
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
 
-        Route::get('/admin/register-person', function () {
-            return view('auth.register');
-        })->name('admin.register-person');
+        Route::get('/admin/register-person', [RegisteredUserController::class, 'create'])->name('admin.register-person');
         Route::post('/admin/register-person', [RegisteredUserController::class, 'store'])
             ->name('admin.register.store');
 

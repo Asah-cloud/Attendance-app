@@ -1,0 +1,81 @@
+<?php
+
+use App\Models\Company;
+use App\Models\User;
+use Spatie\Permission\Models\Role;
+
+beforeEach(function () {
+    foreach (['admin', 'manager', 'usher'] as $role) {
+        Role::findOrCreate($role);
+    }
+});
+
+function companyManagementAdmin(): User
+{
+    $admin = User::factory()->create(['role' => 'admin']);
+    $admin->assignRole('admin');
+
+    return $admin;
+}
+
+it('allows the super admin to list companies', function () {
+    $admin = companyManagementAdmin();
+    $company = Company::create(['name' => 'Acme Co']);
+
+    $this->actingAs($admin)
+        ->get(route('companies.index'))
+        ->assertOk()
+        ->assertSee('Acme Co');
+});
+
+it('allows the super admin to create a company', function () {
+    $admin = companyManagementAdmin();
+
+    $this->actingAs($admin)
+        ->post(route('companies.store'), [
+            'name' => 'New Co',
+            'subscription_ends_at' => now()->addYear()->toDateString(),
+            'event_limit' => 10,
+        ])
+        ->assertRedirect(route('companies.index'));
+
+    $this->assertDatabaseHas('companies', ['name' => 'New Co', 'event_limit' => 10]);
+});
+
+it('allows the super admin to update a company', function () {
+    $admin = companyManagementAdmin();
+    $company = Company::create(['name' => 'Acme Co', 'event_limit' => 5]);
+
+    $this->actingAs($admin)
+        ->put(route('companies.update', $company), [
+            'name' => 'Acme Co Renamed',
+            'subscription_ends_at' => now()->addYear()->toDateString(),
+            'event_limit' => 20,
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('companies.index'));
+
+    expect($company->fresh()->name)->toBe('Acme Co Renamed')
+        ->and($company->fresh()->event_limit)->toBe(20);
+});
+
+it('allows the super admin to delete a company', function () {
+    $admin = companyManagementAdmin();
+    $company = Company::create(['name' => 'Acme Co']);
+
+    $this->actingAs($admin)
+        ->delete(route('companies.destroy', $company))
+        ->assertRedirect(route('companies.index'));
+
+    $this->assertDatabaseMissing('companies', ['id' => $company->id]);
+});
+
+it('prevents a manager from accessing company management', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)
+        ->get(route('companies.index'))
+        ->assertForbidden();
+});

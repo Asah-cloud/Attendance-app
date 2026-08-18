@@ -61,7 +61,7 @@ The first row may contain headings. Imported accounts receive a random unusable 
 
 - `admin` is the cross-company super-admin.
 - `manager` can manage records only within their own company.
-- `regular` can view only their assigned event.
+- `usher` can view only their assigned event.
 
 Spatie Laravel Permission is authoritative. The legacy `users.role` field remains synchronized for compatibility with existing views and data.
 
@@ -104,3 +104,9 @@ ARKESEL_SANDBOX=false
 ```
 
 Keep `ARKESEL_SANDBOX=true` until the sender ID and message flow have been tested. Run a supervised `php artisan queue:work` process and invoke `php artisan schedule:run` every minute in production. Event reminders are sent one day before an event; subscription warnings are sent seven days before expiry.
+
+### Resend delivery webhook
+
+The `resend/resend-laravel` package exposes a signed webhook endpoint at `POST /resend/webhook` (see `vendor/resend/resend-laravel/routes/web.php`) that verifies requests with `RESEND_WEBHOOK_SECRET`. Set that env var to the signing secret shown when you add the webhook in the Resend dashboard, pointed at `{APP_URL}/resend/webhook`, subscribed to at least the bounced, complained, failed, and delivery-delayed events.
+
+Bounce/complaint/failure/delay events are logged (see `App\Listeners\LogResendEmailEvents`) so they show up wherever `LOG_CHANNEL` is configured to write. If `RESEND_WEBHOOK_SECRET` is left blank the endpoint accepts unsigned requests, so always set it in any environment where the URL is reachable.
