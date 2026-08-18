@@ -10,7 +10,7 @@ trait UsesAttendanceChannels
     {
         $channels = [];
 
-        if (! empty($notifiable->email)) {
+        if (! empty($notifiable->email) && ! str_ends_with($notifiable->email, '@example.invalid')) {
             $channels[] = 'mail';
         }
 

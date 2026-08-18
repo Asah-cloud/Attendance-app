@@ -6,7 +6,9 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
+use App\Notifications\EventRegistrationSubmitted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
 
@@ -86,7 +88,9 @@ it('blocks users whose company subscription is inactive', function () {
     $this->actingAs($manager)->get(route('events.index'))->assertForbidden();
 });
 
-it('imports participants into the event company with normalized phones', function () {
+it('imports participants into the event company with normalized phones and emails them a confirmation', function () {
+    Notification::fake();
+
     $company = Company::create(['name' => 'One']);
     $event = Event::create([
         'company_id' => $company->id,
@@ -99,8 +103,29 @@ it('imports participants into the event company with normalized phones', functio
     $user = Participant::where('member_id', $company->id.':42')->firstOrFail();
     expect($user->company_id)->toBe($company->id)
         ->and($user->phone)->toBe('201234567')
+        ->and($user->email)->toBe('jane@example.com')
         ->and($user->category)->toBe('Member')
         ->and($event->confirmedParticipants()->whereKey($user->id)->exists())->toBeTrue();
+
+    Notification::assertSentTo($user, EventRegistrationSubmitted::class);
+});
+
+it('does not re-notify a participant when the same import row is processed again', function () {
+    Notification::fake();
+
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'Import Event',
+        'event_date' => now(),
+    ]);
+
+    Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
+    Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
+
+    $user = Participant::where('member_id', $company->id.':42')->firstOrFail();
+
+    Notification::assertSentToTimes($user, EventRegistrationSubmitted::class, 1);
 });
 
 it('allows a manager to reach the import workflow for their company event', function () {

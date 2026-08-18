@@ -1,2 +1,2 @@
-ID,Name,Unused,Unused,Category,Phone
-42,Jane Attendee,,,Member,0201234567
+ID,Name,Unused,Unused,Category,Phone,Email
+42,Jane Attendee,,,Member,0201234567,jane@example.com
