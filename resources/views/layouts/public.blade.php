@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Asah Apex Attendance helps organisations run faster event check-ins, live attendance tracking, and clear reporting.">
+    @if($noindex)
+        <meta name="robots" content="noindex, nofollow">
+    @else
+        <link rel="canonical" href="{{ url()->current() }}">
+    @endif
     <meta property="og:title" content="Asah Apex Attendance">
     <meta property="og:description" content="Attendance, made effortless. QR check-in, live insights, and clear reports for every event.">
     <meta property="og:type" content="website">

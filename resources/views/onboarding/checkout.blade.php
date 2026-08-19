@@ -1,4 +1,4 @@
-<x-public-layout :title="'Test checkout — '.$plan['name']">
+<x-public-layout :title="'Test checkout — '.$plan['name']" :noindex="true">
     <section class="min-h-screen bg-slate-50 px-5 pb-20 pt-32">
         <div class="mx-auto max-w-xl">
             <div class="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">

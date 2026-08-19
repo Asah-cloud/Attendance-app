@@ -1,4 +1,4 @@
-<x-public-layout :title="$event->title.' registration'">
+<x-public-layout :title="$event->title.' registration'" :noindex="true">
     <section class="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-32">
         <div class="mx-auto max-w-2xl">
 

@@ -1,4 +1,4 @@
-<x-public-layout title="Event check-in">
+<x-public-layout title="Event check-in" :noindex="true">
     <section class="min-h-screen bg-slate-50 px-5 pb-20 pt-32">
         <div class="mx-auto max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
             <div class="mx-auto grid h-16 w-16 place-items-center rounded-full {{ $successful ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600' }} text-3xl font-black">
