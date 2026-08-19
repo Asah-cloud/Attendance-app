@@ -134,8 +134,43 @@ it('includes the company and event logo URLs in the registration confirmation em
             $mail = $notification->toMail($participant);
 
             return $mail->view === 'emails.registration'
-                && $mail->viewData['companyLogoUrl'] === Storage::url($company->logo_path)
-                && $mail->viewData['eventLogoUrl'] === Storage::url($event->logo_path);
+                && $mail->viewData['companyLogoUrl'] === url(Storage::url($company->logo_path))
+                && $mail->viewData['eventLogoUrl'] === url(Storage::url($event->logo_path));
+        }
+    );
+});
+
+it('always sends absolute logo URLs in emails, since relative URLs never load in mail clients', function () {
+    Storage::fake('public');
+    Notification::fake();
+
+    $company = Company::create(['name' => 'Acme Co', 'logo_path' => 'company-logos/acme.png']);
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'Annual Meetup',
+        'event_date' => now()->addWeek(),
+        'registration_enabled' => true,
+        'logo_path' => 'event-logos/meetup.png',
+    ]);
+
+    $this->post(route('events.register.store', $event), [
+        'name' => 'Jane Attendee',
+        'email' => 'jane@example.com',
+        'phone' => '0201234567',
+        'category' => 'Member',
+        'consent' => '1',
+    ])->assertRedirect();
+
+    $participant = \App\Models\Participant::where('email', 'jane@example.com')->firstOrFail();
+
+    Notification::assertSentTo(
+        $participant,
+        EventRegistrationSubmitted::class,
+        function (EventRegistrationSubmitted $notification) use ($participant) {
+            $mail = $notification->toMail($participant);
+
+            return str_starts_with($mail->viewData['companyLogoUrl'], 'http')
+                && str_starts_with($mail->viewData['eventLogoUrl'], 'http');
         }
     );
 });

@@ -29,8 +29,8 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
                 'subject' => $subject,
                 'event' => $event,
                 'organizationName' => $organization,
-                'companyLogoUrl' => $company?->logo_path ? Storage::url($company->logo_path) : null,
-                'eventLogoUrl' => $event->logo_path ? Storage::url($event->logo_path) : null,
+                'companyLogoUrl' => $company?->logo_path ? url(Storage::url($company->logo_path)) : null,
+                'eventLogoUrl' => $event->logo_path ? url(Storage::url($event->logo_path)) : null,
                 'greeting' => 'Hello '.$notifiable->name.'!',
                 'lines' => array_values(array_filter([
                     'Thank you for registering for '.$event->title.'. We have received your details successfully.',
