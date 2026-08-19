@@ -140,6 +140,43 @@ it('includes the company and event logo URLs in the registration confirmation em
     );
 });
 
+it('shows the company name and event title as visible text in the email, not just as image alt text', function () {
+    Storage::fake('public');
+    Notification::fake();
+
+    $company = Company::create(['name' => 'Acme Co', 'logo_path' => 'company-logos/acme.png']);
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'Annual Meetup',
+        'event_date' => now()->addWeek(),
+        'registration_enabled' => true,
+        'logo_path' => 'event-logos/meetup.png',
+    ]);
+
+    $this->post(route('events.register.store', $event), [
+        'name' => 'Jane Attendee',
+        'email' => 'jane@example.com',
+        'phone' => '0201234567',
+        'category' => 'Member',
+        'consent' => '1',
+    ])->assertRedirect();
+
+    $participant = \App\Models\Participant::where('email', 'jane@example.com')->firstOrFail();
+
+    Notification::assertSentTo(
+        $participant,
+        EventRegistrationSubmitted::class,
+        function (EventRegistrationSubmitted $notification) use ($participant) {
+            $mail = $notification->toMail($participant);
+            $html = view($mail->view, $mail->viewData)->render();
+
+            // Not just alt="Acme Co" / alt="Annual Meetup" - actual visible text nodes.
+            return str_contains($html, '>Acme Co<')
+                && str_contains($html, '>Annual Meetup<');
+        }
+    );
+});
+
 it('always sends absolute logo URLs in emails, since relative URLs never load in mail clients', function () {
     Storage::fake('public');
     Notification::fake();
