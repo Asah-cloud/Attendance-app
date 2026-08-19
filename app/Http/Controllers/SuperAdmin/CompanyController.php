@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CompanyController extends Controller
 {
@@ -22,14 +23,19 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
             'subscription_ends_at' => 'required|date',
             'event_limit' => 'required|integer|min:1',
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
-        Company::create($request->only(['name', 'email', 'subscription_ends_at', 'event_limit']));
+        if ($request->hasFile('logo')) {
+            $validated['logo_path'] = $request->file('logo')->store('company-logos', 'public');
+        }
+
+        Company::create(collect($validated)->only(['name', 'email', 'subscription_ends_at', 'event_limit', 'logo_path'])->all());
 
         return redirect()->route('companies.index')->with('success', 'Company created successfully!');
     }
@@ -53,9 +59,24 @@ class CompanyController extends Controller
             'subscription_ends_at' => 'required|date',
             'event_limit' => 'required|integer|min:1',
             'is_active' => 'required|boolean',
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_logo' => ['nullable', 'boolean'],
         ]);
 
-        $company->update($validated);
+        if ($request->boolean('remove_logo') && $company->logo_path) {
+            Storage::disk('public')->delete($company->logo_path);
+            $company->logo_path = null;
+        }
+
+        if ($request->hasFile('logo')) {
+            if ($company->logo_path) {
+                Storage::disk('public')->delete($company->logo_path);
+            }
+            $company->logo_path = $request->file('logo')->store('company-logos', 'public');
+        }
+
+        unset($validated['logo'], $validated['remove_logo']);
+        $company->fill($validated)->save();
 
         return redirect()->route('companies.index')->with('success', 'Company updated successfully!');
     }

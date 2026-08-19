@@ -21,16 +21,16 @@
             <div class="mb-6 flex items-center justify-between gap-4"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Company settings</p><h2 class="mt-1 text-2xl font-black">{{ $company->name }}</h2></div><a href="{{ route('companies.index') }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:border-blue-300 hover:text-blue-700">Back to companies</a></div>
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-2xl border border-gray-100 p-8">
                 
-                <form action="{{ route('companies.update', $company->id) }}" method="POST" class="space-y-6">
+                <form action="{{ route('companies.update', $company->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                     @csrf
                     @method('PUT')
 
                     {{-- Company Name Input --}}
                     <div>
                         <label for="name" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Company / Organization Name</label>
-                        <input type="text" name="name" id="name" 
-                               value="{{ old('name', $company->name) }}" 
-                               class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3" 
+                        <input type="text" name="name" id="name"
+                               value="{{ old('name', $company->name) }}"
+                               class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3"
                                required>
                         @error('name')
                             <p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>
@@ -40,6 +40,22 @@
                     <div>
                         <label for="email" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Company Email</label>
                         <input type="email" name="email" id="email" value="{{ old('email', $company->email) }}" class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Company Logo</label>
+                        @if($company->logo_path)
+                            <div class="mb-3 flex items-center gap-4">
+                                <img src="{{ Storage::url($company->logo_path) }}" alt="{{ $company->name }} logo" class="h-16 w-16 rounded-xl border border-gray-200 object-contain p-2">
+                                <label class="flex items-center gap-2 text-xs font-bold text-gray-500">
+                                    <input type="checkbox" name="remove_logo" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                    Remove current logo
+                                </label>
+                            </div>
+                        @endif
+                        <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" class="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
+                        <p class="mt-1 text-xs text-gray-400">PNG, JPG or WebP, max 2 MB.</p>
+                        @error('logo')<p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>@enderror
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
