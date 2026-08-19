@@ -14,6 +14,7 @@ use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
+use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
 use Illuminate\Support\Facades\Route;
 
 // Public marketing pages
@@ -121,6 +122,13 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::middleware(['role:admin'])->group(function () {
         // Full CRUD Company Tenant Management Resources
         Route::resource('companies', CompanyController::class)->except('show');
+
+        // Archived (soft-deleted) companies: browse their events/attendees
+        // and either restore them or permanently delete them for good.
+        Route::get('/companies/history', [CompanyHistoryController::class, 'index'])->name('companies.history.index');
+        Route::get('/companies/history/{company}', [CompanyHistoryController::class, 'show'])->name('companies.history.show')->withTrashed();
+        Route::post('/companies/history/{company}/restore', [CompanyHistoryController::class, 'restore'])->name('companies.history.restore')->withTrashed();
+        Route::delete('/companies/history/{company}', [CompanyHistoryController::class, 'destroy'])->name('companies.history.destroy')->withTrashed();
     });
 });
 

@@ -109,7 +109,7 @@ it('allows the super admin to replace and remove a company logo while editing a 
     Storage::disk('public')->assertMissing($firstLogoPath);
 });
 
-it('allows the super admin to delete a company', function () {
+it('archives a company instead of permanently deleting it, and hides it from the normal list', function () {
     $admin = companyManagementAdmin();
     $company = Company::create(['name' => 'Acme Co']);
 
@@ -117,7 +117,25 @@ it('allows the super admin to delete a company', function () {
         ->delete(route('companies.destroy', $company))
         ->assertRedirect(route('companies.index'));
 
-    $this->assertDatabaseMissing('companies', ['id' => $company->id]);
+    $this->assertDatabaseHas('companies', ['id' => $company->id]);
+    expect($company->fresh()->trashed())->toBeTrue();
+
+    $this->actingAs($admin)
+        ->get(route('companies.index'))
+        ->assertDontSee('Acme Co');
+});
+
+it('immediately blocks an archived company\'s manager from the app', function () {
+    $admin = companyManagementAdmin();
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($admin)->delete(route('companies.destroy', $company));
+
+    $this->actingAs($manager)
+        ->get(route('dashboard'))
+        ->assertForbidden();
 });
 
 it('prevents a manager from accessing company management', function () {

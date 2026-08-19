@@ -82,13 +82,14 @@ class CompanyController extends Controller
     }
 
     /**
-     * Remove the specified company from storage.
+     * Archive the specified company. Company has SoftDeletes, so this hides
+     * it (and blocks its users via EnsureCompanyIsActive) without touching
+     * its data - see CompanyHistoryController for restore/permanent delete.
      */
     public function destroy(Company $company)
     {
-        // Use the static destroy method which accepts the primary key(s).
         $company->delete();
 
-        return redirect()->route('companies.index')->with('success', 'Company deleted successfully!');
+        return redirect()->route('companies.index')->with('success', "{$company->name} has been archived. Find it in History to restore or permanently delete it.");
     }
 }

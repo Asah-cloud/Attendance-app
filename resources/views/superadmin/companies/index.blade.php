@@ -11,7 +11,7 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="mb-6 flex items-end justify-between gap-4"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Platform tenants</p><h2 class="mt-1 text-2xl font-black">Manage companies</h2></div><a href="{{ route('companies.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-blue-200 hover:-translate-y-0.5 hover:bg-blue-700">Add company</a></div>
+            <div class="mb-6 flex items-end justify-between gap-4"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Platform tenants</p><h2 class="mt-1 text-2xl font-black">Manage companies</h2></div><div class="flex items-center gap-3"><a href="{{ route('companies.history.index') }}" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600 shadow-sm hover:border-blue-300 hover:text-blue-700">History</a><a href="{{ route('companies.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-blue-200 hover:-translate-y-0.5 hover:bg-blue-700">Add company</a></div></div>
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-2xl">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -35,11 +35,11 @@
                             <td class="p-6 text-sm text-gray-500">{{ $company->subscription_ends_at }}</td>
                             <td class="p-6 text-sm font-bold">{{ $company->event_limit }}</td>
                             <td class="p-6 text-right">
-                                <form action="{{ route('companies.destroy', $company->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to permanently delete this company record?')">
+                                <form action="{{ route('companies.destroy', $company->id) }}" method="POST" onsubmit="return confirm('Archive this company? Its managers and staff will immediately lose access. It will stay in History until permanently deleted from there.')">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-xl font-black uppercase tracking-wider transition-all">
-                                        Delete
+                                        Archive
                                     </button>
                                 </form>
                             </td>

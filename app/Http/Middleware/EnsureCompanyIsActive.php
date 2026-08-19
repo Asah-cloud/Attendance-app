@@ -18,7 +18,7 @@ class EnsureCompanyIsActive
 
         $company = $user->company;
 
-        abort_if(! $company->is_active, 403, 'Your company account has been suspended.');
+        abort_if(! $company || ! $company->is_active, 403, 'Your company account has been suspended.');
 
         if ($company->subscription_ends_at && $company->subscription_ends_at->endOfDay()->isPast()) {
             return redirect()->route('billing.index')
