@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
@@ -71,53 +72,64 @@ class OnboardingController extends Controller
 
         $validated = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $plan = $this->plan($payment['plan_key']);
+        $logoPath = $request->hasFile('logo') ? $request->file('logo')->store('company-logos', 'public') : null;
 
-        [$company, $user] = DB::transaction(function () use ($validated, $payment, $plan): array {
-            $company = Company::create([
-                'name' => $validated['company_name'],
-                'email' => $validated['email'],
-                'subscription_ends_at' => now()->addMonths((int) config('plans.billing_period_months'))->toDateString(),
-                'subscription_started_at' => now(),
-                'event_limit' => $plan['event_limit'],
-                'is_active' => true,
-                'plan_key' => $payment['plan_key'],
-                'plan_price_minor' => $payment['price_minor'],
-                'billing_currency' => $payment['currency'],
-                'payment_reference' => $payment['payment_reference'],
-                'subscription_auto_renews' => true,
-            ]);
+        try {
+            [$company, $user] = DB::transaction(function () use ($validated, $payment, $plan, $logoPath): array {
+                $company = Company::create([
+                    'name' => $validated['company_name'],
+                    'email' => $validated['email'],
+                    'logo_path' => $logoPath,
+                    'subscription_ends_at' => now()->addMonths((int) config('plans.billing_period_months'))->toDateString(),
+                    'subscription_started_at' => now(),
+                    'event_limit' => $plan['event_limit'],
+                    'is_active' => true,
+                    'plan_key' => $payment['plan_key'],
+                    'plan_price_minor' => $payment['price_minor'],
+                    'billing_currency' => $payment['currency'],
+                    'payment_reference' => $payment['payment_reference'],
+                    'subscription_auto_renews' => true,
+                ]);
 
-            SubscriptionPayment::create([
-                'company_id' => $company->id,
-                'plan_key' => $payment['plan_key'],
-                'type' => 'initial',
-                'amount_minor' => $payment['price_minor'],
-                'currency' => $payment['currency'],
-                'payment_reference' => $payment['payment_reference'],
-                'status' => 'paid',
-                'paid_at' => $payment['paid_at'],
-            ]);
+                SubscriptionPayment::create([
+                    'company_id' => $company->id,
+                    'plan_key' => $payment['plan_key'],
+                    'type' => 'initial',
+                    'amount_minor' => $payment['price_minor'],
+                    'currency' => $payment['currency'],
+                    'payment_reference' => $payment['payment_reference'],
+                    'status' => 'paid',
+                    'paid_at' => $payment['paid_at'],
+                ]);
 
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'email_verified_at' => now(),
-                'password' => Hash::make($validated['password']),
-                'category' => 'manager',
-                'role' => 'manager',
-                'company_id' => $company->id,
-            ]);
+                $user = User::create([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'email_verified_at' => now(),
+                    'password' => Hash::make($validated['password']),
+                    'category' => 'manager',
+                    'role' => 'manager',
+                    'company_id' => $company->id,
+                ]);
 
-            $user->assignRole(Role::findOrCreate('manager'));
+                $user->assignRole(Role::findOrCreate('manager'));
 
-            return [$company, $user];
-        });
+                return [$company, $user];
+            });
+        } catch (\Throwable $exception) {
+            if ($logoPath) {
+                Storage::disk('public')->delete($logoPath);
+            }
+
+            throw $exception;
+        }
 
         event(new Registered($user));
         Auth::login($user);

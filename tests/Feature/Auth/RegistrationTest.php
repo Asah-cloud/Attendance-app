@@ -2,6 +2,8 @@
 
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 test('pricing displays all three test plan prices', function () {
     $this->get(route('pricing'))
@@ -93,4 +95,24 @@ test('a paid onboarding creates a company manager and opens the dashboard', func
         'payment_reference' => $company->payment_reference,
         'status' => 'paid',
     ]);
+});
+
+test('a manager can upload a company logo while registering after payment', function () {
+    Storage::fake('public');
+
+    $this->post(route('checkout.test-payment', 'business'));
+
+    $this->post(route('register'), [
+        'company_name' => 'Acme Events',
+        'logo' => UploadedFile::fake()->image('logo.png', 300, 300),
+        'name' => 'Manager One',
+        'email' => 'manager@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ])->assertRedirect(route('dashboard'));
+
+    $company = Company::where('name', 'Acme Events')->firstOrFail();
+
+    expect($company->logo_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($company->logo_path);
 });
