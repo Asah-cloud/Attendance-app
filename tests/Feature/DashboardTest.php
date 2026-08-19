@@ -46,6 +46,31 @@ it('shows platform data to the super admin', function () {
         ->assertSee('Active subscriptions');
 });
 
+it('excludes archived companies from the super admin platform stats', function () {
+    $live = Company::create(['name' => 'Live Company', 'subscription_ends_at' => now()->addMonth()]);
+    $liveEvent = Event::create(['company_id' => $live->id, 'title' => 'Live Event', 'event_date' => now()->addDay()]);
+    $liveParticipant = Participant::create(['company_id' => $live->id, 'name' => 'Live Attendee']);
+    EventRegistration::create(['event_id' => $liveEvent->id, 'participant_id' => $liveParticipant->id, 'status' => 'confirmed']);
+
+    $archived = Company::create(['name' => 'Archived Company', 'subscription_ends_at' => now()->addMonth()]);
+    $archivedEvent = Event::create(['company_id' => $archived->id, 'title' => 'Archived Event', 'event_date' => now()->addDay()]);
+    Participant::create(['company_id' => $archived->id, 'name' => 'Archived Attendee']);
+    $archived->delete();
+
+    $admin = User::factory()->create(['role' => 'admin']);
+    $admin->assignRole('admin');
+
+    $this->actingAs($admin)->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('Live Company')
+        ->assertSee('Live Event')
+        ->assertDontSee('Archived Company')
+        ->assertDontSee('Archived Event');
+
+    expect(Event::whereHas('company')->count())->toBe(1)
+        ->and(Participant::whereHas('company')->count())->toBe(1);
+});
+
 it('allows a manager to update only their organization branding', function () {
     Storage::fake('public');
     $company = Company::create(['name' => 'Old Organization', 'subscription_ends_at' => now()->addMonth()]);

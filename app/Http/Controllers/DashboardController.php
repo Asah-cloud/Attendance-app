@@ -46,14 +46,14 @@ class DashboardController extends Controller
                     'activeSubscriptions' => Company::where('is_active', true)
                         ->where(fn ($query) => $query->whereNull('subscription_ends_at')->orWhereDate('subscription_ends_at', '>=', $today))
                         ->count(),
-                    'events' => Event::count(),
-                    'participants' => Participant::count(),
-                    'checkInsToday' => Attendance::whereDate('created_at', $today)->count(),
-                    'revenueMinor' => SubscriptionPayment::where('status', 'paid')->sum('amount_minor'),
+                    'events' => Event::whereHas('company')->count(),
+                    'participants' => Participant::whereHas('company')->count(),
+                    'checkInsToday' => Attendance::whereDate('created_at', $today)->whereHas('event.company')->count(),
+                    'revenueMinor' => SubscriptionPayment::where('status', 'paid')->whereHas('company')->sum('amount_minor'),
                 ],
                 'recentCompanies' => Company::withCount(['events', 'users'])->latest()->limit(5)->get(),
-                'recentPayments' => SubscriptionPayment::with('company')->where('status', 'paid')->latest('paid_at')->limit(5)->get(),
-                'upcomingEvents' => Event::with('company')->withCount('registrations')
+                'recentPayments' => SubscriptionPayment::with('company')->where('status', 'paid')->whereHas('company')->latest('paid_at')->limit(5)->get(),
+                'upcomingEvents' => Event::with('company')->withCount('registrations')->whereHas('company')
                     ->whereNull('cancelled_at')->whereDate('event_date', '>=', $today)
                     ->orderBy('event_date')->limit(5)->get(),
                 'expiringCompanies' => Company::whereNotNull('subscription_ends_at')
