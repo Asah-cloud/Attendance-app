@@ -20,6 +20,7 @@ class PublicEventRegistrationController extends Controller
     {
         abort_unless($event->registration_enabled, 404);
         $event->ensureSystemRegistrationFields();
+        $event->loadMissing('company');
 
         return view('registrations.create', [
             'event' => $event,
@@ -75,7 +76,7 @@ class PublicEventRegistrationController extends Controller
             ]);
         });
 
-        $registration->load(['event', 'participant']);
+        $registration->load(['event.company', 'participant']);
         $registration->participant->notify(new EventRegistrationSubmitted($registration));
 
         return redirect()->route('registrations.confirmation', $registration->registration_code);
@@ -83,7 +84,7 @@ class PublicEventRegistrationController extends Controller
 
     public function confirmation(string $code): View
     {
-        $registration = EventRegistration::with(['event', 'participant'])
+        $registration = EventRegistration::with(['event.company', 'participant'])
             ->where('registration_code', $code)
             ->firstOrFail();
 

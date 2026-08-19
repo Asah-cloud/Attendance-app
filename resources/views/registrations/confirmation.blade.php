@@ -1,6 +1,10 @@
 <x-public-layout title="Registration confirmation">
     <section class="min-h-screen bg-slate-50 px-5 pb-20 pt-32"><div class="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
         @if(session('success'))<div class="mb-5 rounded-xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
+        @if($registration->event->logo_path || $registration->event->company?->logo_path)<div class="mx-auto mb-5 flex items-center justify-center gap-4">
+            @if($registration->event->logo_path)<img src="{{ Storage::url($registration->event->logo_path) }}" alt="{{ $registration->event->title }} logo" class="h-14 w-14 rounded-2xl border border-slate-200 object-contain p-2">@endif
+            @if($registration->event->company?->logo_path)<img src="{{ Storage::url($registration->event->company->logo_path) }}" alt="{{ $registration->event->company->name }} logo" class="h-10 w-10 rounded-xl border border-slate-200 object-contain p-1.5">@endif
+        </div>@endif
         <div class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-blue-50 text-2xl text-blue-600">✓</div><p class="mt-5 text-xs font-black uppercase tracking-widest text-blue-600">Registration received</p><h1 class="mt-3 text-3xl font-black">{{ $registration->event->title }}</h1><p class="mt-3 text-slate-600">{{ $registration->participant->name }}</p>
         <div class="mt-6 rounded-2xl bg-slate-50 p-5"><p class="text-xs uppercase text-slate-500">Status</p><p class="mt-2 text-xl font-black capitalize">{{ $registration->status }}</p></div>
         @if($registration->status === \App\Models\EventRegistration::STATUS_CONFIRMED)

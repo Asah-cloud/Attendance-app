@@ -8,6 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Storage;
 
 class RegistrationLifecycleNotification extends Notification implements ShouldQueue
 {
@@ -18,18 +19,30 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
     public function toMail(object $notifiable): MailMessage
     {
         $event = $this->registration->event;
-        $organization = $event->company?->name ?? 'The event team';
+        $company = $event->company;
+        $organization = $company?->name ?? 'The event team';
+        $subject = $this->subject().' - '.$event->title;
 
         return (new MailMessage)
-            ->subject($this->subject().' - '.$event->title)
-            ->greeting('Hello '.$notifiable->name.'!')
-            ->line($this->message())
-            ->line('Event: '.$event->title)
-            ->line('Date: '.$event->event_date->format('M j, Y'))
-            ->when($event->location, fn (MailMessage $mail) => $mail->line('Location: '.$event->location))
-            ->action($this->actionLabel(), route('registrations.confirmation', $this->registration->registration_code))
-            ->line('Please keep your personal registration link safe. We look forward to welcoming you!')
-            ->salutation('Warm regards, '.$organization);
+            ->subject($subject)
+            ->view('emails.registration', [
+                'subject' => $subject,
+                'event' => $event,
+                'organizationName' => $organization,
+                'companyLogoUrl' => $company?->logo_path ? Storage::url($company->logo_path) : null,
+                'eventLogoUrl' => $event->logo_path ? Storage::url($event->logo_path) : null,
+                'greeting' => 'Hello '.$notifiable->name.'!',
+                'lines' => array_values(array_filter([
+                    $this->message(),
+                    'Event: '.$event->title,
+                    'Date: '.$event->event_date->format('M j, Y'),
+                    $event->location ? 'Location: '.$event->location : null,
+                    'Please keep your personal registration link safe. We look forward to welcoming you!',
+                ])),
+                'actionLabel' => $this->actionLabel(),
+                'actionUrl' => route('registrations.confirmation', $this->registration->registration_code),
+                'salutation' => 'Warm regards, '.$organization,
+            ]);
     }
 
     public function toArkesel(object $notifiable): string

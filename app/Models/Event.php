@@ -23,6 +23,7 @@ class Event extends Model
         'end_date',
         'description',
         'location',
+        'logo_path',
         'registration_enabled',
         'registration_opens_at',
         'registration_closes_at',

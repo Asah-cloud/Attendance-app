@@ -24,7 +24,7 @@
                     <p class="text-sm text-gray-500 mt-1 font-medium">Fill in the details below to open attendance for a new service or conference.</p>
                 </div>
 
-                <form action="{{ route('events.store') }}" method="POST" class="p-8 space-y-8">
+                <form action="{{ route('events.store') }}" method="POST" enctype="multipart/form-data" class="p-8 space-y-8">
                     @csrf
                     
                     {{-- Pass down the company id automatically if it exists --}}
@@ -74,6 +74,15 @@
                         <textarea name="description" rows="4" placeholder="Briefly describe the purpose of this event..." 
                                   class="w-full border-gray-200 bg-gray-50/30 rounded-xl px-4 py-3 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all outline-none">{{ old('description') }}</textarea>
                         @error('description') <p class="text-red-500 text-xs mt-2 font-bold">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Event Logo --}}
+                    <div>
+                        <label for="logo" class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Event Logo (Optional)</label>
+                        <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp"
+                               class="block w-full rounded-xl border border-gray-200 bg-gray-50/30 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
+                        <p class="mt-2 text-[10px] text-gray-400 font-medium italic">PNG, JPG or WebP. Maximum size: 2 MB. Shown on the registration form and confirmation emails.</p>
+                        @error('logo') <p class="text-red-500 text-xs mt-2 font-bold">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Action Buttons --}}

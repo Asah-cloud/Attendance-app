@@ -24,7 +24,7 @@
                     <p class="text-sm text-gray-500 mt-1 font-medium">Keep your congregation updated by ensuring these details are accurate.</p>
                 </div>
 
-                <form action="{{ route('events.update', $event->id) }}" method="POST" class="p-8 space-y-8">
+                <form action="{{ route('events.update', $event->id) }}" method="POST" enctype="multipart/form-data" class="p-8 space-y-8">
                     @csrf
                     @method('PUT')
 
@@ -81,6 +81,24 @@
                                    class="w-full border-gray-200 bg-gray-50/30 rounded-xl ps-10 pe-4 py-3 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all outline-none" 
                                    placeholder="Main Sanctuary, Youth Hall, etc.">
                         </div>
+                    </div>
+
+                    {{-- Event Logo --}}
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Event Logo</label>
+                        @if($event->logo_path)
+                            <div class="mb-3 flex items-center gap-4">
+                                <img src="{{ Storage::url($event->logo_path) }}" alt="{{ $event->title }} logo" class="h-16 w-16 rounded-xl border border-gray-200 object-contain p-2">
+                                <label class="flex items-center gap-2 text-xs font-bold text-gray-500">
+                                    <input type="checkbox" name="remove_logo" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                    Remove current logo
+                                </label>
+                            </div>
+                        @endif
+                        <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp"
+                               class="block w-full rounded-xl border border-gray-200 bg-gray-50/30 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
+                        <p class="mt-2 text-[10px] text-gray-400 font-medium italic">PNG, JPG or WebP. Maximum size: 2 MB. Shown on the registration form and confirmation emails.</p>
+                        @error('logo') <p class="text-red-500 text-xs mt-2 font-bold">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="pt-6 border-t border-gray-50 flex flex-col sm:flex-row justify-end items-center gap-6">

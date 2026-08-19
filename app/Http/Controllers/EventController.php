@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -103,6 +104,7 @@ class EventController extends Controller
             'description' => 'nullable|string',
             'day' => 'nullable|integer|min:1',
             'company_id' => ['nullable', Rule::exists('companies', 'id')],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         // Determine which company this event belongs to
@@ -117,6 +119,11 @@ class EventController extends Controller
         if (! $company->is_active || ($company->subscription_ends_at && $company->subscription_ends_at->endOfDay()->isPast())) {
             return back()->withInput()->with('error', 'This company subscription is inactive or expired.');
         }
+
+        if ($request->hasFile('logo')) {
+            $validated['logo_path'] = $request->file('logo')->store('event-logos', 'public');
+        }
+        unset($validated['logo']);
 
         // Enforce active subscription limits
         $created = DB::transaction(function () use ($companyId, $validated) {
@@ -133,6 +140,10 @@ class EventController extends Controller
         });
 
         if (! $created) {
+            if (! empty($validated['logo_path'])) {
+                Storage::disk('public')->delete($validated['logo_path']);
+            }
+
             return back()->withInput()->with('error', "Cannot create event. {$company->name} has reached its event limit of {$company->event_limit}.");
         }
 
@@ -171,12 +182,28 @@ class EventController extends Controller
             'end_date' => 'nullable|date|after_or_equal:event_date',
             'description' => 'nullable|string',
             'location' => 'nullable|string',
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_logo' => ['nullable', 'boolean'],
         ]);
 
         $detailsChanged = $event->event_date?->toDateString() !== $validated['event_date']
             || $event->end_date?->toDateString() !== ($validated['end_date'] ?? null)
             || (string) $event->location !== (string) ($validated['location'] ?? null);
-        $event->update($validated);
+
+        if ($request->boolean('remove_logo') && $event->logo_path) {
+            Storage::disk('public')->delete($event->logo_path);
+            $event->logo_path = null;
+        }
+
+        if ($request->hasFile('logo')) {
+            if ($event->logo_path) {
+                Storage::disk('public')->delete($event->logo_path);
+            }
+            $event->logo_path = $request->file('logo')->store('event-logos', 'public');
+        }
+
+        unset($validated['logo'], $validated['remove_logo']);
+        $event->fill($validated)->save();
 
         if ($detailsChanged) {
             $event->registrations()->update(['reminder_sent_at' => null]);

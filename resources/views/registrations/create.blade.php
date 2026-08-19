@@ -1,5 +1,9 @@
 <x-public-layout :title="$event->title.' registration'">
     <section class="min-h-screen bg-slate-50 px-5 pb-20 pt-32"><div class="mx-auto max-w-2xl">
+        @if($event->logo_path || $event->company?->logo_path)<div class="mb-6 flex items-center gap-4">
+            @if($event->logo_path)<img src="{{ Storage::url($event->logo_path) }}" alt="{{ $event->title }} logo" class="h-16 w-16 rounded-2xl border border-slate-200 bg-white object-contain p-2">@endif
+            @if($event->company?->logo_path)<img src="{{ Storage::url($event->company->logo_path) }}" alt="{{ $event->company->name }} logo" class="h-12 w-12 rounded-xl border border-slate-200 bg-white object-contain p-1.5">@endif
+        </div>@endif
         <div class="mb-7"><p class="text-xs font-black uppercase tracking-widest text-blue-600">Event registration</p><h1 class="mt-3 text-4xl font-black text-slate-950">{{ $event->title }}</h1><p class="mt-3 text-slate-600">{{ $event->location }} · {{ $event->event_date->format('M d, Y') }}</p></div>
         @if(!$isOpen)<div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 font-bold text-amber-900">Registration is not currently open.</div>@else
         <form method="POST" action="{{ route('events.register.store', $event) }}" class="space-y-5 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">@csrf

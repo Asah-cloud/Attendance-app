@@ -139,7 +139,7 @@ class RegistrationLifecycleService
 
     public function notify(EventRegistration $registration, string $type): void
     {
-        $registration->loadMissing(['event', 'participant']);
+        $registration->loadMissing(['event.company', 'participant']);
         $registration->participant->notify(new RegistrationLifecycleNotification($registration, $type));
     }
 }
