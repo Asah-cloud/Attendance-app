@@ -24,6 +24,7 @@ class EventRegistrationFormController extends Controller
     public function registrations(Request $request, Event $event): View
     {
         $this->authorize('update', $event);
+        $event->ensureSystemRegistrationFields();
         $status = $request->string('status')->toString();
         $registrations = $event->registrations()
             ->with('participant')
@@ -31,18 +32,22 @@ class EventRegistrationFormController extends Controller
             ->latest('registered_at')
             ->paginate(25)
             ->withQueryString();
+        $categoryField = $event->registrationFields()->where('field_key', 'category')->first();
+        $genderField = $event->registrationFields()->where('field_key', 'gender')->first();
 
-        return view('events.registrations', compact('event', 'registrations', 'status'));
+        return view('events.registrations', compact('event', 'registrations', 'status', 'categoryField', 'genderField'));
     }
 
     public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
     {
         $this->authorize('update', $event);
+        $event->ensureSystemRegistrationFields();
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
-            'category' => ['required', 'string', 'max:100'],
+            'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
+            'category' => $this->categoryRule($event),
         ]);
 
         $registration = DB::transaction(function () use ($event, $validated, $participants): EventRegistration {
@@ -92,6 +97,23 @@ class EventRegistrationFormController extends Controller
         return back()->with('success', 'Registration cancelled.');
     }
 
+    public function updateParticipant(Request $request, Event $event, EventRegistration $registration): RedirectResponse
+    {
+        $this->authorizeRegistration($event, $registration);
+        $event->ensureSystemRegistrationFields();
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
+            'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
+            'category' => $this->categoryRule($event),
+            'member_id' => ['nullable', 'string', 'max:255'],
+        ]);
+        $registration->participant->update($validated);
+
+        return back()->with('success', 'Attendee details updated.');
+    }
+
     public function resend(Event $event, EventRegistration $registration): RedirectResponse
     {
         $this->authorizeRegistration($event, $registration);
@@ -110,10 +132,10 @@ class EventRegistrationFormController extends Controller
 
         return response()->streamDownload(function () use ($event): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Name', 'Email', 'Phone', 'Category', 'Status', 'Source', 'Registered At', 'Registration Code']);
+            fputcsv($handle, ['Name', 'Email', 'Phone', 'Category', 'Gender', 'Status', 'Source', 'Registered At', 'Registration Code']);
             $event->registrations()->with('participant')->latest('registered_at')->chunk(250, function ($registrations) use ($handle): void {
                 foreach ($registrations as $registration) {
-                    fputcsv($handle, [$registration->participant->name, $registration->participant->email, $registration->participant->phone, $registration->participant->category, $registration->status, $registration->source, $registration->registered_at?->toDateTimeString(), $registration->registration_code]);
+                    fputcsv($handle, [$registration->participant->name, $registration->participant->email, $registration->participant->phone, $registration->participant->category, $registration->participant->gender, $registration->status, $registration->source, $registration->registered_at?->toDateTimeString(), $registration->registration_code]);
                 }
             });
             fclose($handle);
@@ -156,10 +178,27 @@ class EventRegistrationFormController extends Controller
     {
         $this->authorize('update', $event);
         abort_unless($field->event_id === $event->id && $field->is_system, 404);
-        $validated = $request->validate(['label' => ['required', 'string', 'max:255']]);
-        $field->update(['label' => $validated['label'], 'is_required' => true, 'is_active' => true]);
 
-        return back()->with('success', 'System field label updated.');
+        $isCategory = $field->field_key === 'category';
+        $rules = ['label' => ['required', 'string', 'max:255']];
+        if ($isCategory) {
+            $rules['field_type'] = ['required', Rule::in(['text', 'select'])];
+            $rules['options'] = ['nullable', 'string', 'max:2000'];
+        }
+        $validated = $request->validate($rules);
+
+        $update = ['label' => $validated['label'], 'is_required' => true, 'is_active' => true];
+        if ($isCategory) {
+            $options = $this->options($validated['options'] ?? null);
+            if ($validated['field_type'] === 'select' && count($options) < 2) {
+                return back()->withErrors(['options' => 'A dropdown category needs at least two options.'])->withInput();
+            }
+            $update['field_type'] = $validated['field_type'];
+            $update['options'] = $validated['field_type'] === 'select' ? $options : null;
+        }
+        $field->update($update);
+
+        return back()->with('success', 'System field updated.');
     }
 
     public function storeField(Request $request, Event $event): RedirectResponse
@@ -218,6 +257,22 @@ class EventRegistrationFormController extends Controller
             'Content-Type' => 'image/svg+xml',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    private function fieldOptions(Event $event, string $fieldKey, array $default): array
+    {
+        $field = $event->registrationFields()->where('field_key', $fieldKey)->first();
+
+        return $field?->options ?: $default;
+    }
+
+    private function categoryRule(Event $event): array
+    {
+        $field = $event->registrationFields()->where('field_key', 'category')->first();
+
+        return $field && $field->field_type === 'select'
+            ? ['required', Rule::in($field->options ?? [])]
+            : ['required', 'string', 'max:100'];
     }
 
     private function options(?string $options): array

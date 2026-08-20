@@ -38,7 +38,7 @@
                     @php $labels = $fields->where('is_system', true)->keyBy('field_key'); @endphp
 
                     <div class="grid gap-5 sm:grid-cols-2">
-                        @foreach(['name' => 'full_name', 'email' => 'email', 'phone' => 'phone', 'category' => 'category'] as $name => $key)
+                        @foreach(['name' => 'full_name', 'email' => 'email', 'phone' => 'phone'] as $name => $key)
                             <div class="{{ $key === 'full_name' ? 'sm:col-span-2' : '' }}">
                                 <label class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $labels[$key]->label }}</label>
                                 <input type="{{ $key === 'email' ? 'email' : ($key === 'phone' ? 'tel' : 'text') }}" name="{{ $name }}" value="{{ old($name) }}" required
@@ -46,6 +46,29 @@
                                 <x-input-error :messages="$errors->get($name)" class="mt-1.5" />
                             </div>
                         @endforeach
+
+                        <div>
+                            <label class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $labels['gender']->label }}</label>
+                            <select name="gender" required class="mt-2 w-full rounded-xl border-slate-200 bg-slate-50/60 px-4 py-3 text-sm font-medium shadow-sm transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+                                <option value="">Select one</option>
+                                @foreach($labels['gender']->options ?? ['Male', 'Female'] as $option)<option value="{{ $option }}" @selected(old('gender') === $option)>{{ $option }}</option>@endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('gender')" class="mt-1.5" />
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $labels['category']->label }}</label>
+                            @if($labels['category']->field_type === 'select')
+                                <select name="category" required class="mt-2 w-full rounded-xl border-slate-200 bg-slate-50/60 px-4 py-3 text-sm font-medium shadow-sm transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+                                    <option value="">Select one</option>
+                                    @foreach($labels['category']->options ?? [] as $option)<option value="{{ $option }}" @selected(old('category') === $option)>{{ $option }}</option>@endforeach
+                                </select>
+                            @else
+                                <input type="text" name="category" value="{{ old('category') }}" required
+                                       class="mt-2 w-full rounded-xl border-slate-200 bg-slate-50/60 px-4 py-3 text-sm font-medium shadow-sm transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
+                            @endif
+                            <x-input-error :messages="$errors->get('category')" class="mt-1.5" />
+                        </div>
                     </div>
 
                     @if($fields->where('is_system', false)->isNotEmpty())

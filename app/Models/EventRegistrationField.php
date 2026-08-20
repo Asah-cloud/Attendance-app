@@ -11,6 +11,7 @@ class EventRegistrationField extends Model
         'full_name' => ['label' => 'Full name', 'field_type' => 'text', 'display_order' => 10],
         'email' => ['label' => 'Email address', 'field_type' => 'email', 'display_order' => 20],
         'phone' => ['label' => 'Phone number', 'field_type' => 'tel', 'display_order' => 30],
+        'gender' => ['label' => 'Gender', 'field_type' => 'select', 'options' => ['Male', 'Female'], 'display_order' => 35],
         'category' => ['label' => 'Attendee category', 'field_type' => 'text', 'display_order' => 40],
         'consent' => ['label' => 'I agree to the event terms and privacy notice', 'field_type' => 'checkbox', 'display_order' => 1000],
     ];

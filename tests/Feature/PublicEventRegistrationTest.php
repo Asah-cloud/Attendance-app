@@ -39,6 +39,7 @@ function registrationPayload(array $overrides = []): array
         'name' => 'Public Attendee',
         'email' => 'public@example.com',
         'phone' => '+233 20 123 4567',
+        'gender' => 'Female',
         'category' => 'Guest',
         'consent' => '1',
     ], $overrides);
@@ -66,7 +67,7 @@ it('allows managers to configure their event form while protecting system fields
         ->assertOk()
         ->assertHeader('content-type', 'image/svg+xml');
 
-    expect($event->registrationFields()->where('is_system', true)->count())->toBe(5);
+    expect($event->registrationFields()->where('is_system', true)->count())->toBe(6);
     $systemField = $event->registrationFields()->where('field_key', 'email')->firstOrFail();
 
     $this->actingAs($manager)
@@ -213,13 +214,91 @@ it('lets organizers manage registrations, export them, and resend confirmations'
         ->and($registration->fresh()->cancelled_at)->not->toBeNull();
 
     $this->actingAs($manager)->post(route('events.registrations.store', $event), [
-        'name' => 'Manual Attendee', 'email' => 'manual@example.com', 'phone' => '', 'category' => 'Member',
+        'name' => 'Manual Attendee', 'email' => 'manual@example.com', 'phone' => '', 'gender' => 'Male', 'category' => 'Member',
     ])->assertSessionHas('success');
     $this->assertDatabaseHas('participants', ['email' => 'manual@example.com']);
     $this->assertDatabaseHas('event_registrations', ['event_id' => $event->id, 'source' => 'manual', 'status' => 'confirmed']);
 
     $this->actingAs($manager)->get(route('events.registrations.export', $event))
         ->assertOk()->assertDownload();
+});
+
+it('renders the manager attendee list with gender and category columns', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Attendee One', 'email' => 'one@example.com', 'category' => 'Guest', 'gender' => 'Female']);
+    $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))
+        ->assertOk()
+        ->assertSee('Attendee One')
+        ->assertSee('Female')
+        ->assertSee('Gender');
+});
+
+it('lets a manager turn the category field into a dropdown and enforces its options', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $categoryField = $event->registrationFields()->where('field_key', 'category')->firstOrFail();
+
+    $this->actingAs($manager)->patch(route('events.registration-fields.update', [$event, $categoryField]), [
+        'label' => 'Attendee category',
+        'field_type' => 'select',
+        'options' => "Member\nVisitor",
+    ])->assertSessionHas('success');
+
+    expect($categoryField->fresh())
+        ->field_type->toBe('select')
+        ->options->toBe(['Member', 'Visitor']);
+
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))
+        ->assertOk()
+        ->assertSee('Select attendee type');
+
+    Notification::fake();
+    $this->post(route('events.register.store', $event), registrationPayload(['category' => 'Not A Real Option']))
+        ->assertSessionHasErrors('category');
+    $this->post(route('events.register.store', $event), registrationPayload(['category' => 'Visitor']))
+        ->assertRedirect();
+});
+
+it('lets a manager edit an attendee\'s details', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Old Name', 'email' => 'old@example.com', 'category' => 'Guest']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'New Name',
+        'email' => 'new@example.com',
+        'phone' => '0201234567',
+        'gender' => 'Male',
+        'category' => 'VIP',
+        'member_id' => 'M-100',
+    ])->assertSessionHas('success');
+
+    expect($participant->fresh())
+        ->name->toBe('New Name')
+        ->email->toBe('new@example.com')
+        ->category->toBe('VIP')
+        ->member_id->toBe('M-100');
+});
+
+it('prevents an usher from editing attendee details', function () {
+    $event = publicRegistrationEvent();
+    $usher = User::factory()->create(['company_id' => $event->company_id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Attendee', 'email' => 'attendee@example.com']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($usher)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'Hacked Name', 'category' => 'Guest',
+    ])->assertForbidden();
+
+    expect($participant->fresh()->name)->toBe('Attendee');
 });
 
 it('prevents managers from controlling another company registrations', function () {
@@ -232,4 +311,7 @@ it('prevents managers from controlling another company registrations', function 
 
     $this->actingAs($manager)->patch(route('events.registrations.approve', [$event, $registration]))->assertForbidden();
     $this->actingAs($manager)->get(route('events.registrations.export', $event))->assertForbidden();
+    $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'Hacked Name', 'category' => 'Guest',
+    ])->assertForbidden();
 });

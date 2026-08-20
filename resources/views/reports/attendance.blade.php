@@ -74,11 +74,51 @@
                 </div>
             </div>
 
+            {{-- Category / Gender Filters --}}
+            <form method="GET" action="{{ route('reports.event', ['event' => $event->id, 'day' => $selectedDay]) }}" class="mb-8 flex flex-wrap items-center gap-3 print:hidden">
+                <span class="text-xs font-black uppercase tracking-widest text-gray-400">Filter registry</span>
+                <select name="category" onchange="this.form.submit()" class="rounded-xl border-gray-200 text-xs font-bold">
+                    <option value="">All categories</option>
+                    @foreach($availableCategories as $option)<option value="{{ $option }}" @selected($filterCategory === $option)>{{ $option }}</option>@endforeach
+                </select>
+                <select name="gender" onchange="this.form.submit()" class="rounded-xl border-gray-200 text-xs font-bold">
+                    <option value="">All genders</option>
+                    @foreach($availableGenders as $option)<option value="{{ $option }}" @selected($filterGender === $option)>{{ $option }}</option>@endforeach
+                </select>
+                @if($filterCategory !== '' || $filterGender !== '')
+                    <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $selectedDay]) }}" class="text-xs font-bold text-slate-500 underline">Clear filters</a>
+                @endif
+            </form>
+
             {{-- 2. Summary Cards --}}
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                 <x-summary-card title="Total Registered" :value="$totalExpected" color="blue" />
                 <x-summary-card title="Present Members" :value="$presentUsers->count()" color="green" />
                 <x-summary-card title="Absent Members" :value="$absentUsers->count()" color="red" />
+            </div>
+
+            {{-- Category / Gender Breakdown --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 print:hidden">
+                <div class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-gray-400">Present by category</h3>
+                    <div class="flex flex-wrap gap-2">
+                        @forelse($categoryBreakdown as $label => $count)
+                            <span class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{{ $label }} · {{ $count }}</span>
+                        @empty
+                            <p class="text-sm text-gray-400">No attendance yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+                <div class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-gray-400">Present by gender</h3>
+                    <div class="flex flex-wrap gap-2">
+                        @forelse($genderBreakdown as $label => $count)
+                            <span class="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">{{ $label }} · {{ $count }}</span>
+                        @empty
+                            <p class="text-sm text-gray-400">No attendance yet.</p>
+                        @endforelse
+                    </div>
+                </div>
             </div>
 
             {{-- 3. Lists Staggered Layout --}}

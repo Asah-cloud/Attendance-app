@@ -45,7 +45,31 @@
 
         <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <h3 class="text-lg font-black">Protected system fields</h3><p class="mt-1 text-sm text-gray-500">You may rename these labels, but they cannot be disabled, reordered, or removed.</p>
-            <div class="mt-5 space-y-3">@foreach($event->registrationFields->where('is_system', true) as $field)<form method="POST" action="{{ route('events.registration-fields.update', [$event, $field]) }}" class="flex gap-3">@csrf @method('PATCH')<input name="label" value="{{ $field->label }}" class="flex-1 rounded-xl border-gray-200"><span class="self-center rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Locked · {{ $field->field_type }}</span><button class="rounded-xl bg-gray-900 px-4 text-sm font-bold text-white">Save</button></form>@endforeach</div>
+            <div class="mt-5 space-y-3">
+                @foreach($event->registrationFields->where('is_system', true) as $field)
+                    @if($field->field_key === 'category')
+                        <form method="POST" action="{{ route('events.registration-fields.update', [$event, $field]) }}" class="grid gap-3 rounded-2xl border border-gray-100 p-4 md:grid-cols-2">
+                            @csrf @method('PATCH')
+                            <div><label class="text-xs font-black uppercase text-gray-500">Label</label><input name="label" value="{{ old('label', $field->label) }}" class="mt-2 w-full rounded-xl border-gray-200"></div>
+                            <div>
+                                <label class="text-xs font-black uppercase text-gray-500">Field type</label>
+                                <select name="field_type" class="mt-2 w-full rounded-xl border-gray-200">
+                                    <option value="text" @selected($field->field_type === 'text')>Free text</option>
+                                    <option value="select" @selected($field->field_type === 'select')>Dropdown</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="text-xs font-black uppercase text-gray-500">Dropdown options (one per line, used only when field type is Dropdown)</label>
+                                <textarea name="options" rows="3" class="mt-2 w-full rounded-xl border-gray-200">{{ old('options', collect($field->options)->implode("\n")) }}</textarea>
+                                <x-input-error :messages="$errors->get('options')" />
+                            </div>
+                            <button class="rounded-xl bg-gray-900 px-4 py-3 text-sm font-bold text-white md:col-span-2 md:w-fit">Save</button>
+                        </form>
+                    @else
+                        <form method="POST" action="{{ route('events.registration-fields.update', [$event, $field]) }}" class="flex gap-3">@csrf @method('PATCH')<input name="label" value="{{ $field->label }}" class="flex-1 rounded-xl border-gray-200"><span class="self-center rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Locked · {{ $field->field_type }}</span><button class="rounded-xl bg-gray-900 px-4 text-sm font-bold text-white">Save</button></form>
+                    @endif
+                @endforeach
+            </div>
         </section>
 
         <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">

@@ -49,7 +49,10 @@ class SummaryReportController extends Controller
 
         ['presentUsers' => $presentUsers, 'absentUsers' => $absentUsers, 'totalEventDays' => $totalEventDays] = $data;
 
-        return view('reports.summary', compact('event', 'presentUsers', 'absentUsers', 'totalEventDays'));
+        $categoryBreakdown = $presentUsers->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
+        $genderBreakdown = $presentUsers->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
+
+        return view('reports.summary', compact('event', 'presentUsers', 'absentUsers', 'totalEventDays', 'categoryBreakdown', 'genderBreakdown'));
     }
 
     public function download(Event $event)

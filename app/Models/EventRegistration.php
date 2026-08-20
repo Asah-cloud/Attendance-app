@@ -18,6 +18,8 @@ class EventRegistration extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    public const STATUS_AWAITING_CONFIRMATION = 'awaiting_confirmation';
+
     protected $fillable = [
         'event_id',
         'participant_id',
@@ -30,6 +32,7 @@ class EventRegistration extends Model
         'consented_at',
         'terms_version',
         'reminder_sent_at',
+        'confirmation_sent_at',
     ];
 
     protected function casts(): array
@@ -41,6 +44,7 @@ class EventRegistration extends Model
             'consented_at' => 'datetime',
             'custom_answers' => 'array',
             'reminder_sent_at' => 'datetime',
+            'confirmation_sent_at' => 'datetime',
         ];
     }
 

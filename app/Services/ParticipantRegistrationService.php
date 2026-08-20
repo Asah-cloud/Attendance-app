@@ -59,15 +59,18 @@ class ParticipantRegistrationService
                 'phone' => $phone,
                 'member_id' => $memberId,
                 'category' => $this->usableString($data['category'] ?? null) ?? 'Member',
+                'gender' => $this->usableString($data['gender'] ?? null),
                 'company_id' => $event->company_id,
             ]);
         }
 
         $user->fill([
             'name' => $data['name'] ?? $user->name,
+            'email' => $email ?? $user->email,
             'phone' => $user->phone ?? $phone,
             'member_id' => $user->member_id ?? $memberId,
             'category' => $this->usableString($data['category'] ?? null) ?? $user->category,
+            'gender' => $this->usableString($data['gender'] ?? null) ?? $user->gender,
             'company_id' => $user->company_id ?? $event->company_id,
         ])->save();
 

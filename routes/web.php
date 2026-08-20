@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AttendanceConfirmationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
@@ -35,6 +36,10 @@ Route::post('/registrations/{code}/cancel', [PublicEventRegistrationController::
 Route::get('/check-in/{code}', [AttendanceController::class, 'personalCheckIn'])
     ->middleware('throttle:30,1')
     ->name('attendance.personal');
+Route::get('/confirm/{code}', [PublicEventRegistrationController::class, 'showConfirm'])->name('attendance.confirm.show');
+Route::post('/confirm/{code}', [PublicEventRegistrationController::class, 'storeConfirm'])
+    ->middleware('throttle:10,1')
+    ->name('attendance.confirm.store');
 
 Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'verified', 'company.active'])
@@ -98,6 +103,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/registrations/{registration}/reject', [EventRegistrationFormController::class, 'reject'])->name('events.registrations.reject');
         Route::patch('/events/{event}/registrations/{registration}/cancel', [EventRegistrationFormController::class, 'cancelRegistration'])->name('events.registrations.cancel');
         Route::post('/events/{event}/registrations/{registration}/resend', [EventRegistrationFormController::class, 'resend'])->name('events.registrations.resend');
+        Route::patch('/events/{event}/registrations/{registration}/participant', [EventRegistrationFormController::class, 'updateParticipant'])->name('events.registrations.participant.update');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');
         Route::get('/events/{event}/registration-form/print-qr', [EventRegistrationFormController::class, 'printQr'])->name('events.registration-form.print-qr');
         Route::get('/events/{event}/registration-form/download-qr', [EventRegistrationFormController::class, 'downloadQr'])->name('events.registration-form.download-qr');
@@ -112,6 +118,14 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         // Participant imports are company-scoped by the event policy, so managers
         // can import into their own events while admins retain global access.
         Route::post('/events/{event}/import', [EventController::class, 'import'])->name('events.import.store');
+
+        // Hard-copy attendees: import a contact list, customize the welcome
+        // message, and bulk-send confirmation requests via email/SMS.
+        Route::get('/events/{event}/confirmations', [AttendanceConfirmationController::class, 'index'])->name('events.confirmations.index');
+        Route::patch('/events/{event}/confirmations/message', [AttendanceConfirmationController::class, 'updateMessage'])->name('events.confirmations.message.update');
+        Route::post('/events/{event}/confirmations/import', [AttendanceConfirmationController::class, 'import'])->name('events.confirmations.import');
+        Route::post('/events/{event}/confirmations/send', [AttendanceConfirmationController::class, 'send'])->name('events.confirmations.send');
+        Route::delete('/events/{event}/confirmations/{registration}', [AttendanceConfirmationController::class, 'remove'])->name('events.confirmations.destroy');
 
         // Manual Attendance Overrides
         Route::post('events/{event}/attendance', [AttendanceController::class, 'store'])->name('events.attendance.store');

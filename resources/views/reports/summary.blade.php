@@ -63,6 +63,30 @@
                 </div>
             </div>
 
+            {{-- 2b. Category / Gender Breakdown --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 print:hidden">
+                <div class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-gray-400">Attendees by category</h3>
+                    <div class="flex flex-wrap gap-2">
+                        @forelse($categoryBreakdown as $label => $count)
+                            <span class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{{ $label }} · {{ $count }}</span>
+                        @empty
+                            <p class="text-sm text-gray-400">No attendance yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+                <div class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-gray-400">Attendees by gender</h3>
+                    <div class="flex flex-wrap gap-2">
+                        @forelse($genderBreakdown as $label => $count)
+                            <span class="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">{{ $label }} · {{ $count }}</span>
+                        @empty
+                            <p class="text-sm text-gray-400">No attendance yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+
             {{-- 3. Detailed Attendance Table --}}
             <div x-data="{ open: false }" class="bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100">
                 <button type="button" @click="open = !open" :aria-expanded="open.toString()" class="flex w-full items-center justify-between px-8 py-6 bg-gray-50/50 border-b border-gray-100 text-left hover:bg-blue-50">

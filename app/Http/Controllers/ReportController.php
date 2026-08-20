@@ -64,7 +64,27 @@ class ReportController extends Controller
 
         ['presentUsers' => $presentUsers, 'absentUsers' => $absentUsers, 'totalExpected' => $totalExpected] = $data;
 
-        return view('reports.attendance', compact('event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay'));
+        $categoryBreakdown = $presentUsers->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
+        $genderBreakdown = $presentUsers->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
+
+        $filterCategory = request()->string('category')->toString();
+        $filterGender = request()->string('gender')->toString();
+        if ($filterCategory !== '') {
+            $presentUsers = $presentUsers->where('category', $filterCategory)->values();
+            $absentUsers = $absentUsers->where('category', $filterCategory)->values();
+        }
+        if ($filterGender !== '') {
+            $presentUsers = $presentUsers->where('gender', $filterGender)->values();
+            $absentUsers = $absentUsers->where('gender', $filterGender)->values();
+        }
+
+        $availableCategories = $event->confirmedParticipants()->distinct()->pluck('category')->filter()->sort()->values();
+        $availableGenders = $event->confirmedParticipants()->distinct()->pluck('gender')->filter()->sort()->values();
+
+        return view('reports.attendance', compact(
+            'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay',
+            'categoryBreakdown', 'genderBreakdown', 'filterCategory', 'filterGender', 'availableCategories', 'availableGenders'
+        ));
     }
 
     public function exportExcel(Event $event, $day = 'all')

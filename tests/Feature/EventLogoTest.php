@@ -2,6 +2,7 @@
 
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\EventRegistrationSubmitted;
 use Illuminate\Http\UploadedFile;
@@ -92,6 +93,7 @@ it('shows the company and event logos on the public registration form and confir
         'name' => 'Jane Attendee',
         'email' => 'jane@example.com',
         'phone' => '0201234567',
+        'gender' => 'Female',
         'category' => 'Member',
         'consent' => '1',
     ])->assertRedirect();
@@ -121,11 +123,12 @@ it('includes the company and event logo URLs in the registration confirmation em
         'name' => 'Jane Attendee',
         'email' => 'jane@example.com',
         'phone' => '0201234567',
+        'gender' => 'Female',
         'category' => 'Member',
         'consent' => '1',
     ])->assertRedirect();
 
-    $participant = \App\Models\Participant::where('email', 'jane@example.com')->firstOrFail();
+    $participant = Participant::where('email', 'jane@example.com')->firstOrFail();
 
     Notification::assertSentTo(
         $participant,
@@ -157,11 +160,12 @@ it('shows the company name and event title as visible text in the email, not jus
         'name' => 'Jane Attendee',
         'email' => 'jane@example.com',
         'phone' => '0201234567',
+        'gender' => 'Female',
         'category' => 'Member',
         'consent' => '1',
     ])->assertRedirect();
 
-    $participant = \App\Models\Participant::where('email', 'jane@example.com')->firstOrFail();
+    $participant = Participant::where('email', 'jane@example.com')->firstOrFail();
 
     Notification::assertSentTo(
         $participant,
@@ -194,11 +198,12 @@ it('always sends absolute logo URLs in emails, since relative URLs never load in
         'name' => 'Jane Attendee',
         'email' => 'jane@example.com',
         'phone' => '0201234567',
+        'gender' => 'Female',
         'category' => 'Member',
         'consent' => '1',
     ])->assertRedirect();
 
-    $participant = \App\Models\Participant::where('email', 'jane@example.com')->firstOrFail();
+    $participant = Participant::where('email', 'jane@example.com')->firstOrFail();
 
     Notification::assertSentTo(
         $participant,

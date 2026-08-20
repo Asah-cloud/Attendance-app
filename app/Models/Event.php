@@ -31,6 +31,7 @@ class Event extends Model
         'registration_requires_approval',
         'registration_terms',
         'registration_terms_version',
+        'confirmation_message',
         'cancelled_at',
     ];
 
