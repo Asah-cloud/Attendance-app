@@ -7,6 +7,7 @@ use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\AttendanceConfirmationRequest;
+use App\Notifications\RegistrationLifecycleNotification;
 use Illuminate\Support\Facades\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
@@ -102,10 +103,11 @@ it('lets a manager add a confirmation question inline and preview the live form'
 });
 
 it('lets an attendee confirm their attendance through the personal link', function () {
+    Notification::fake();
     $company = Company::create(['name' => 'Acme Co']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now(), 'registration_terms' => 'Standard terms.']);
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy', 'email' => 'john@example.com']);
-    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION]);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'source' => 'hardcopy_import']);
 
     $this->get(route('attendance.confirm.show', $registration->registration_code))
         ->assertOk()
@@ -123,15 +125,39 @@ it('lets an attendee confirm their attendance through the personal link', functi
 
     expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED)
         ->and($event->confirmedParticipants()->whereKey($participant->id)->exists())->toBeTrue();
+
+    Notification::assertSentTo(
+        $participant,
+        RegistrationLifecycleNotification::class,
+        fn ($notification) => $notification->type === 'confirmed'
+    );
+
+    // Following the confirmation through shows the "thanks" copy and the scannable QR.
+    $this->get(route('registrations.confirmation', $registration->registration_code))
+        ->assertOk()
+        ->assertSee('Thanks for confirming!')
+        ->assertSee('Your personal check-in QR');
+
+    // Revisiting the original confirm link after they've already confirmed should
+    // land them back on their QR page, not a dead 404.
+    $this->get(route('attendance.confirm.show', $registration->registration_code))
+        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+    $this->post(route('attendance.confirm.store', $registration->registration_code), ['consent' => '1'])
+        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
 });
 
-it('does not expose a confirmation form for a registration that is not awaiting confirmation', function () {
+it('redirects a registration that is not awaiting confirmation to its QR page instead of showing the form', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now()]);
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'Already Confirmed']);
     $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
 
-    $this->get(route('attendance.confirm.show', $registration->registration_code))->assertNotFound();
+    $this->get(route('attendance.confirm.show', $registration->registration_code))
+        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+});
+
+it('404s for a confirmation code that does not exist at all', function () {
+    $this->get(route('attendance.confirm.show', 'not-a-real-code'))->assertNotFound();
 });
 
 it('lets a manager remove an imported contact without notifying them', function () {

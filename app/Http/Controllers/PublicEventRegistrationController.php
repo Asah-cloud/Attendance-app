@@ -101,24 +101,32 @@ class PublicEventRegistrationController extends Controller
         return back()->with('success', 'Your registration has been cancelled.');
     }
 
-    public function showConfirm(string $code): View
+    public function showConfirm(string $code): View|RedirectResponse
     {
         $registration = EventRegistration::with(['event.company', 'participant'])
             ->where('registration_code', $code)
-            ->where('status', EventRegistration::STATUS_AWAITING_CONFIRMATION)
             ->firstOrFail();
+
+        if ($registration->status !== EventRegistration::STATUS_AWAITING_CONFIRMATION) {
+            return redirect()->route('registrations.confirmation', $registration->registration_code);
+        }
+
         $event = $registration->event;
         $fields = $event->registrationFields()->where('is_system', false)->where('is_active', true)->get();
 
         return view('confirmations.show', compact('registration', 'event', 'fields'));
     }
 
-    public function storeConfirm(Request $request, string $code): RedirectResponse
+    public function storeConfirm(Request $request, string $code, RegistrationLifecycleService $lifecycle): RedirectResponse
     {
         $registration = EventRegistration::with('event')
             ->where('registration_code', $code)
-            ->where('status', EventRegistration::STATUS_AWAITING_CONFIRMATION)
             ->firstOrFail();
+
+        if ($registration->status !== EventRegistration::STATUS_AWAITING_CONFIRMATION) {
+            return redirect()->route('registrations.confirmation', $registration->registration_code);
+        }
+
         $event = $registration->event;
         $fields = $event->registrationFields()->where('is_system', false)->where('is_active', true)->get();
 
@@ -134,6 +142,8 @@ class PublicEventRegistrationController extends Controller
             'consented_at' => now(),
             'terms_version' => $event->registration_terms_version,
         ]);
+
+        $lifecycle->notify($registration, 'confirmed');
 
         return redirect()->route('registrations.confirmation', $registration->registration_code);
     }

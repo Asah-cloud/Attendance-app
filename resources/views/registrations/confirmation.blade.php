@@ -15,7 +15,7 @@
             @endif
 
             <div class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-blue-50 text-2xl text-blue-600">✓</div>
-            <p class="mt-5 text-xs font-black uppercase tracking-widest text-blue-600">Registration received</p>
+            <p class="mt-5 text-xs font-black uppercase tracking-widest text-blue-600">{{ $registration->source === 'hardcopy_import' ? 'Thanks for confirming!' : 'Registration received' }}</p>
 
             @if($registration->event->logo_path)
                 <div class="mt-3 flex items-center justify-center gap-3">
