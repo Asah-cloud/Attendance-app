@@ -8,7 +8,9 @@ use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\AttendanceConfirmationRequest;
 use App\Notifications\RegistrationLifecycleNotification;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
 
@@ -144,6 +146,32 @@ it('lets an attendee confirm their attendance through the personal link', functi
         ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
     $this->post(route('attendance.confirm.store', $registration->registration_code), ['consent' => '1'])
         ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+});
+
+it('uses the event flyer as the confirmation page background when one is set', function () {
+    Storage::fake('public');
+    $company = Company::create(['name' => 'Acme Co']);
+    $flyerPath = UploadedFile::fake()->image('flyer.png', 1080, 1350)->store('event-flyers', 'public');
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now(), 'flyer_path' => $flyerPath]);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION]);
+
+    $this->get(route('attendance.confirm.show', $registration->registration_code))
+        ->assertOk()
+        ->assertSee("background-image: url('".Storage::url($flyerPath)."')", false)
+        ->assertSee("You're invited", false);
+});
+
+it('falls back to the generated design when the event has no flyer', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now()]);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION]);
+
+    $response = $this->get(route('attendance.confirm.show', $registration->registration_code))->assertOk();
+
+    $response->assertDontSee('background-image: url', false)
+        ->assertSee((string) strtoupper(substr($event->title, 0, 1)));
 });
 
 it('redirects a registration that is not awaiting confirmation to its QR page instead of showing the form', function () {

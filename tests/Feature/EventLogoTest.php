@@ -67,6 +67,49 @@ it('allows a manager to replace and then remove an event logo', function () {
     Storage::disk('public')->assertMissing($firstLogoPath);
 });
 
+it('stores an event flyer when creating an event', function () {
+    Storage::fake('public');
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventLogoManager($company);
+
+    $this->actingAs($manager)->post(route('events.store'), [
+        'title' => 'Annual Meetup',
+        'event_date' => now()->addWeek()->toDateString(),
+        'flyer' => UploadedFile::fake()->image('event-flyer.png', 1080, 1350),
+    ])->assertRedirect('/events');
+
+    $event = Event::where('title', 'Annual Meetup')->firstOrFail();
+    expect($event->flyer_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($event->flyer_path);
+});
+
+it('allows a manager to replace and then remove an event flyer', function () {
+    Storage::fake('public');
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventLogoManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+
+    $this->actingAs($manager)->put(route('events.update', $event), [
+        'title' => $event->title,
+        'event_date' => $event->event_date->toDateString(),
+        'flyer' => UploadedFile::fake()->image('flyer.png', 1080, 1350),
+    ])->assertRedirect('/events');
+
+    $event->refresh();
+    $firstFlyerPath = $event->flyer_path;
+    expect($firstFlyerPath)->not->toBeNull();
+    Storage::disk('public')->assertExists($firstFlyerPath);
+
+    $this->actingAs($manager)->put(route('events.update', $event), [
+        'title' => $event->title,
+        'event_date' => $event->event_date->toDateString(),
+        'remove_flyer' => '1',
+    ])->assertRedirect('/events');
+
+    expect($event->refresh()->flyer_path)->toBeNull();
+    Storage::disk('public')->assertMissing($firstFlyerPath);
+});
+
 it('shows the company and event logos on the public registration form and confirmation page', function () {
     Storage::fake('public');
     $company = Company::create(['name' => 'Acme Co', 'logo_path' => 'company-logos/acme.png']);

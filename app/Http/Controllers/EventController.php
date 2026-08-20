@@ -105,6 +105,7 @@ class EventController extends Controller
             'day' => 'nullable|integer|min:1',
             'company_id' => ['nullable', Rule::exists('companies', 'id')],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         // Determine which company this event belongs to
@@ -123,7 +124,10 @@ class EventController extends Controller
         if ($request->hasFile('logo')) {
             $validated['logo_path'] = $request->file('logo')->store('event-logos', 'public');
         }
-        unset($validated['logo']);
+        if ($request->hasFile('flyer')) {
+            $validated['flyer_path'] = $request->file('flyer')->store('event-flyers', 'public');
+        }
+        unset($validated['logo'], $validated['flyer']);
 
         // Enforce active subscription limits
         $created = DB::transaction(function () use ($companyId, $validated) {
@@ -142,6 +146,9 @@ class EventController extends Controller
         if (! $created) {
             if (! empty($validated['logo_path'])) {
                 Storage::disk('public')->delete($validated['logo_path']);
+            }
+            if (! empty($validated['flyer_path'])) {
+                Storage::disk('public')->delete($validated['flyer_path']);
             }
 
             return back()->withInput()->with('error', "Cannot create event. {$company->name} has reached its event limit of {$company->event_limit}.");
@@ -184,6 +191,8 @@ class EventController extends Controller
             'location' => 'nullable|string',
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
+            'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_flyer' => ['nullable', 'boolean'],
         ]);
 
         $detailsChanged = $event->event_date?->toDateString() !== $validated['event_date']
@@ -202,7 +211,19 @@ class EventController extends Controller
             $event->logo_path = $request->file('logo')->store('event-logos', 'public');
         }
 
-        unset($validated['logo'], $validated['remove_logo']);
+        if ($request->boolean('remove_flyer') && $event->flyer_path) {
+            Storage::disk('public')->delete($event->flyer_path);
+            $event->flyer_path = null;
+        }
+
+        if ($request->hasFile('flyer')) {
+            if ($event->flyer_path) {
+                Storage::disk('public')->delete($event->flyer_path);
+            }
+            $event->flyer_path = $request->file('flyer')->store('event-flyers', 'public');
+        }
+
+        unset($validated['logo'], $validated['remove_logo'], $validated['flyer'], $validated['remove_flyer']);
         $event->fill($validated)->save();
 
         if ($detailsChanged) {

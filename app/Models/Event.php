@@ -24,6 +24,7 @@ class Event extends Model
         'description',
         'location',
         'logo_path',
+        'flyer_path',
         'registration_enabled',
         'registration_opens_at',
         'registration_closes_at',

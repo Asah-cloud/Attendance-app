@@ -85,6 +85,15 @@
                         @error('logo') <p class="text-red-500 text-xs mt-2 font-bold">{{ $message }}</p> @enderror
                     </div>
 
+                    {{-- Event Flyer --}}
+                    <div>
+                        <label for="flyer" class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Event Flyer (Optional)</label>
+                        <input id="flyer" name="flyer" type="file" accept="image/png,image/jpeg,image/webp"
+                               class="block w-full rounded-xl border border-gray-200 bg-gray-50/30 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
+                        <p class="mt-2 text-[10px] text-gray-400 font-medium italic">PNG, JPG or WebP. Maximum size: 2 MB. Used as the background of the hard-copy attendance confirmation page.</p>
+                        @error('flyer') <p class="text-red-500 text-xs mt-2 font-bold">{{ $message }}</p> @enderror
+                    </div>
+
                     {{-- Action Buttons --}}
                     <div class="pt-6 border-t border-gray-50 flex flex-col sm:flex-row justify-end items-center gap-6">
                         <a href="{{ route('events.index') }}" class="text-sm font-bold text-gray-400 hover:text-red-600 transition-colors uppercase tracking-widest">Cancel</a>

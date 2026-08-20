@@ -10,36 +10,62 @@
         <div class="relative mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-8 lg:grid-cols-2">
 
             {{-- Event flyer panel --}}
-            <div class="relative flex flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-8 text-white shadow-2xl shadow-indigo-950/30 sm:p-10">
-                <div class="pointer-events-none absolute inset-0 opacity-[0.15]" style="background-image: radial-gradient(circle, #ffffff 1px, transparent 1px); background-size: 22px 22px;"></div>
+            @if($event->flyer_path)
+                <div class="relative flex min-h-[420px] flex-col justify-end overflow-hidden rounded-3xl bg-slate-900 p-8 text-white shadow-2xl shadow-indigo-950/30 sm:p-10" style="background-image: url('{{ Storage::url($event->flyer_path) }}'); background-size: cover; background-position: center;">
+                    <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
 
-                @if($event->company?->logo_path || $event->company?->name)
-                    <div class="relative flex items-center gap-2.5">
-                        @if($event->company?->logo_path)
-                            <img src="{{ Storage::url($event->company->logo_path) }}" alt="{{ $event->company->name }} logo" class="h-8 w-8 rounded-lg border border-white/20 bg-white object-contain p-1 shadow-sm">
-                        @endif
-                        @if($event->company?->name)
-                            <span class="text-sm font-bold text-blue-100">Hosted by {{ $event->company->name }}</span>
-                        @endif
-                    </div>
-                @endif
-
-                <div class="relative flex flex-1 flex-col items-center justify-center py-10 text-center">
-                    @if($event->logo_path)
-                        <img src="{{ Storage::url($event->logo_path) }}" alt="{{ $event->title }} logo" class="h-28 w-28 rounded-3xl border border-white/20 bg-white object-contain p-3 shadow-xl">
-                    @else
-                        <div class="grid h-28 w-28 place-items-center rounded-3xl border border-white/20 bg-white/10 text-4xl font-black">{{ strtoupper(substr($event->title, 0, 1)) }}</div>
+                    @if($event->company?->logo_path || $event->company?->name)
+                        <div class="absolute left-8 top-8 right-8 flex items-center gap-2.5 sm:left-10 sm:top-10 sm:right-10">
+                            @if($event->company?->logo_path)
+                                <img src="{{ Storage::url($event->company->logo_path) }}" alt="{{ $event->company->name }} logo" class="h-8 w-8 rounded-lg border border-white/20 bg-white object-contain p-1 shadow-sm">
+                            @endif
+                            @if($event->company?->name)
+                                <span class="text-sm font-bold text-white drop-shadow">Hosted by {{ $event->company->name }}</span>
+                            @endif
+                        </div>
                     @endif
 
-                    <p class="mt-7 text-xs font-black uppercase tracking-[0.3em] text-blue-200">You're invited</p>
-                    <h1 class="mt-3 text-3xl font-black leading-tight sm:text-4xl">{{ $event->title }}</h1>
-                    <p class="mt-4 text-sm font-semibold text-blue-100">{{ $event->event_date->format('M d, Y') }}@if($event->location) · {{ $event->location }}@endif</p>
+                    <div class="relative">
+                        <p class="text-xs font-black uppercase tracking-[0.3em] text-blue-200">You're invited</p>
+                        <h1 class="mt-3 text-3xl font-black leading-tight sm:text-4xl">{{ $event->title }}</h1>
+                        <p class="mt-4 text-sm font-semibold text-blue-100">{{ $event->event_date->format('M d, Y') }}@if($event->location) · {{ $event->location }}@endif</p>
+                        <div class="mt-6 border-t border-white/15 pt-5 text-xs font-bold uppercase tracking-widest text-blue-200">
+                            Please confirm your attendance &rarr;
+                        </div>
+                    </div>
                 </div>
+            @else
+                <div class="relative flex flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-8 text-white shadow-2xl shadow-indigo-950/30 sm:p-10">
+                    <div class="pointer-events-none absolute inset-0 opacity-[0.15]" style="background-image: radial-gradient(circle, #ffffff 1px, transparent 1px); background-size: 22px 22px;"></div>
 
-                <div class="relative border-t border-white/15 pt-5 text-center text-xs font-bold uppercase tracking-widest text-blue-200">
-                    Please confirm your attendance &rarr;
+                    @if($event->company?->logo_path || $event->company?->name)
+                        <div class="relative flex items-center gap-2.5">
+                            @if($event->company?->logo_path)
+                                <img src="{{ Storage::url($event->company->logo_path) }}" alt="{{ $event->company->name }} logo" class="h-8 w-8 rounded-lg border border-white/20 bg-white object-contain p-1 shadow-sm">
+                            @endif
+                            @if($event->company?->name)
+                                <span class="text-sm font-bold text-blue-100">Hosted by {{ $event->company->name }}</span>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div class="relative flex flex-1 flex-col items-center justify-center py-10 text-center">
+                        @if($event->logo_path)
+                            <img src="{{ Storage::url($event->logo_path) }}" alt="{{ $event->title }} logo" class="h-28 w-28 rounded-3xl border border-white/20 bg-white object-contain p-3 shadow-xl">
+                        @else
+                            <div class="grid h-28 w-28 place-items-center rounded-3xl border border-white/20 bg-white/10 text-4xl font-black">{{ strtoupper(substr($event->title, 0, 1)) }}</div>
+                        @endif
+
+                        <p class="mt-7 text-xs font-black uppercase tracking-[0.3em] text-blue-200">You're invited</p>
+                        <h1 class="mt-3 text-3xl font-black leading-tight sm:text-4xl">{{ $event->title }}</h1>
+                        <p class="mt-4 text-sm font-semibold text-blue-100">{{ $event->event_date->format('M d, Y') }}@if($event->location) · {{ $event->location }}@endif</p>
+                    </div>
+
+                    <div class="relative border-t border-white/15 pt-5 text-center text-xs font-bold uppercase tracking-widest text-blue-200">
+                        Please confirm your attendance &rarr;
+                    </div>
                 </div>
-            </div>
+            @endif
 
             {{-- Confirmation form --}}
             <form method="POST" action="{{ route('attendance.confirm.store', $registration->registration_code) }}" class="relative space-y-6 overflow-hidden rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-200/70 sm:p-10">
