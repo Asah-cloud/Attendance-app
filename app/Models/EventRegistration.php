@@ -33,6 +33,7 @@ class EventRegistration extends Model
         'terms_version',
         'reminder_sent_at',
         'confirmation_sent_at',
+        'confirmation_reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -45,6 +46,7 @@ class EventRegistration extends Model
             'custom_answers' => 'array',
             'reminder_sent_at' => 'datetime',
             'confirmation_sent_at' => 'datetime',
+            'confirmation_reminder_sent_at' => 'datetime',
         ];
     }
 

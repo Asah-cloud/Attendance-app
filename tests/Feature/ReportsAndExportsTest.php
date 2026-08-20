@@ -74,6 +74,40 @@ it('allows a manager to export event attendance as excel', function () {
     expect($response->headers->get('Content-Disposition'))->toContain('.xlsx');
 });
 
+it('allows a manager to export event attendance as pdf', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = reportsEventWithAttendee($company);
+
+    $response = $this->actingAs($manager)->get(route('reports.pdf', ['event' => $event, 'day' => 1]));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Type'))->toContain('application/pdf')
+        ->and($response->headers->get('Content-Disposition'))->toContain('.pdf');
+});
+
+it('allows a manager to export the full summary as pdf', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = reportsEventWithAttendee($company);
+
+    $response = $this->actingAs($manager)->get(route('reports.summary.pdf', $event));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Type'))->toContain('application/pdf');
+});
+
+it('prevents a manager from exporting another company event as pdf', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $otherCompany = Company::create(['name' => 'Other Co']);
+    $manager = reportsManager($company);
+    $event = reportsEventWithAttendee($otherCompany);
+
+    $this->actingAs($manager)
+        ->get(route('reports.pdf', ['event' => $event, 'day' => 1]))
+        ->assertForbidden();
+});
+
 it('allows a manager to export event attendance as csv', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = reportsManager($company);

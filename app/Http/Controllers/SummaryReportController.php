@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\AttendanceExport;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -15,6 +16,38 @@ class SummaryReportController extends Controller
     public function index(Event $event)
     {
         $this->authorize('view', $event);
+        [
+            'presentUsers' => $presentUsers,
+            'absentUsers' => $absentUsers,
+            'totalEventDays' => $totalEventDays,
+            'categoryBreakdown' => $categoryBreakdown,
+            'genderBreakdown' => $genderBreakdown,
+        ] = $this->summaryData($event);
+
+        return view('reports.summary', compact('event', 'presentUsers', 'absentUsers', 'totalEventDays', 'categoryBreakdown', 'genderBreakdown'));
+    }
+
+    public function download(Event $event)
+    {
+        $this->authorize('view', $event);
+        $fileName = 'Full_Summary_'.str_replace(' ', '_', $event->title).'.xlsx';
+
+        return Excel::download(new AttendanceExport($event, 'all'), $fileName);
+    }
+
+    public function downloadPdf(Event $event)
+    {
+        $this->authorize('view', $event);
+        $summaryData = $this->summaryData($event);
+
+        $pdf = Pdf::loadView('reports.summary-pdf', array_merge(['event' => $event], $summaryData))->setPaper('a4');
+        $fileName = 'Full_Summary_'.str_replace(' ', '_', $event->title).'.pdf';
+
+        return $pdf->download($fileName);
+    }
+
+    private function summaryData(Event $event): array
+    {
         $data = $this->cache->rememberEvent($event->id, 'summary-report', function () use ($event): array {
             $start = Carbon::parse($event->event_date);
             $end = $event->end_date ? Carbon::parse($event->end_date) : $start;
@@ -47,19 +80,9 @@ class SummaryReportController extends Controller
             return compact('presentUsers', 'absentUsers', 'totalEventDays');
         }, ApplicationCache::REPORT_TTL);
 
-        ['presentUsers' => $presentUsers, 'absentUsers' => $absentUsers, 'totalEventDays' => $totalEventDays] = $data;
+        $data['categoryBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
+        $data['genderBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
 
-        $categoryBreakdown = $presentUsers->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
-        $genderBreakdown = $presentUsers->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
-
-        return view('reports.summary', compact('event', 'presentUsers', 'absentUsers', 'totalEventDays', 'categoryBreakdown', 'genderBreakdown'));
-    }
-
-    public function download(Event $event)
-    {
-        $this->authorize('view', $event);
-        $fileName = 'Full_Summary_'.str_replace(' ', '_', $event->title).'.xlsx';
-
-        return Excel::download(new AttendanceExport($event, 'all'), $fileName);
+        return $data;
     }
 }

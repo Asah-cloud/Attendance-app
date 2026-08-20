@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationField;
+use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
@@ -109,9 +110,41 @@ class EventRegistrationFormController extends Controller
             'category' => $this->categoryRule($event),
             'member_id' => ['nullable', 'string', 'max:255'],
         ]);
-        $registration->participant->update($validated);
+        $participant = $registration->participant;
+        $changes = collect($validated)
+            ->filter(fn ($value, $field) => (string) $participant->getAttribute($field) !== (string) $value)
+            ->mapWithKeys(fn ($value, $field) => [$field => ['old' => $participant->getAttribute($field), 'new' => $value]])
+            ->all();
+
+        $participant->update($validated);
+
+        if ($changes !== []) {
+            $participant->auditLogs()->create([
+                'user_id' => $request->user()->id,
+                'changes' => $changes,
+            ]);
+        }
 
         return back()->with('success', 'Attendee details updated.');
+    }
+
+    public function participantHistory(Event $event, EventRegistration $registration): View
+    {
+        $this->authorizeRegistration($event, $registration);
+        $logs = $registration->participant->auditLogs()->with('user')->get();
+
+        return view('events.participant-history', compact('event', 'registration', 'logs'));
+    }
+
+    public function badges(Event $event): View
+    {
+        $this->authorize('update', $event);
+        $registrations = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with('participant')
+            ->get();
+
+        return view('events.badges', compact('event', 'registrations'));
     }
 
     public function resend(Event $event, EventRegistration $registration): RedirectResponse
@@ -295,7 +328,7 @@ class EventRegistrationFormController extends Controller
     {
         $registration->loadMissing(['event', 'participant']);
         if ($registration->participant->email || $registration->participant->phone) {
-            $registration->participant->notify(new EventRegistrationSubmitted($registration));
+            NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration));
         }
     }
 }

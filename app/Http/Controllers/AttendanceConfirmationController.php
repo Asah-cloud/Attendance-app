@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationField;
 use App\Notifications\AttendanceConfirmationRequest;
+use App\Notifications\Concerns\NotifiesPerChannel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -84,8 +85,8 @@ class AttendanceConfirmationController extends Controller
             if (! $registration->participant->email && ! $registration->participant->phone) {
                 continue;
             }
-            $registration->participant->notify(new AttendanceConfirmationRequest($registration));
-            $registration->update(['confirmation_sent_at' => now()]);
+            NotifiesPerChannel::send($registration->participant, new AttendanceConfirmationRequest($registration));
+            $registration->update(['confirmation_sent_at' => now(), 'confirmation_reminder_sent_at' => null]);
             $sent++;
         }
 

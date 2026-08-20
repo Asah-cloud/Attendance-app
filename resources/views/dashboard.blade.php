@@ -89,6 +89,29 @@
             </section>
         </div>
 
+        <div class="mt-6 grid gap-6 lg:grid-cols-2">
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 class="font-extrabold">Attendance by category</h3><p class="mt-1 text-xs text-slate-500">Check-ins across all your events</p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    @forelse($categoryBreakdown as $label => $total)
+                        <span class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{{ $label }} · {{ $total }}</span>
+                    @empty
+                        <p class="text-sm text-slate-500">No attendance recorded yet.</p>
+                    @endforelse
+                </div>
+            </section>
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 class="font-extrabold">Attendance by gender</h3><p class="mt-1 text-xs text-slate-500">Check-ins across all your events</p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    @forelse($genderBreakdown as $label => $total)
+                        <span class="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">{{ $label }} · {{ $total }}</span>
+                    @empty
+                        <p class="text-sm text-slate-500">No attendance recorded yet.</p>
+                    @endforelse
+                </div>
+            </section>
+        </div>
+
         <section class="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5"><div><h3 class="font-extrabold">Recent registrations</h3><p class="mt-1 text-xs text-slate-500">Newest people across your events</p></div></div>
             <div class="grid divide-y divide-slate-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">@forelse($recentRegistrations->chunk(3) as $chunk)<div class="divide-y divide-slate-100">@foreach($chunk as $registration)<div class="flex items-center gap-3 px-6 py-4"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-black text-slate-600">{{ strtoupper(substr($registration->participant->name, 0, 1)) }}</span><div class="min-w-0 flex-1"><p class="truncate text-sm font-bold">{{ $registration->participant->name }}</p><p class="truncate text-xs text-slate-500">{{ $registration->event->title }} · {{ $registration->registered_at?->diffForHumans() }}</p></div><span class="rounded-full px-2.5 py-1 text-[10px] font-black capitalize {{ $registration->status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }}">{{ $registration->status }}</span></div>@endforeach</div>@empty<p class="p-8 text-sm text-slate-500">No registrations yet.</p>@endforelse</div>

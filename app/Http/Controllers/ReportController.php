@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\AttendanceExport;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
@@ -19,6 +20,72 @@ class ReportController extends Controller
         // Use the route parameter directly instead of request query
         $selectedDay = $this->validatedDay($event, $day);
 
+        [
+            'presentUsers' => $presentUsers,
+            'absentUsers' => $absentUsers,
+            'totalExpected' => $totalExpected,
+            'categoryBreakdown' => $categoryBreakdown,
+            'genderBreakdown' => $genderBreakdown,
+        ] = $this->reportData($event, $selectedDay);
+
+        $filterCategory = request()->string('category')->toString();
+        $filterGender = request()->string('gender')->toString();
+        if ($filterCategory !== '') {
+            $presentUsers = $presentUsers->where('category', $filterCategory)->values();
+            $absentUsers = $absentUsers->where('category', $filterCategory)->values();
+        }
+        if ($filterGender !== '') {
+            $presentUsers = $presentUsers->where('gender', $filterGender)->values();
+            $absentUsers = $absentUsers->where('gender', $filterGender)->values();
+        }
+
+        $availableCategories = $event->confirmedParticipants()->distinct()->pluck('category')->filter()->sort()->values();
+        $availableGenders = $event->confirmedParticipants()->distinct()->pluck('gender')->filter()->sort()->values();
+
+        return view('reports.attendance', compact(
+            'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay',
+            'categoryBreakdown', 'genderBreakdown', 'filterCategory', 'filterGender', 'availableCategories', 'availableGenders'
+        ));
+    }
+
+    public function exportExcel(Event $event, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        // Accepts route parameter directly to match Excel route settings
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.xlsx';
+
+        return Excel::download(new AttendanceExport($event, $day), $fileName);
+    }
+
+    public function exportCsv(Event $event, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        // Accepts route parameter directly to match CSV route settings
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.csv';
+
+        return Excel::download(new AttendanceExport($event, $day), $fileName, \Maatwebsite\Excel\Excel::CSV);
+    }
+
+    public function exportPdf(Event $event, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $selectedDay = $this->validatedDay($event, $day);
+        $reportData = $this->reportData($event, $selectedDay);
+
+        $pdf = Pdf::loadView('reports.attendance-pdf', array_merge(
+            ['event' => $event, 'selectedDay' => $selectedDay],
+            $reportData
+        ))->setPaper('a4');
+
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$selectedDay.'.pdf';
+
+        return $pdf->download($fileName);
+    }
+
+    private function reportData(Event $event, int|string $selectedDay): array
+    {
         $data = $this->cache->rememberEvent($event->id, "attendance-report:{$selectedDay}", function () use ($event, $selectedDay): array {
             if ($selectedDay === 'all') {
                 // 1. Get users who attended at least ONCE during the entire event
@@ -62,49 +129,10 @@ class ReportController extends Controller
             ];
         }, ApplicationCache::REPORT_TTL);
 
-        ['presentUsers' => $presentUsers, 'absentUsers' => $absentUsers, 'totalExpected' => $totalExpected] = $data;
+        $data['categoryBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
+        $data['genderBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
 
-        $categoryBreakdown = $presentUsers->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
-        $genderBreakdown = $presentUsers->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
-
-        $filterCategory = request()->string('category')->toString();
-        $filterGender = request()->string('gender')->toString();
-        if ($filterCategory !== '') {
-            $presentUsers = $presentUsers->where('category', $filterCategory)->values();
-            $absentUsers = $absentUsers->where('category', $filterCategory)->values();
-        }
-        if ($filterGender !== '') {
-            $presentUsers = $presentUsers->where('gender', $filterGender)->values();
-            $absentUsers = $absentUsers->where('gender', $filterGender)->values();
-        }
-
-        $availableCategories = $event->confirmedParticipants()->distinct()->pluck('category')->filter()->sort()->values();
-        $availableGenders = $event->confirmedParticipants()->distinct()->pluck('gender')->filter()->sort()->values();
-
-        return view('reports.attendance', compact(
-            'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay',
-            'categoryBreakdown', 'genderBreakdown', 'filterCategory', 'filterGender', 'availableCategories', 'availableGenders'
-        ));
-    }
-
-    public function exportExcel(Event $event, $day = 'all')
-    {
-        $this->authorize('view', $event);
-        $day = $this->validatedDay($event, $day);
-        // Accepts route parameter directly to match Excel route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.xlsx';
-
-        return Excel::download(new AttendanceExport($event, $day), $fileName);
-    }
-
-    public function exportCsv(Event $event, $day = 'all')
-    {
-        $this->authorize('view', $event);
-        $day = $this->validatedDay($event, $day);
-        // Accepts route parameter directly to match CSV route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.csv';
-
-        return Excel::download(new AttendanceExport($event, $day), $fileName, \Maatwebsite\Excel\Excel::CSV);
+        return $data;
     }
 
     private function validatedDay(Event $event, mixed $day): int|string

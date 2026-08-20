@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
@@ -78,7 +79,7 @@ class PublicEventRegistrationController extends Controller
         });
 
         $registration->load(['event.company', 'participant']);
-        $registration->participant->notify(new EventRegistrationSubmitted($registration));
+        NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration));
 
         return redirect()->route('registrations.confirmation', $registration->registration_code);
     }

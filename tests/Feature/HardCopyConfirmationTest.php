@@ -8,6 +8,7 @@ use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\AttendanceConfirmationRequest;
 use App\Notifications\RegistrationLifecycleNotification;
+use App\Services\ConfirmationReminderSender;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -220,4 +221,52 @@ it('prevents a manager from reaching another company confirmations section', fun
     $event = Event::create(['company_id' => $otherCompany->id, 'title' => 'Homecoming', 'event_date' => now()]);
 
     $this->actingAs($manager)->get(route('events.confirmations.index', $event))->assertForbidden();
+});
+
+it('sends a reminder 3 days after the first confirmation request to whoever is still unconfirmed', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme Co']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now()]);
+
+    $tooSoon = Participant::create(['company_id' => $company->id, 'name' => 'Too Soon', 'email' => 'soon@example.com']);
+    $regTooSoon = $event->registrations()->create(['participant_id' => $tooSoon->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'confirmation_sent_at' => now()->subDay()]);
+
+    $due = Participant::create(['company_id' => $company->id, 'name' => 'Due Person', 'email' => 'due@example.com']);
+    $regDue = $event->registrations()->create(['participant_id' => $due->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'confirmation_sent_at' => now()->subDays(4)]);
+
+    $alreadyReminded = Participant::create(['company_id' => $company->id, 'name' => 'Already Reminded', 'email' => 'reminded@example.com']);
+    $regReminded = $event->registrations()->create(['participant_id' => $alreadyReminded->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'confirmation_sent_at' => now()->subDays(5), 'confirmation_reminder_sent_at' => now()->subDays(2)]);
+
+    $alreadyConfirmed = Participant::create(['company_id' => $company->id, 'name' => 'Confirmed Already', 'email' => 'confirmed@example.com']);
+    $regConfirmed = $event->registrations()->create(['participant_id' => $alreadyConfirmed->id, 'status' => EventRegistration::STATUS_CONFIRMED, 'confirmation_sent_at' => now()->subDays(4)]);
+
+    $sent = app(ConfirmationReminderSender::class)->sendDue();
+
+    expect($sent)->toBe(1);
+    Notification::assertSentTo($due, AttendanceConfirmationRequest::class);
+    Notification::assertNotSentTo($tooSoon, AttendanceConfirmationRequest::class);
+    Notification::assertNotSentTo($alreadyReminded, AttendanceConfirmationRequest::class);
+    Notification::assertNotSentTo($alreadyConfirmed, AttendanceConfirmationRequest::class);
+    expect($regDue->fresh()->confirmation_reminder_sent_at)->not->toBeNull()
+        ->and($regTooSoon->fresh()->confirmation_reminder_sent_at)->toBeNull()
+        ->and($regReminded->fresh()->confirmation_reminder_sent_at)->not->toBeNull()
+        ->and($regConfirmed->fresh()->confirmation_reminder_sent_at)->toBeNull();
+});
+
+it('resets the reminder clock when a manager manually resends confirmation requests', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = hardCopyManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now()]);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy', 'email' => 'john@example.com']);
+    $registration = $event->registrations()->create([
+        'participant_id' => $participant->id,
+        'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION,
+        'confirmation_sent_at' => now()->subDays(5),
+        'confirmation_reminder_sent_at' => now()->subDays(2),
+    ]);
+
+    $this->actingAs($manager)->post(route('events.confirmations.send', $event))->assertSessionHas('success');
+
+    expect($registration->fresh()->confirmation_reminder_sent_at)->toBeNull();
 });

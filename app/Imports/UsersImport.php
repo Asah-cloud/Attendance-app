@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Event;
+use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
 use Maatwebsite\Excel\Concerns\OnEachRow;
@@ -50,7 +51,7 @@ class UsersImport implements OnEachRow
         // this event, so re-importing a corrected file doesn't re-send mail.
         if ($registration->wasRecentlyCreated) {
             $registration->loadMissing(['event', 'participant']);
-            $participant->notify(new EventRegistrationSubmitted($registration));
+            NotifiesPerChannel::send($participant, new EventRegistrationSubmitted($registration));
         }
     }
 }

@@ -88,6 +88,14 @@ class DashboardController extends Controller
                 ],
                 'registrationStatuses' => EventRegistration::whereIn('event_id', clone $eventIds)
                     ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
+                'categoryBreakdown' => Attendance::whereIn('event_id', clone $eventIds)
+                    ->join('participants', 'participants.id', '=', 'attendances.participant_id')
+                    ->selectRaw("COALESCE(NULLIF(participants.category, ''), 'Unspecified') as label, count(*) as total")
+                    ->groupBy('label')->orderByDesc('total')->pluck('total', 'label'),
+                'genderBreakdown' => Attendance::whereIn('event_id', clone $eventIds)
+                    ->join('participants', 'participants.id', '=', 'attendances.participant_id')
+                    ->selectRaw("COALESCE(NULLIF(participants.gender, ''), 'Unspecified') as label, count(*) as total")
+                    ->groupBy('label')->orderByDesc('total')->pluck('total', 'label'),
                 'upcomingEvents' => Event::where('company_id', $companyId)->withCount(['registrations', 'attendances'])
                     ->whereNull('cancelled_at')->whereDate('event_date', '>=', $today)
                     ->orderBy('event_date')->limit(5)->get(),

@@ -7,6 +7,7 @@
                 <a href="{{ route('events.registrations.export', $event) }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export CSV</a>
                 <a href="{{ route('events.registration-form.edit', $event) }}" class="rounded-xl bg-amber-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-amber-950">Form & sharing</a>
                 <a href="{{ route('events.confirmations.index', $event) }}" class="rounded-xl bg-violet-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-violet-950">Hard-copy confirmations</a>
+                <a href="{{ route('events.badges', $event) }}" target="_blank" class="rounded-xl bg-teal-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-teal-950">Print badges</a>
                 <a href="{{ route('events.attendance', $event) }}" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Attendance</a>
             </div>
         </div>
@@ -40,6 +41,7 @@
                 <tr><td class="px-5 py-4 font-bold text-slate-900">{{ $registration->participant->name }}</td><td class="px-5 py-4 text-slate-600">{{ $registration->participant->email ?: '—' }}<br>{{ $registration->participant->phone ?: '' }}</td><td class="px-5 py-4">{{ $registration->participant->category }}</td><td class="px-5 py-4">{{ $registration->participant->gender ?: '—' }}</td><td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">{{ ucfirst($registration->status) }}</span></td><td class="px-5 py-4 text-slate-500">{{ $registration->registered_at?->format('M j, Y g:i A') }}</td>
                     <td class="px-5 py-4"><div class="flex min-w-56 flex-wrap gap-2">
                         <button type="button" onclick="document.getElementById('edit-participant-{{ $registration->id }}').classList.toggle('hidden')" class="text-xs font-bold text-slate-700">Edit</button>
+                        <a href="{{ route('events.registrations.participant.history', [$event, $registration]) }}" class="text-xs font-bold text-slate-500">History</a>
                         @if(in_array($registration->status, ['pending','waitlisted','rejected','cancelled']))<form method="POST" action="{{ route('events.registrations.approve', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-emerald-700">Approve</button></form>@endif
                         @if(!in_array($registration->status, ['rejected','cancelled']))<form method="POST" action="{{ route('events.registrations.reject', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-amber-700">Reject</button></form>@endif
                         @if($registration->status !== 'cancelled')<form method="POST" action="{{ route('events.registrations.cancel', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-red-700">Cancel</button></form>@endif

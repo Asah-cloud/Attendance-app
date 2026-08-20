@@ -10,6 +10,7 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventRegistrationFormController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationBrandingController;
+use App\Http\Controllers\ParticipantMergeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\ReportController;
@@ -82,8 +83,10 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
     Route::get('/reports/event/{event}/excel/{day?}', [ReportController::class, 'exportExcel'])->name('reports.excel');
     Route::get('/reports/event/{event}/csv/{day?}', [ReportController::class, 'exportCsv'])->name('reports.csv');
+    Route::get('/reports/event/{event}/pdf/{day?}', [ReportController::class, 'exportPdf'])->name('reports.pdf');
     Route::get('/events/{event}/summary', [SummaryReportController::class, 'index'])->name('reports.summary');
     Route::get('/events/{event}/summary/export', [SummaryReportController::class, 'download'])->name('reports.summary.export');
+    Route::get('/events/{event}/summary/pdf', [SummaryReportController::class, 'downloadPdf'])->name('reports.summary.pdf');
 
     // --- SHARED MANAGEMENT ROUTES (Admins & Managers) ---
     Route::middleware(['role:admin|manager'])->group(function () {
@@ -104,6 +107,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/registrations/{registration}/cancel', [EventRegistrationFormController::class, 'cancelRegistration'])->name('events.registrations.cancel');
         Route::post('/events/{event}/registrations/{registration}/resend', [EventRegistrationFormController::class, 'resend'])->name('events.registrations.resend');
         Route::patch('/events/{event}/registrations/{registration}/participant', [EventRegistrationFormController::class, 'updateParticipant'])->name('events.registrations.participant.update');
+        Route::get('/events/{event}/registrations/{registration}/history', [EventRegistrationFormController::class, 'participantHistory'])->name('events.registrations.participant.history');
+        Route::get('/events/{event}/badges', [EventRegistrationFormController::class, 'badges'])->name('events.badges');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');
         Route::get('/events/{event}/registration-form/print-qr', [EventRegistrationFormController::class, 'printQr'])->name('events.registration-form.print-qr');
         Route::get('/events/{event}/registration-form/download-qr', [EventRegistrationFormController::class, 'downloadQr'])->name('events.registration-form.download-qr');
@@ -130,6 +135,13 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         // Manual Attendance Overrides
         Route::post('events/{event}/attendance', [AttendanceController::class, 'store'])->name('events.attendance.store');
         Route::delete('/events/{event}/attendance/{participant_id}', [AttendanceController::class, 'destroy'])->name('events.attendance.destroy');
+    });
+
+    // --- MANAGER ONLY: participant data cleanup (not event-scoped) ---
+    Route::middleware(['role:manager'])->prefix('participants/duplicates')->name('participants.duplicates.')->group(function () {
+        Route::get('/', [ParticipantMergeController::class, 'index'])->name('index');
+        Route::get('/compare', [ParticipantMergeController::class, 'compare'])->name('compare');
+        Route::post('/merge', [ParticipantMergeController::class, 'merge'])->name('merge');
     });
 
     // --- SUPER ADMIN ONLY ROUTES ---

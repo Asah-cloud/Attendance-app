@@ -287,6 +287,78 @@ it('lets a manager edit an attendee\'s details', function () {
         ->member_id->toBe('M-100');
 });
 
+it('logs an audit entry for each changed field when a manager edits an attendee', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Old Name', 'email' => 'old@example.com', 'category' => 'Guest', 'gender' => 'Male']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'New Name',
+        'email' => 'old@example.com',
+        'gender' => 'Male',
+        'category' => 'VIP',
+    ]);
+
+    $log = $participant->auditLogs()->firstOrFail();
+    expect($log->user_id)->toBe($manager->id)
+        ->and($log->changes)->toHaveKey('name', ['old' => 'Old Name', 'new' => 'New Name'])
+        ->and($log->changes)->toHaveKey('category', ['old' => 'Guest', 'new' => 'VIP'])
+        ->and($log->changes)->not->toHaveKey('email')
+        ->and($log->changes)->not->toHaveKey('gender');
+
+    $this->actingAs($manager)
+        ->get(route('events.registrations.participant.history', [$event, $registration]))
+        ->assertOk()
+        ->assertSee('Old Name')
+        ->assertSee('New Name')
+        ->assertSee($manager->name);
+});
+
+it('does not log an audit entry when an edit submits no actual changes', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Same Name', 'email' => 'same@example.com', 'category' => 'Guest', 'gender' => 'Male']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'Same Name',
+        'email' => 'same@example.com',
+        'gender' => 'Male',
+        'category' => 'Guest',
+    ]);
+
+    expect($participant->auditLogs()->count())->toBe(0);
+});
+
+it('generates printable badges with a scannable QR for each confirmed attendee', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $confirmed = Participant::create(['company_id' => $event->company_id, 'name' => 'Badge Person', 'category' => 'VIP']);
+    $confirmedReg = $event->registrations()->create(['participant_id' => $confirmed->id, 'status' => 'confirmed']);
+    $pending = Participant::create(['company_id' => $event->company_id, 'name' => 'Pending Person']);
+    $event->registrations()->create(['participant_id' => $pending->id, 'status' => 'pending']);
+
+    $this->actingAs($manager)
+        ->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertSee('Badge Person')
+        ->assertSee('VIP')
+        ->assertDontSee('Pending Person')
+        ->assertSee('<svg', false);
+});
+
+it('prevents an usher from printing badges', function () {
+    $event = publicRegistrationEvent();
+    $usher = User::factory()->create(['company_id' => $event->company_id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+
+    $this->actingAs($usher)->get(route('events.badges', $event))->assertForbidden();
+});
+
 it('prevents an usher from editing attendee details', function () {
     $event = publicRegistrationEvent();
     $usher = User::factory()->create(['company_id' => $event->company_id, 'role' => 'usher']);

@@ -48,6 +48,11 @@ class Participant extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(ParticipantAuditLog::class)->latest();
+    }
+
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_registrations')

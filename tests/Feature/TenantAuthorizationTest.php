@@ -125,7 +125,9 @@ it('does not re-notify a participant when the same import row is processed again
 
     $user = Participant::where('member_id', $company->id.':42')->firstOrFail();
 
-    Notification::assertSentToTimes($user, EventRegistrationSubmitted::class, 1);
+    // Sent twice total: once per eligible channel (mail + SMS) for the one
+    // logical notification event, not once per import attempt.
+    Notification::assertSentToTimes($user, EventRegistrationSubmitted::class, 2);
 });
 
 it('allows a manager to reach the import workflow for their company event', function () {

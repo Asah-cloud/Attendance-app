@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\RegistrationLifecycleNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -140,6 +141,6 @@ class RegistrationLifecycleService
     public function notify(EventRegistration $registration, string $type): void
     {
         $registration->loadMissing(['event.company', 'participant']);
-        $registration->participant->notify(new RegistrationLifecycleNotification($registration, $type));
+        NotifiesPerChannel::send($registration->participant, new RegistrationLifecycleNotification($registration, $type));
     }
 }

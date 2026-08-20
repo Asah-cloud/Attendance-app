@@ -33,6 +33,9 @@
                     <a href="{{ route('reports.summary.export', $event->id) }}" class="inline-flex items-center px-5 py-2.5 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition-all shadow-lg shadow-green-100">
                         Export Master File
                     </a>
+                    <a href="{{ route('reports.summary.pdf', $event->id) }}" class="inline-flex items-center px-5 py-2.5 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-100">
+                        Export PDF
+                    </a>
                     <button onclick="window.print()" class="inline-flex items-center px-5 py-2.5 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200">
                         Print Registry
                     </button>
