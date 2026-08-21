@@ -139,6 +139,7 @@ class EventRegistrationFormController extends Controller
     public function badges(Event $event): View
     {
         $this->authorize('update', $event);
+        $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->with('participant')

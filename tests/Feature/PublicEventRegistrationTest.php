@@ -335,9 +335,11 @@ it('does not log an audit entry when an edit submits no actual changes', functio
 
 it('generates printable badges with a scannable QR for each confirmed attendee', function () {
     $event = publicRegistrationEvent();
+    $event->company()->update(['name' => 'Acme Organization', 'logo_path' => 'company-logos/acme.png']);
+    $event->update(['logo_path' => 'event-logos/conference.png', 'location' => 'Accra Conference Centre']);
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
     $manager->assignRole('manager');
-    $confirmed = Participant::create(['company_id' => $event->company_id, 'name' => 'Badge Person', 'category' => 'VIP']);
+    $confirmed = Participant::create(['company_id' => $event->company_id, 'name' => 'Badge Person', 'category' => 'VIP', 'member_id' => 'MEM-42']);
     $confirmedReg = $event->registrations()->create(['participant_id' => $confirmed->id, 'status' => 'confirmed']);
     $pending = Participant::create(['company_id' => $event->company_id, 'name' => 'Pending Person']);
     $event->registrations()->create(['participant_id' => $pending->id, 'status' => 'pending']);
@@ -347,6 +349,12 @@ it('generates printable badges with a scannable QR for each confirmed attendee',
         ->assertOk()
         ->assertSee('Badge Person')
         ->assertSee('VIP')
+        ->assertSee('MEM-42')
+        ->assertSee('Acme Organization')
+        ->assertSee('Accra Conference Centre')
+        ->assertSee(Storage::url('company-logos/acme.png'))
+        ->assertSee(Storage::url('event-logos/conference.png'))
+        ->assertSee('Scan for attendance')
         ->assertDontSee('Pending Person')
         ->assertSee('<svg', false);
 });
