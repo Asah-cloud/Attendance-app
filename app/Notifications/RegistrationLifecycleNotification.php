@@ -23,7 +23,7 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
         $organization = $company?->name ?? 'The event team';
         $subject = $this->subject().' - '.$event->title;
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject($subject)
             ->view('emails.registration', [
                 'subject' => $subject,
@@ -43,6 +43,15 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
                 'actionUrl' => route('registrations.confirmation', $this->registration->registration_code),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
+
+        return $company?->approvedEmailFromAddress()
+            ? $mail->from($company->approvedEmailFromAddress(), $company->email_from_name ?: $company->name)
+            : $mail;
+    }
+
+    public function smsSenderId(): ?string
+    {
+        return $this->registration->event->company?->approvedSmsSenderId();
     }
 
     public function toArkesel(object $notifiable): string

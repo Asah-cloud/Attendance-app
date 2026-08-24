@@ -22,8 +22,12 @@ class ArkeselChannel
             return null;
         }
 
+        $sender = method_exists($notification, 'smsSenderId')
+            ? $notification->smsSenderId()
+            : null;
+
         $payload = [
-            'sender' => config('services.arkesel.sender'),
+            'sender' => $sender ?: config('services.arkesel.sender'),
             'message' => $message,
             'recipients' => [$recipient],
             'sandbox' => (bool) config('services.arkesel.sandbox'),

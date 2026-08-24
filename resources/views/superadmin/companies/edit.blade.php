@@ -89,6 +89,27 @@
                     <hr class="border-gray-100 my-6">
 
                     <div>
+                        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Messaging identity approval</p>
+                        <p class="mt-1 text-xs text-gray-500">Approve only after the email domain or SMS sender ID has been verified with the provider.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <div>
+                            <label for="email_sender_status" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Email: {{ $company->email_from_address ?: 'Not configured' }}</label>
+                            <select id="email_sender_status" name="email_sender_status" class="w-full rounded-xl border-gray-200 p-3 text-sm font-bold">
+                                @foreach(['unconfigured', 'pending', 'approved', 'rejected'] as $status)<option value="{{ $status }}" @selected(old('email_sender_status', $company->email_sender_status) === $status)>{{ ucfirst($status) }}</option>@endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sms_sender_status" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">SMS: {{ $company->sms_sender_id ?: 'Not configured' }}</label>
+                            <select id="sms_sender_status" name="sms_sender_status" class="w-full rounded-xl border-gray-200 p-3 text-sm font-bold">
+                                @foreach(['unconfigured', 'pending', 'approved', 'rejected'] as $status)<option value="{{ $status }}" @selected(old('sms_sender_status', $company->sms_sender_status) === $status)>{{ ucfirst($status) }}</option>@endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-100 my-6">
+
+                    <div>
                         <input type="hidden" name="is_active" value="0">
                         <label class="inline-flex items-center gap-3 font-bold text-sm text-gray-700">
                             <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $company->is_active)) class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">

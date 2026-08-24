@@ -26,7 +26,7 @@ class AttendanceConfirmationRequest extends Notification implements ShouldQueue
         $organization = $company?->name ?? 'The event team';
         $subject = 'Please confirm your attendance - '.$event->title;
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject($subject)
             ->view('emails.registration', [
                 'subject' => $subject,
@@ -40,6 +40,15 @@ class AttendanceConfirmationRequest extends Notification implements ShouldQueue
                 'actionUrl' => route('attendance.confirm.show', $this->registration->registration_code),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
+
+        return $company?->approvedEmailFromAddress()
+            ? $mail->from($company->approvedEmailFromAddress(), $company->email_from_name ?: $company->name)
+            : $mail;
+    }
+
+    public function smsSenderId(): ?string
+    {
+        return $this->registration->event->company?->approvedSmsSenderId();
     }
 
     public function toArkesel(object $notifiable): string

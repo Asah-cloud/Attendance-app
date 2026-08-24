@@ -24,6 +24,11 @@ class Company extends Model
         'name',
         'email',
         'logo_path',
+        'email_from_name',
+        'email_from_address',
+        'email_sender_status',
+        'sms_sender_id',
+        'sms_sender_status',
         'subscription_ends_at',
         'event_limit',
         'is_active',
@@ -71,5 +76,15 @@ class Company extends Model
     public function participants(): HasMany
     {
         return $this->hasMany(Participant::class);
+    }
+
+    public function approvedEmailFromAddress(): ?string
+    {
+        return $this->email_sender_status === 'approved' ? $this->email_from_address : null;
+    }
+
+    public function approvedSmsSenderId(): ?string
+    {
+        return $this->sms_sender_status === 'approved' ? $this->sms_sender_id : null;
     }
 }

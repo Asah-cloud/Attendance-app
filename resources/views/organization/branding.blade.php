@@ -24,5 +24,41 @@
                 <div class="flex justify-end"><button class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Save branding</button></div>
             </form>
         </div>
+
+        <div class="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div class="border-b border-slate-100 pb-6">
+                <p class="text-xs font-extrabold uppercase tracking-[0.2em] text-blue-600">Messaging identity</p>
+                <h2 class="mt-2 text-2xl font-black text-slate-950">Send as your organization</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Requested identities use the platform defaults until an administrator confirms provider approval.</p>
+            </div>
+
+            <form method="POST" action="{{ route('organization.messaging.update') }}" class="mt-7 space-y-6">
+                @csrf @method('PATCH')
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label for="email_from_name" class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Email sender name</label>
+                        <input id="email_from_name" name="email_from_name" value="{{ old('email_from_name', $company->email_from_name) }}" placeholder="{{ $company->name }}" class="mt-2 w-full rounded-xl border-slate-200 px-4 py-3 text-sm font-bold">
+                        @error('email_from_name')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="email_from_address" class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Email from address</label>
+                        <input id="email_from_address" name="email_from_address" type="email" value="{{ old('email_from_address', $company->email_from_address) }}" placeholder="events@yourcompany.com" class="mt-2 w-full rounded-xl border-slate-200 px-4 py-3 text-sm font-bold">
+                        <p class="mt-2 text-xs text-slate-400">Use an address on a domain your organization controls.</p>
+                        @error('email_from_address')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+                <div class="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-600">Email status: <span class="uppercase text-blue-700">{{ $company->email_sender_status }}</span></div>
+
+                <div>
+                    <label for="sms_sender_id" class="text-xs font-extrabold uppercase tracking-wider text-slate-500">SMS sender ID</label>
+                    <input id="sms_sender_id" name="sms_sender_id" value="{{ old('sms_sender_id', $company->sms_sender_id) }}" maxlength="11" placeholder="MYCOMPANY" class="mt-2 w-full rounded-xl border-slate-200 px-4 py-3 text-sm font-bold uppercase sm:max-w-sm">
+                    <p class="mt-2 text-xs text-slate-400">3–11 letters, numbers, or spaces. Approval depends on the SMS provider and mobile networks.</p>
+                    @error('sms_sender_id')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <div class="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-600">SMS status: <span class="uppercase text-blue-700">{{ $company->sms_sender_status }}</span></div>
+
+                <div class="flex justify-end"><button class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Save messaging identity</button></div>
+            </form>
+        </div>
     </div>
 </x-app-layout>

@@ -23,7 +23,7 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
         $organization = $company?->name ?? 'The event team';
         $subject = 'Thank you for registering - '.$event->title;
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject($subject)
             ->view('emails.registration', [
                 'subject' => $subject,
@@ -43,6 +43,10 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
                 'actionUrl' => route('registrations.confirmation', $this->registration->registration_code),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
+
+        return $company?->approvedEmailFromAddress()
+            ? $mail->from($company->approvedEmailFromAddress(), $company->email_from_name ?: $company->name)
+            : $mail;
     }
 
     public function toArkesel(object $notifiable): string
@@ -53,5 +57,10 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
         return 'Hello '.$notifiable->name.'! Thank you for registering for '.$event->title.'. We received your details. Status: '
             .ucfirst($this->registration->status).'. From '.$organization.'. Details: '
             .route('registrations.confirmation', $this->registration->registration_code);
+    }
+
+    public function smsSenderId(): ?string
+    {
+        return $this->registration->event->company?->approvedSmsSenderId();
     }
 }

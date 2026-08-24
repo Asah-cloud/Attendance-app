@@ -65,6 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:manager')->prefix('organization')->name('organization.')->group(function () {
         Route::get('/branding', [OrganizationBrandingController::class, 'edit'])->name('branding.edit');
         Route::patch('/branding', [OrganizationBrandingController::class, 'update'])->name('branding.update');
+        Route::patch('/messaging', [OrganizationBrandingController::class, 'updateMessaging'])->name('messaging.update');
     });
 });
 
