@@ -7,12 +7,15 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\EventFormController;
 use App\Http\Controllers\EventRegistrationFormController;
+use App\Http\Controllers\MealDistributionController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationBrandingController;
 use App\Http\Controllers\ParticipantMergeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
+use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
@@ -41,6 +44,12 @@ Route::get('/confirm/{code}', [PublicEventRegistrationController::class, 'showCo
 Route::post('/confirm/{code}', [PublicEventRegistrationController::class, 'storeConfirm'])
     ->middleware('throttle:10,1')
     ->name('attendance.confirm.store');
+
+Route::get('/forms/{eventSlug}/{formSlug}', [PublicFormController::class, 'show'])->name('forms.show');
+Route::post('/forms/{eventSlug}/{formSlug}', [PublicFormController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('forms.store');
+Route::get('/forms/{eventSlug}/{formSlug}/thank-you', [PublicFormController::class, 'thankYou'])->name('forms.thank-you');
 
 Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'verified', 'company.active'])
@@ -80,6 +89,10 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::post('/events/{event}/scanner/check-in', [AttendanceController::class, 'scan'])
         ->middleware('throttle:60,1')
         ->name('events.scanner.check-in');
+    Route::get('/events/{event}/meals', [MealDistributionController::class, 'index'])->name('events.meals.index');
+    Route::get('/events/{event}/meals/{meal}/scanner', [MealDistributionController::class, 'scanner'])->name('events.meals.scanner');
+    Route::post('/events/{event}/meals/{meal}/issue', [MealDistributionController::class, 'issue'])
+        ->middleware('throttle:120,1')->name('events.meals.issue');
     Route::patch('/events/{event}/update-day', [EventController::class, 'updateDay'])->name('events.update-day');
     // Reporting & Exports
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
@@ -117,6 +130,28 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/registration-fields', [EventRegistrationFormController::class, 'storeField'])->name('events.registration-fields.store');
         Route::patch('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'updateSystemField'])->name('events.registration-fields.update');
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
+
+        Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
+        Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
+        Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
+        Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->name('events.meals.collections.reverse');
+
+        // Event feedback/survey forms: build any question set, share via slug URL + QR,
+        // review responses in a table, and export them as Excel/PDF.
+        Route::get('/events/{event}/forms', [EventFormController::class, 'index'])->name('events.forms.index');
+        Route::get('/events/{event}/forms/create', [EventFormController::class, 'create'])->name('events.forms.create');
+        Route::post('/events/{event}/forms', [EventFormController::class, 'store'])->name('events.forms.store');
+        Route::get('/events/{event}/forms/{form}/edit', [EventFormController::class, 'edit'])->name('events.forms.edit');
+        Route::patch('/events/{event}/forms/{form}', [EventFormController::class, 'update'])->name('events.forms.update');
+        Route::delete('/events/{event}/forms/{form}', [EventFormController::class, 'destroy'])->name('events.forms.destroy');
+        Route::post('/events/{event}/forms/{form}/fields', [EventFormController::class, 'storeField'])->name('events.forms.fields.store');
+        Route::patch('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'updateField'])->name('events.forms.fields.update');
+        Route::delete('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'destroyField'])->name('events.forms.fields.destroy');
+        Route::get('/events/{event}/forms/{form}/responses', [EventFormController::class, 'responses'])->name('events.forms.responses');
+        Route::get('/events/{event}/forms/{form}/responses/export', [EventFormController::class, 'exportExcel'])->name('events.forms.responses.export');
+        Route::get('/events/{event}/forms/{form}/responses/pdf', [EventFormController::class, 'exportPdf'])->name('events.forms.responses.pdf');
+        Route::get('/events/{event}/forms/{form}/print-qr', [EventFormController::class, 'printQr'])->name('events.forms.print-qr');
+        Route::get('/events/{event}/forms/{form}/download-qr', [EventFormController::class, 'downloadQr'])->name('events.forms.download-qr');
 
         Route::get('/admin/register-person', [RegisteredUserController::class, 'create'])->name('admin.register-person');
         Route::post('/admin/register-person', [RegisteredUserController::class, 'store'])

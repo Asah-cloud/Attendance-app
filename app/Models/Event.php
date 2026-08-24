@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Event extends Model
 {
@@ -15,9 +16,27 @@ class Event extends Model
         'registration_requires_approval' => false,
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Event $event): void {
+            if ($event->slug) {
+                return;
+            }
+
+            $base = Str::slug($event->title) ?: 'event';
+            $slug = $base;
+            $suffix = 2;
+            while (static::query()->where('slug', $slug)->exists()) {
+                $slug = $base.'-'.$suffix++;
+            }
+            $event->slug = $slug;
+        });
+    }
+
     protected $fillable = [
         'company_id',
         'title',
+        'slug',
         'day',
         'event_date',
         'end_date',
@@ -62,9 +81,19 @@ class Event extends Model
         return $this->hasMany(EventRegistration::class);
     }
 
+    public function forms(): HasMany
+    {
+        return $this->hasMany(Form::class);
+    }
+
     public function registrationFields(): HasMany
     {
         return $this->hasMany(EventRegistrationField::class)->orderBy('display_order');
+    }
+
+    public function mealDistributions(): HasMany
+    {
+        return $this->hasMany(MealDistribution::class);
     }
 
     public function ensureSystemRegistrationFields(): void

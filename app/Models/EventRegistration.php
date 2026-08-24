@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class EventRegistration extends Model
@@ -66,5 +67,10 @@ class EventRegistration extends Model
     public function participant(): BelongsTo
     {
         return $this->belongsTo(Participant::class);
+    }
+
+    public function mealCollections(): HasMany
+    {
+        return $this->hasMany(MealCollection::class);
     }
 }
