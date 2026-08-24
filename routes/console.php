@@ -5,6 +5,7 @@ use App\Models\EventRegistration;
 use App\Notifications\CompanySubscriptionNotification;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Services\ConfirmationReminderSender;
+use App\Services\EmailDomainLifecycleManager;
 use App\Services\RegistrationLifecycleService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -60,3 +61,6 @@ Schedule::call(function (): void {
 
 Schedule::call(fn () => app(ConfirmationReminderSender::class)->sendDue())
     ->dailyAt('09:00')->name('send-confirmation-reminders')->withoutOverlapping();
+
+Schedule::call(fn () => app(EmailDomainLifecycleManager::class)->processPending())
+    ->hourly()->name('check-email-domain-verifications')->withoutOverlapping();

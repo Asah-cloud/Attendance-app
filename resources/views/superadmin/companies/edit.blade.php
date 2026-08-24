@@ -93,11 +93,10 @@
                         <p class="mt-1 text-xs text-gray-500">Approve only after the email domain or SMS sender ID has been verified with the provider.</p>
                     </div>
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <div>
-                            <label for="email_sender_status" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Email: {{ $company->email_from_address ?: 'Not configured' }}</label>
-                            <select id="email_sender_status" name="email_sender_status" class="w-full rounded-xl border-gray-200 p-3 text-sm font-bold">
-                                @foreach(['unconfigured', 'pending', 'approved', 'rejected'] as $status)<option value="{{ $status }}" @selected(old('email_sender_status', $company->email_sender_status) === $status)>{{ ucfirst($status) }}</option>@endforeach
-                            </select>
+                        <div class="rounded-xl bg-gray-50 p-4">
+                            <p class="text-xs font-black uppercase tracking-widest text-gray-400">Email: {{ $company->email_from_address ?: 'Not configured' }}</p>
+                            <p class="mt-2 text-sm font-black uppercase text-blue-700">{{ $company->email_sender_status }}</p>
+                            <p class="mt-1 text-xs text-gray-500">Email approval is controlled automatically by Resend DNS verification.</p>
                         </div>
                         <div>
                             <label for="sms_sender_status" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">SMS: {{ $company->sms_sender_id ?: 'Not configured' }}</label>

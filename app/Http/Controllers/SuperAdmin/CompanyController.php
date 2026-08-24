@@ -61,7 +61,6 @@ class CompanyController extends Controller
             'is_active' => 'required|boolean',
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
-            'email_sender_status' => ['sometimes', 'in:unconfigured,pending,approved,rejected'],
             'sms_sender_status' => ['sometimes', 'in:unconfigured,pending,approved,rejected'],
         ]);
 

@@ -66,6 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/branding', [OrganizationBrandingController::class, 'edit'])->name('branding.edit');
         Route::patch('/branding', [OrganizationBrandingController::class, 'update'])->name('branding.update');
         Route::patch('/messaging', [OrganizationBrandingController::class, 'updateMessaging'])->name('messaging.update');
+        Route::post('/messaging/email-domain/check', [OrganizationBrandingController::class, 'checkEmailDomain'])->name('messaging.email-domain.check');
     });
 });
 
