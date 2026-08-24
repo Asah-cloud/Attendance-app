@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\SubscriptionPayment;
 use App\Models\User;
+use App\Notifications\CompanyWelcomeNotification;
 use Carbon\Carbon;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -132,6 +133,7 @@ class OnboardingController extends Controller
         }
 
         event(new Registered($user));
+        $user->notify(new CompanyWelcomeNotification($company));
         Auth::login($user);
         $request->session()->forget('onboarding_payment');
         $request->session()->regenerate();

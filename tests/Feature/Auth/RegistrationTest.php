@@ -2,7 +2,9 @@
 
 use App\Models\Company;
 use App\Models\User;
+use App\Notifications\CompanyWelcomeNotification;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
 test('pricing displays all three test plan prices', function () {
@@ -50,6 +52,7 @@ test('tampered or expired payment sessions cannot create manager accounts', func
 });
 
 test('a paid onboarding creates a company manager and opens the dashboard', function () {
+    Notification::fake();
     $this->post(route('checkout.test-payment', 'business'))
         ->assertRedirect(route('register'))
         ->assertSessionHas('onboarding_payment');
@@ -86,6 +89,12 @@ test('a paid onboarding creates a company manager and opens the dashboard', func
         ->and($manager->email_verified_at)->not->toBeNull();
 
     $this->assertAuthenticatedAs($manager);
+    Notification::assertSentTo(
+        $manager,
+        CompanyWelcomeNotification::class,
+        fn (CompanyWelcomeNotification $notification, array $channels) => $channels === ['mail']
+            && $notification->company->is($company)
+    );
     $this->assertDatabaseHas('subscription_payments', [
         'company_id' => $company->id,
         'plan_key' => 'business',
