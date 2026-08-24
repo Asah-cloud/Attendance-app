@@ -19,5 +19,6 @@
         <div><x-input-label for="password" :value="__('Password')" /><x-text-input id="password" class="mt-1 block w-full" type="password" name="password" required /><x-input-error :messages="$errors->get('password')" class="mt-1" /></div>
         <div><x-input-label for="password_confirmation" :value="__('Confirm password')" /><x-text-input id="password_confirmation" class="mt-1 block w-full" type="password" name="password_confirmation" required /></div>
         <x-primary-button class="w-full justify-center py-4">Create manager workspace</x-primary-button>
+        <a href="{{ route('pricing') }}" class="block text-center text-xs font-extrabold text-slate-500 hover:text-blue-700">Choose a different plan</a>
     </form>
 </x-guest-layout>

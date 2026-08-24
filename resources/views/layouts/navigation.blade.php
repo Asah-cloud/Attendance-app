@@ -6,7 +6,7 @@
     ];
 
     if ($user->hasAnyRole(['admin', 'manager'])) {
-        $items[] = ['label' => 'Team', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'icon' => 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.26a4 4 0 0 1 0 7.75'];
+        $items[] = ['label' => 'Team', 'route' => 'admin.users.index', 'active' => ['admin.users.*', 'admin.register-*'], 'icon' => 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.26a4 4 0 0 1 0 7.75'];
     }
     if ($user->hasRole('admin')) {
         $items[] = ['label' => 'Companies', 'route' => 'companies.index', 'active' => 'companies.*', 'icon' => 'M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1'];
@@ -35,7 +35,7 @@
     <nav class="flex-1 space-y-1 overflow-y-auto px-4">
         @foreach($items as $item)
             @php $isActive = collect((array) $item['active'])->contains(fn ($pattern) => request()->routeIs($pattern)); @endphp
-            <a href="{{ route($item['route']) }}" @click="sidebarOpen = false" class="group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition {{ $isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/40' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+            <a href="{{ route($item['route']) }}" @if($isActive) aria-current="page" @endif @click="sidebarOpen = false" class="group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition {{ $isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/40' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $item['icon'] }}" /></svg>
                 {{ $item['label'] }}
             </a>
@@ -43,7 +43,7 @@
     </nav>
 
     <div class="border-t border-white/10 p-4">
-        <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white">
+        <a href="{{ route('profile.edit') }}" @if(request()->routeIs('profile.*')) aria-current="page" @endif class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold {{ request()->routeIs('profile.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /></svg>Profile
         </a>
         <form method="POST" action="{{ route('logout') }}">@csrf
