@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AttendanceConfirmationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EventBillingController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventFormController;
 use App\Http\Controllers\EventRegistrationFormController;
@@ -18,8 +20,10 @@ use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SummaryReportController;
+use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
+use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
 use Illuminate\Support\Facades\Route;
 
 // Public marketing pages
@@ -109,6 +113,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/admin/users/{user}/edit', [AdminController::class, 'edit'])->name('admin.users.edit');
         Route::put('/admin/users/{user}', [AdminController::class, 'update'])->name('admin.users.update');
         Route::delete('/admin/users/{user}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
+        Route::post('/admin/users/{user}/password-reset-link', [AdminPasswordResetController::class, 'sendLink'])->name('admin.users.password.link');
+        Route::post('/admin/users/{user}/temporary-password', [AdminPasswordResetController::class, 'temporaryPassword'])->name('admin.users.password.temporary');
 
         // Event resource routes for Managers and Admins
         Route::patch('/events/{event}/cancel', [EventController::class, 'cancel'])->name('events.cancel');
@@ -132,6 +138,9 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
 
         Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
+        Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
+        Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
+        Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');
         Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
         Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
         Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->name('events.meals.collections.reverse');
@@ -152,6 +161,11 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/forms/{form}/responses/pdf', [EventFormController::class, 'exportPdf'])->name('events.forms.responses.pdf');
         Route::get('/events/{event}/forms/{form}/print-qr', [EventFormController::class, 'printQr'])->name('events.forms.print-qr');
         Route::get('/events/{event}/forms/{form}/download-qr', [EventFormController::class, 'downloadQr'])->name('events.forms.download-qr');
+
+        // Per-attendee event billing: finalize the graduated attendee bill and pay it.
+        Route::get('/events/{event}/billing', [EventBillingController::class, 'show'])->name('events.billing.show');
+        Route::post('/events/{event}/billing/finalize', [EventBillingController::class, 'finalize'])->name('events.billing.finalize');
+        Route::post('/events/{event}/billing/pay', [EventBillingController::class, 'pay'])->name('events.billing.pay');
 
         Route::get('/admin/register-person', [RegisteredUserController::class, 'create'])->name('admin.register-person');
         Route::post('/admin/register-person', [RegisteredUserController::class, 'store'])
@@ -192,6 +206,16 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/companies/history/{company}', [CompanyHistoryController::class, 'show'])->name('companies.history.show')->withTrashed();
         Route::post('/companies/history/{company}/restore', [CompanyHistoryController::class, 'restore'])->name('companies.history.restore')->withTrashed();
         Route::delete('/companies/history/{company}', [CompanyHistoryController::class, 'destroy'])->name('companies.history.destroy')->withTrashed();
+
+        // Attendee pricing: platform default + per-plan tier tables (per-company
+        // overrides live on the company edit screen instead).
+        Route::get('/attendee-pricing', [AttendeePricingController::class, 'edit'])->name('attendee-pricing.edit');
+        Route::put('/attendee-pricing/platform', [AttendeePricingController::class, 'updatePlatform'])->name('attendee-pricing.platform.update');
+        Route::put('/attendee-pricing/plan/{planKey}', [AttendeePricingController::class, 'updatePlan'])->name('attendee-pricing.plan.update');
+
+        // Oversight of per-event attendee bills awaiting payment or refund.
+        Route::get('/event-billing', [SuperAdminEventBillingController::class, 'index'])->name('attendee-billing.index');
+        Route::post('/event-billing/{charge}/refund', [SuperAdminEventBillingController::class, 'markRefunded'])->name('attendee-billing.refund');
     });
 });
 

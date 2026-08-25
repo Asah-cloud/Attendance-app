@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Event extends Model
@@ -84,6 +85,16 @@ class Event extends Model
     public function forms(): HasMany
     {
         return $this->hasMany(Form::class);
+    }
+
+    public function attendeeCharge(): HasOne
+    {
+        return $this->hasOne(EventAttendeeCharge::class);
+    }
+
+    public function checkedInParticipantCount(): int
+    {
+        return $this->attendances()->distinct('participant_id')->count('participant_id');
     }
 
     public function registrationFields(): HasMany

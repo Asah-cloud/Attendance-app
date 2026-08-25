@@ -29,6 +29,7 @@
         request()->routeIs('events.forms.create') => 'Create form',
         request()->routeIs('events.forms.responses') => 'Form responses',
         request()->routeIs('events.forms.*') => 'Forms',
+        request()->routeIs('events.billing.*') => 'Billing',
         request()->routeIs('events.registrations.participant.history') => 'Edit history',
         request()->routeIs('reports.summary*') => 'Summary report',
         request()->routeIs('reports.*') => 'Attendance report',
@@ -50,6 +51,7 @@
         $user->can('update', $contextEvent) ? ['label' => 'Forms', 'route' => route('events.forms.index', $contextEvent), 'active' => request()->routeIs('events.forms.*')] : null,
         ['label' => 'Food', 'route' => route('events.meals.index', $contextEvent), 'active' => request()->routeIs('events.meals.*')],
         ['label' => 'Reports', 'route' => route('reports.event', $contextEvent), 'active' => request()->routeIs('reports.*')],
+        $user->can('update', $contextEvent) ? ['label' => 'Billing', 'route' => route('events.billing.show', $contextEvent), 'active' => request()->routeIs('events.billing.*')] : null,
         $user->can('update', $contextEvent) ? ['label' => 'Settings', 'route' => route('events.edit', $contextEvent), 'active' => request()->routeIs('events.edit')] : null,
     ])) : [];
 @endphp

@@ -109,6 +109,15 @@
                     <hr class="border-gray-100 my-6">
 
                     <div>
+                        <label for="attendee_tiers" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Negotiated per-attendee pricing (optional)</label>
+                        <p class="mt-1 mb-2 text-xs text-gray-500">Overrides both the plan and platform default tiers for this company only. One tier per line, <code>from-to:rate</code> (major currency units), last line unbounded, e.g. <code>1000-:0.50</code>. Leave blank to use the plan/platform default.</p>
+                        <textarea name="attendee_tiers" id="attendee_tiers" rows="5" class="w-full rounded-xl border-gray-200 p-3 font-mono text-xs" placeholder="0-100:2.00&#10;100-300:1.50&#10;300-:1.00">{{ old('attendee_tiers', $attendeeTiersText) }}</textarea>
+                        @error('tiers')<p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>@enderror
+                    </div>
+
+                    <hr class="border-gray-100 my-6">
+
+                    <div>
                         <input type="hidden" name="is_active" value="0">
                         <label class="inline-flex items-center gap-3 font-bold text-sm text-gray-700">
                             <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $company->is_active)) class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">

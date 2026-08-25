@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Imports\UsersImport;
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\EventAttendeeCharge;
+use App\Services\EventBillingService;
 use App\Services\RegistrationLifecycleService;
 // Added these for the import to work
 use Carbon\Carbon;
@@ -234,10 +236,11 @@ class EventController extends Controller
         return redirect('/events')->with('success', 'Event updated successfully!');
     }
 
-    public function cancel(Event $event, RegistrationLifecycleService $lifecycle)
+    public function cancel(Event $event, RegistrationLifecycleService $lifecycle, EventBillingService $billing)
     {
         $this->authorize('delete', $event);
         $lifecycle->cancelEvent($event);
+        $billing->voidForCancellation($event);
 
         return redirect('/events')->with('success', 'Event cancelled and attendees notified.');
     }
@@ -245,6 +248,11 @@ class EventController extends Controller
     public function destroy(Event $event)
     {
         $this->authorize('delete', $event);
+        abort_if(
+            $event->attendeeCharge && in_array($event->attendeeCharge->status, [EventAttendeeCharge::STATUS_PAID, EventAttendeeCharge::STATUS_REFUND_DUE], true),
+            422,
+            'Resolve this event\'s attendee billing before deleting it.'
+        );
         $event->delete();
 
         return redirect('/events')->with('success', 'Event and its records deleted.');

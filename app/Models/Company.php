@@ -96,6 +96,16 @@ class Company extends Model
         return $this->hasMany(Participant::class);
     }
 
+    public function attendeeCharges(): HasMany
+    {
+        return $this->hasMany(EventAttendeeCharge::class);
+    }
+
+    public function attendeePricingTiers(): HasMany
+    {
+        return $this->hasMany(AttendeePricingTier::class);
+    }
+
     public function approvedEmailFromAddress(): ?string
     {
         return $this->email_sender_status === 'approved' ? $this->email_from_address : null;

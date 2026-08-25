@@ -6,6 +6,7 @@ use App\Notifications\CompanySubscriptionNotification;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Services\ConfirmationReminderSender;
 use App\Services\EmailDomainLifecycleManager;
+use App\Services\EventBillingService;
 use App\Services\RegistrationLifecycleService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -64,3 +65,9 @@ Schedule::call(fn () => app(ConfirmationReminderSender::class)->sendDue())
 
 Schedule::call(fn () => app(EmailDomainLifecycleManager::class)->processPending())
     ->hourly()->name('check-email-domain-verifications')->withoutOverlapping();
+
+Schedule::call(fn () => app(EventBillingService::class)->finalizeDue())
+    ->dailyAt('06:00')->name('finalize-event-attendee-charges')->withoutOverlapping();
+
+Schedule::call(fn () => app(EventBillingService::class)->reconcileDue())
+    ->dailyAt('07:00')->name('reconcile-event-attendee-charges')->withoutOverlapping();
