@@ -143,6 +143,20 @@ it('immediately blocks an archived company\'s manager from the app', function ()
         ->assertForbidden();
 });
 
+it('renders the admin events workspace for both subscription and pay-per-event companies', function () {
+    $admin = companyManagementAdmin();
+    $subscriptionCompany = Company::create(['name' => 'Subscription Co', 'event_limit' => 5]);
+    $payPerEventCompany = Company::create(['name' => 'Pay Per Event Co', 'billing_mode' => Company::BILLING_MODE_PAY_PER_EVENT]);
+
+    $this->actingAs($admin)
+        ->get(route('events.index'))
+        ->assertOk()
+        ->assertSee('Subscription Co')
+        ->assertSee('of 5 event slots used')
+        ->assertSee('Pay Per Event Co')
+        ->assertSee('pay-per-event, no cap');
+});
+
 it('prevents a manager from accessing company management', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
