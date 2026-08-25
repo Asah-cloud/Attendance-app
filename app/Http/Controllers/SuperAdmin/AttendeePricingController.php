@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendeePricingTier;
+use App\Models\Plan;
 use App\Services\AttendeePricingTierParser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class AttendeePricingController extends Controller
             ->orderBy('band_from')
             ->get();
 
-        $plans = collect(config('plans.plans'))->map(function ($plan, $key) use ($parser) {
+        $plans = collect(Plan::allKeyed())->map(function ($plan, $key) use ($parser) {
             $tiers = AttendeePricingTier::query()
                 ->where('scope_type', AttendeePricingTier::SCOPE_PLAN)
                 ->where('plan_key', $key)
@@ -56,7 +57,7 @@ class AttendeePricingController extends Controller
 
     public function updatePlan(Request $request, string $planKey, AttendeePricingTierParser $parser): RedirectResponse
     {
-        abort_unless(is_array(config("plans.plans.{$planKey}")), 404);
+        abort_unless(Plan::where('key', $planKey)->exists(), 404);
         $validated = $request->validate(['tiers' => ['nullable', 'string']]);
         $text = trim($validated['tiers'] ?? '');
         $rows = $text === '' ? [] : $parser->parse($text);

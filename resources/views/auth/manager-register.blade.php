@@ -1,6 +1,10 @@
 <x-guest-layout>
     <div class="mb-7 text-center">
-        <p class="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{{ $plan['name'] }} plan · GHS {{ number_format($payment['price_minor'] / 100, 2) }}/month</p>
+        @if($payPerEvent ?? false)
+            <p class="text-xs font-black uppercase tracking-[0.2em] text-blue-600">Pay per event · no subscription</p>
+        @else
+            <p class="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{{ $plan['name'] }} plan · GHS {{ number_format($payment['price_minor'] / 100, 2) }}/month</p>
+        @endif
         <h1 class="mt-3 text-2xl font-black text-gray-900">Create your manager workspace</h1>
         <p class="mt-2 text-sm text-gray-500">Your company and first manager account will be created together.</p>
     </div>

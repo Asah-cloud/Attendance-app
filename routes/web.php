@@ -23,6 +23,8 @@ use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
+use App\Http\Controllers\SuperAdmin\CompanyPricingController;
+use App\Http\Controllers\SuperAdmin\PlanController;
 use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +34,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/pricing', [OnboardingController::class, 'pricing'])->name('pricing');
+Route::post('/pricing/pay-per-event', [OnboardingController::class, 'choosePayPerEvent'])->name('onboarding.pay-per-event');
 
 Route::get('/events/{event}/register', [PublicEventRegistrationController::class, 'create'])->name('events.register');
 Route::post('/events/{event}/register', [PublicEventRegistrationController::class, 'store'])
@@ -212,11 +215,26 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/companies/history/{company}/restore', [CompanyHistoryController::class, 'restore'])->name('companies.history.restore')->withTrashed();
         Route::delete('/companies/history/{company}', [CompanyHistoryController::class, 'destroy'])->name('companies.history.destroy')->withTrashed();
 
+        // Subscription plans: full CRUD on prices, limits, and features.
+        Route::get('/pricing/plans', [PlanController::class, 'index'])->name('pricing.plans.index');
+        Route::get('/pricing/plans/create', [PlanController::class, 'create'])->name('pricing.plans.create');
+        Route::post('/pricing/plans', [PlanController::class, 'store'])->name('pricing.plans.store');
+        Route::get('/pricing/plans/{plan}/edit', [PlanController::class, 'edit'])->name('pricing.plans.edit');
+        Route::put('/pricing/plans/{plan}', [PlanController::class, 'update'])->name('pricing.plans.update');
+        Route::delete('/pricing/plans/{plan}', [PlanController::class, 'destroy'])->name('pricing.plans.destroy');
+
         // Attendee pricing: platform default + per-plan tier tables (per-company
         // overrides live on the company edit screen instead).
         Route::get('/attendee-pricing', [AttendeePricingController::class, 'edit'])->name('attendee-pricing.edit');
         Route::put('/attendee-pricing/platform', [AttendeePricingController::class, 'updatePlatform'])->name('attendee-pricing.platform.update');
         Route::put('/attendee-pricing/plan/{planKey}', [AttendeePricingController::class, 'updatePlan'])->name('attendee-pricing.plan.update');
+
+        // Per-company and per-event attendee pricing overrides.
+        Route::get('/pricing/companies', [CompanyPricingController::class, 'index'])->name('pricing.companies.index');
+        Route::get('/pricing/companies/{company}', [CompanyPricingController::class, 'show'])->name('pricing.companies.show');
+        Route::put('/pricing/companies/{company}', [CompanyPricingController::class, 'update'])->name('pricing.companies.update');
+        Route::get('/pricing/companies/{company}/events/{event}', [CompanyPricingController::class, 'editEvent'])->name('pricing.companies.events.edit');
+        Route::put('/pricing/companies/{company}/events/{event}', [CompanyPricingController::class, 'updateEvent'])->name('pricing.companies.events.update');
 
         // Oversight of per-event attendee bills awaiting payment or refund.
         Route::get('/event-billing', [SuperAdminEventBillingController::class, 'index'])->name('attendee-billing.index');

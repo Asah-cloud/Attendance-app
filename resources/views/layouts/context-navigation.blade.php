@@ -9,6 +9,7 @@
         request()->routeIs('admin.users.*', 'admin.register-*') => ['Team', route('admin.users.index')],
         request()->routeIs('companies.history.*') => ['Company history', route('companies.history.index')],
         request()->routeIs('companies.*') => ['Companies', route('companies.index')],
+        request()->routeIs('pricing.plans.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') => ['Pricing', route('pricing.plans.index')],
         request()->routeIs('billing.*') => ['Billing', route('billing.index')],
         request()->routeIs('organization.*') => ['Organization', route('organization.branding.edit')],
         request()->routeIs('participants.duplicates.*') => ['Merge duplicates', route('participants.duplicates.index')],
@@ -40,8 +41,21 @@
         request()->routeIs('companies.history.show') => 'Archived company',
         request()->routeIs('billing.checkout') => 'Checkout',
         request()->routeIs('participants.duplicates.compare') => 'Compare records',
+        request()->routeIs('pricing.plans.create') => 'Add plan',
+        request()->routeIs('pricing.plans.edit') => 'Edit plan',
+        request()->routeIs('pricing.companies.index') => 'Company overrides',
+        request()->routeIs('pricing.companies.show') => 'Company pricing',
+        request()->routeIs('pricing.companies.events.edit') => 'Event pricing',
+        request()->routeIs('attendee-billing.index') => 'Billing oversight',
         default => null,
     };
+
+    $pricingLinks = request()->routeIs('pricing.plans.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') ? [
+        ['label' => 'Plans', 'route' => route('pricing.plans.index'), 'active' => request()->routeIs('pricing.plans.*')],
+        ['label' => 'Attendee pricing', 'route' => route('attendee-pricing.edit'), 'active' => request()->routeIs('attendee-pricing.*')],
+        ['label' => 'Companies', 'route' => route('pricing.companies.index'), 'active' => request()->routeIs('pricing.companies.*')],
+        ['label' => 'Billing oversight', 'route' => route('attendee-billing.index'), 'active' => request()->routeIs('attendee-billing.*')],
+    ] : [];
 
     $eventLinks = $contextEvent ? array_values(array_filter([
         ['label' => 'Attendance', 'route' => route('events.attendance', $contextEvent), 'active' => request()->routeIs('events.attendance', 'events.scanner')],
@@ -77,6 +91,14 @@
         @if($eventLinks)
             <nav class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" aria-label="Event workspace">
                 @foreach($eventLinks as $link)
+                    <a href="{{ $link['route'] }}" @if($link['active']) aria-current="page" @endif class="shrink-0 rounded-xl px-4 py-2.5 text-xs font-extrabold transition {{ $link['active'] ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-blue-700' }}">{{ $link['label'] }}</a>
+                @endforeach
+            </nav>
+        @endif
+
+        @if($pricingLinks)
+            <nav class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" aria-label="Pricing section">
+                @foreach($pricingLinks as $link)
                     <a href="{{ $link['route'] }}" @if($link['active']) aria-current="page" @endif class="shrink-0 rounded-xl px-4 py-2.5 text-xs font-extrabold transition {{ $link['active'] ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-blue-700' }}">{{ $link['label'] }}</a>
                 @endforeach
             </nav>

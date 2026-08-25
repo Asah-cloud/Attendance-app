@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\Plan;
 use App\Models\SubscriptionPayment;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,11 +17,15 @@ class BillingController extends Controller
     {
         $company = $this->company($request);
         $payments = $company->subscriptionPayments()->latest('paid_at')->paginate(10);
+        $attendeeCharges = $company->isPayPerEvent()
+            ? $company->attendeeCharges()->with('event')->latest('finalized_at')->paginate(10, ['*'], 'charges')
+            : null;
 
         return view('billing.index', [
             'company' => $company,
             'payments' => $payments,
-            'plans' => config('plans.plans'),
+            'attendeeCharges' => $attendeeCharges,
+            'plans' => Plan::allKeyed(),
         ]);
     }
 
@@ -51,6 +56,7 @@ class BillingController extends Controller
             $extensionBase = $currentEnd && $currentEnd->gte($today) ? $currentEnd : $today;
 
             $company->update([
+                'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
                 'plan_key' => $plan,
                 'plan_price_minor' => $selectedPlan['price_minor'],
                 'billing_currency' => config('plans.currency'),
@@ -112,9 +118,6 @@ class BillingController extends Controller
 
     private function plan(string $plan): array
     {
-        $selectedPlan = config("plans.plans.{$plan}");
-        abort_unless(is_array($selectedPlan), 404);
-
-        return $selectedPlan;
+        return Plan::arrayByKey($plan);
     }
 }

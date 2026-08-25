@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Company;
+use App\Models\Plan;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -21,7 +22,7 @@ class CompanyWelcomeNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $planName = config("plans.plans.{$this->company->plan_key}.name", ucfirst((string) $this->company->plan_key));
+        $planName = Plan::where('key', $this->company->plan_key)->value('name') ?? ucfirst((string) $this->company->plan_key);
 
         return (new MailMessage)
             ->subject('Welcome to '.config('app.name'))

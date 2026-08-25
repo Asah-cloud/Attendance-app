@@ -13,10 +13,13 @@ class AttendeePricingTier extends Model
 
     public const SCOPE_COMPANY = 'company';
 
+    public const SCOPE_EVENT = 'event';
+
     protected $fillable = [
         'scope_type',
         'plan_key',
         'company_id',
+        'event_id',
         'band_from',
         'band_to',
         'rate_minor',
@@ -28,11 +31,17 @@ class AttendeePricingTier extends Model
             'band_from' => 'integer',
             'band_to' => 'integer',
             'rate_minor' => 'integer',
+            'event_id' => 'integer',
         ];
     }
 
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
     }
 }

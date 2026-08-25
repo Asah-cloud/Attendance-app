@@ -36,6 +36,7 @@ it('allows the super admin to create a company', function () {
     $this->actingAs($admin)
         ->post(route('companies.store'), [
             'name' => 'New Co',
+            'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
             'subscription_ends_at' => now()->addYear()->toDateString(),
             'event_limit' => 10,
         ])
@@ -51,6 +52,7 @@ it('allows the super admin to update a company', function () {
     $this->actingAs($admin)
         ->put(route('companies.update', $company), [
             'name' => 'Acme Co Renamed',
+            'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
             'subscription_ends_at' => now()->addYear()->toDateString(),
             'event_limit' => 20,
             'is_active' => true,
@@ -68,6 +70,7 @@ it('allows the super admin to upload a company logo while creating a company', f
     $this->actingAs($admin)
         ->post(route('companies.store'), [
             'name' => 'New Co',
+            'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
             'subscription_ends_at' => now()->addYear()->toDateString(),
             'event_limit' => 10,
             'logo' => UploadedFile::fake()->image('logo.png', 300, 300),
@@ -86,6 +89,7 @@ it('allows the super admin to replace and remove a company logo while editing a 
 
     $this->actingAs($admin)->put(route('companies.update', $company), [
         'name' => $company->name,
+        'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
         'subscription_ends_at' => now()->addYear()->toDateString(),
         'event_limit' => $company->event_limit,
         'is_active' => true,
@@ -99,6 +103,7 @@ it('allows the super admin to replace and remove a company logo while editing a 
 
     $this->actingAs($admin)->put(route('companies.update', $company), [
         'name' => $company->name,
+        'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
         'subscription_ends_at' => now()->addYear()->toDateString(),
         'event_limit' => $company->event_limit,
         'is_active' => true,

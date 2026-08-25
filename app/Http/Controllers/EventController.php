@@ -119,7 +119,11 @@ class EventController extends Controller
 
         $company = Company::findOrFail($companyId);
 
-        if (! $company->is_active || ($company->subscription_ends_at && $company->subscription_ends_at->endOfDay()->isPast())) {
+        if (! $company->is_active || (
+            $company->billing_mode === Company::BILLING_MODE_SUBSCRIPTION
+            && $company->subscription_ends_at
+            && $company->subscription_ends_at->endOfDay()->isPast()
+        )) {
             return back()->withInput()->with('error', 'This company subscription is inactive or expired.');
         }
 
@@ -135,7 +139,8 @@ class EventController extends Controller
         $created = DB::transaction(function () use ($companyId, $validated) {
             $company = Company::query()->lockForUpdate()->findOrFail($companyId);
 
-            if ($company->events()->count() >= $company->event_limit) {
+            if ($company->billing_mode !== Company::BILLING_MODE_PAY_PER_EVENT
+                && $company->events()->count() >= $company->event_limit) {
                 return false;
             }
 

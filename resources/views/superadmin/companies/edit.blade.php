@@ -21,7 +21,7 @@
             <div class="mb-6 flex items-center justify-between gap-4"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Company settings</p><h2 class="mt-1 text-2xl font-black">{{ $company->name }}</h2></div><a href="{{ route('companies.index') }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:border-blue-300 hover:text-blue-700">Back to companies</a></div>
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-2xl border border-gray-100 p-8">
                 
-                <form action="{{ route('companies.update', $company->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                <form action="{{ route('companies.update', $company->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6" x-data="{ billingMode: '{{ old('billing_mode', $company->billing_mode) }}' }">
                     @csrf
                     @method('PUT')
 
@@ -58,16 +58,28 @@
                         @error('logo')<p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>@enderror
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="billing_mode" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Billing mode</label>
+                        <select name="billing_mode" id="billing_mode" x-model="billingMode" class="w-full rounded-xl border-gray-200 p-3 text-sm font-bold focus:border-blue-500 focus:ring-blue-500">
+                            <option value="subscription">Monthly subscription</option>
+                            <option value="pay_per_event">Pay per event (no subscription)</option>
+                        </select>
+                        <p class="text-gray-400 text-[11px] mt-1 font-medium">Pay-per-event companies skip the event limit below and are billed per attendee on each event instead.</p>
+                        @error('billing_mode')
+                            <p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" :class="{ 'opacity-50': billingMode === 'pay_per_event' }">
                         {{-- Event Tracking Limit --}}
                         <div>
                             <label for="event_limit" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Event Registration Limit</label>
-                            <input type="number" name="event_limit" id="event_limit" 
-                                   value="{{ old('event_limit', $company->event_limit) }}" 
-                                   min="1" 
-                                   class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3" 
-                                   required>
-                            <p class="text-gray-400 text-[11px] mt-1 font-medium">Maximum concurrent attendance rosters allowed.</p>
+                            <input type="number" name="event_limit" id="event_limit"
+                                   value="{{ old('event_limit', $company->event_limit) }}"
+                                   min="1"
+                                   class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3"
+                                   :required="billingMode === 'subscription'">
+                            <p class="text-gray-400 text-[11px] mt-1 font-medium">Maximum concurrent attendance rosters allowed. Ignored in pay-per-event mode.</p>
                             @error('event_limit')
                                 <p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>
                             @enderror
@@ -76,10 +88,10 @@
                         {{-- Subscription Expiry Date --}}
                         <div>
                             <label for="subscription_ends_at" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Subscription Term End Date</label>
-                            <input type="date" name="subscription_ends_at" id="subscription_ends_at" 
-                                   value="{{ old('subscription_ends_at', $company->subscription_ends_at ? \Carbon\Carbon::parse($company->subscription_ends_at)->format('Y-m-d') : '') }}" 
-                                   class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3" 
-                                   required>
+                            <input type="date" name="subscription_ends_at" id="subscription_ends_at"
+                                   value="{{ old('subscription_ends_at', $company->subscription_ends_at ? \Carbon\Carbon::parse($company->subscription_ends_at)->format('Y-m-d') : '') }}"
+                                   class="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl shadow-sm text-sm font-medium p-3"
+                                   :required="billingMode === 'subscription'">
                             @error('subscription_ends_at')
                                 <p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>
                             @enderror
@@ -108,11 +120,10 @@
 
                     <hr class="border-gray-100 my-6">
 
-                    <div>
-                        <label for="attendee_tiers" class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Negotiated per-attendee pricing (optional)</label>
-                        <p class="mt-1 mb-2 text-xs text-gray-500">Overrides both the plan and platform default tiers for this company only. One tier per line, <code>from-to:rate</code> (major currency units), last line unbounded, e.g. <code>1000-:0.50</code>. Leave blank to use the plan/platform default.</p>
-                        <textarea name="attendee_tiers" id="attendee_tiers" rows="5" class="w-full rounded-xl border-gray-200 p-3 font-mono text-xs" placeholder="0-100:2.00&#10;100-300:1.50&#10;300-:1.00">{{ old('attendee_tiers', $attendeeTiersText) }}</textarea>
-                        @error('tiers')<p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>@enderror
+                    <div class="rounded-xl bg-slate-50 p-4">
+                        <p class="text-xs font-black uppercase tracking-widest text-gray-400">Attendee pricing</p>
+                        <p class="mt-1 text-xs text-gray-500">Negotiated per-attendee overrides for this company and its events now live in the Pricing section.</p>
+                        <a href="{{ route('pricing.companies.show', $company) }}" class="mt-3 inline-block rounded-lg bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-700">Manage {{ $company->name }}'s pricing &rarr;</a>
                     </div>
 
                     <hr class="border-gray-100 my-6">

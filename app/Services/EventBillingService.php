@@ -19,7 +19,7 @@ class EventBillingService
     public function estimate(Event $event): array
     {
         $registeredCount = $this->registeredCount($event);
-        $calc = $this->pricing->calculate($event->company, $registeredCount);
+        $calc = $this->pricing->calculate($event->company, $registeredCount, $event);
 
         return array_merge($calc, ['registered_count' => $registeredCount]);
     }
@@ -39,7 +39,7 @@ class EventBillingService
 
             $company = $lockedEvent->company;
             $registeredCount = $this->registeredCount($lockedEvent);
-            $calc = $this->pricing->calculate($company, $registeredCount);
+            $calc = $this->pricing->calculate($company, $registeredCount, $lockedEvent);
 
             return EventAttendeeCharge::create([
                 'event_id' => $lockedEvent->id,
@@ -104,7 +104,7 @@ class EventBillingService
         abort_unless($event->status === 'closed', 422, 'This event has not closed yet.');
 
         $checkedInCount = $event->checkedInParticipantCount();
-        $calc = $this->pricing->calculate($event->company, $checkedInCount);
+        $calc = $this->pricing->calculate($event->company, $checkedInCount, $event);
         $refundAmount = max(0, $charge->amount_minor - $calc['amount_minor']);
 
         $charge->update([

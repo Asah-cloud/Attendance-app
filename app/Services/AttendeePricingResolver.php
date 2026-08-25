@@ -4,12 +4,24 @@ namespace App\Services;
 
 use App\Models\AttendeePricingTier;
 use App\Models\Company;
+use App\Models\Event;
 use Illuminate\Support\Collection;
 
 class AttendeePricingResolver
 {
-    public function tiersFor(Company $company): Collection
+    public function tiersFor(Company $company, ?Event $event = null): Collection
     {
+        if ($event) {
+            $eventTiers = AttendeePricingTier::query()
+                ->where('scope_type', AttendeePricingTier::SCOPE_EVENT)
+                ->where('event_id', $event->id)
+                ->orderBy('band_from')
+                ->get();
+            if ($eventTiers->isNotEmpty()) {
+                return $eventTiers;
+            }
+        }
+
         $companyTiers = AttendeePricingTier::query()
             ->where('scope_type', AttendeePricingTier::SCOPE_COMPANY)
             ->where('company_id', $company->id)
@@ -36,9 +48,9 @@ class AttendeePricingResolver
             ->get();
     }
 
-    public function calculate(Company $company, int $count): array
+    public function calculate(Company $company, int $count, ?Event $event = null): array
     {
-        $tiers = $this->tiersFor($company);
+        $tiers = $this->tiersFor($company, $event);
         $breakdown = [];
         $amountMinor = 0;
 

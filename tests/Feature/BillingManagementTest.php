@@ -117,6 +117,41 @@ it('allows a manager to update billing contact and renewal preference', function
         ->and($company->fresh()->subscription_cancelled_at)->toBeNull();
 });
 
+it('never redirects a pay-per-event company to billing regardless of subscription fields', function () {
+    $company = Company::create([
+        'name' => 'Pay Per Event Co',
+        'is_active' => true,
+        'billing_mode' => Company::BILLING_MODE_PAY_PER_EVENT,
+        'subscription_ends_at' => now()->subYear(),
+    ]);
+    $manager = billingManager($company);
+
+    $this->actingAs($manager)
+        ->get(route('dashboard'))
+        ->assertOk();
+
+    $this->actingAs($manager)
+        ->get(route('billing.index'))
+        ->assertOk()
+        ->assertSee('Pay per event');
+});
+
+it('switches a pay-per-event company back to a subscription when it pays for a plan', function () {
+    $company = Company::create([
+        'name' => 'Switching Co',
+        'is_active' => true,
+        'billing_mode' => Company::BILLING_MODE_PAY_PER_EVENT,
+    ]);
+    $manager = billingManager($company);
+
+    $this->actingAs($manager)
+        ->post(route('billing.test-payment', 'starter'))
+        ->assertRedirect(route('billing.index'));
+
+    expect($company->fresh()->billing_mode)->toBe(Company::BILLING_MODE_SUBSCRIPTION)
+        ->and($company->fresh()->plan_key)->toBe('starter');
+});
+
 it('prevents ushers from accessing company billing', function () {
     $company = Company::create(['name' => 'One']);
     $user = User::factory()->create(['company_id' => $company->id]);

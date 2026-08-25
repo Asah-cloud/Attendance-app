@@ -63,10 +63,17 @@
                 ['03', 'Participant imports', 'Bring existing lists in from Excel and keep every attendee connected to the right event.', 'feature-import.webp', 'A participant spreadsheet being imported'],
                 ['04', 'Multi-day tracking', 'Track attendance day by day without mixing sessions or losing the full event picture.', 'feature-days.webp', 'Multi-day attendance tracking on a tablet'],
                 ['05', 'Clear reporting', 'See present and absent participants, attendance rates, and downloadable summaries.', 'feature-reports.webp', 'An event coordinator reviewing attendance reports'],
-                ['06', 'Company controls', 'Keep teams and data separated with role-based access, limits, and subscription controls.', 'feature-controls.webp', 'A company administrator managing permissions'],
+                ['06', 'Company controls', 'Keep teams and data separated with role-based access, multi-manager accounts, and subscription or pay-per-event billing controls.', 'feature-controls.webp', 'A company administrator managing permissions'],
+                ['07', 'Everything around the event', 'Custom registration forms, food distribution tracking, printable A5/A6 badges, and Excel/CSV/PDF exports — plus your own logo, flyer, SMS sender ID and email domain.', null, null],
             ] as [$number, $heading, $copy, $image, $alt])
                 <article class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-950/5">
-                    <img src="{{ asset('images/'.$image) }}" alt="{{ $alt }}" width="720" height="540" loading="lazy" decoding="async" class="h-52 w-full object-cover transition duration-500 group-hover:scale-[1.03]">
+                    @if($image)
+                        <img src="{{ asset('images/'.$image) }}" alt="{{ $alt }}" width="720" height="540" loading="lazy" decoding="async" class="h-52 w-full object-cover transition duration-500 group-hover:scale-[1.03]">
+                    @else
+                        <div class="grid h-52 w-full place-items-center bg-gradient-to-br from-blue-600 to-blue-800 text-white">
+                            <svg class="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" /></svg>
+                        </div>
+                    @endif
                     <div class="p-7">
                         <span class="text-xs font-extrabold text-blue-600">{{ $number }}</span>
                         <h3 class="mt-5 text-xl font-extrabold text-[#071426]">{{ $heading }}</h3>

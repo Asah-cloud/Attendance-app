@@ -26,7 +26,27 @@
             @endforeach
         </div>
 
-        <div class="mt-16 rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center">
+        <div class="mt-10 rounded-[2rem] border border-blue-200 bg-blue-50/40 p-8">
+            <p class="text-sm font-extrabold text-blue-700">No subscription</p>
+            <h2 class="mt-2 text-3xl font-extrabold text-[#071426]">Pay only for the events you run.</h2>
+            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600">No monthly fee, no event cap. You're billed per confirmed attendee, once per event, using graduated rates that drop as your attendee count grows.</p>
+            <div class="mt-6 overflow-hidden rounded-2xl border border-blue-100 bg-white">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-blue-50 text-xs uppercase text-blue-700"><tr><th class="p-4">Attendees</th><th class="p-4 text-right">Rate per attendee</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($payPerEventTiers as $tier)
+                            <tr><td class="p-4 font-semibold">{{ $tier->band_from }}{{ $tier->band_to ? '–'.$tier->band_to : '+' }}</td><td class="p-4 text-right font-black">GHS {{ number_format($tier->rate_minor / 100, 2) }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <form method="POST" action="{{ route('onboarding.pay-per-event') }}" class="mt-6">
+                @csrf
+                <button class="rounded-2xl bg-[#071426] px-6 py-4 text-sm font-extrabold text-white hover:bg-slate-800">Start with pay-per-event</button>
+            </form>
+        </div>
+
+        <div class="mt-10 rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center">
             <p class="font-extrabold text-amber-950">Test mode is active.</p>
             <p class="mt-2 text-sm leading-7 text-amber-800">No real charge will be made. The simulated checkout will be replaced by Card and Mobile Money payment before launch.</p>
         </div>

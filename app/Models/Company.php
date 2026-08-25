@@ -10,6 +10,10 @@ class Company extends Model
 {
     use SoftDeletes;
 
+    public const BILLING_MODE_SUBSCRIPTION = 'subscription';
+
+    public const BILLING_MODE_PAY_PER_EVENT = 'pay_per_event';
+
     protected static function booted(): void
     {
         static::updating(function (Company $company): void {
@@ -43,6 +47,7 @@ class Company extends Model
         'subscription_ends_at',
         'event_limit',
         'is_active',
+        'billing_mode',
         'plan_key',
         'plan_price_minor',
         'billing_currency',
@@ -114,5 +119,10 @@ class Company extends Model
     public function approvedSmsSenderId(): ?string
     {
         return $this->sms_sender_status === 'approved' ? $this->sms_sender_id : null;
+    }
+
+    public function isPayPerEvent(): bool
+    {
+        return $this->billing_mode === self::BILLING_MODE_PAY_PER_EVENT;
     }
 }

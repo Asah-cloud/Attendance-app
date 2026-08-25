@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AttendeePricingTier;
 use App\Models\Company;
+use App\Models\Plan;
 use App\Models\SubscriptionPayment;
 use App\Models\User;
 use App\Notifications\CompanyWelcomeNotification;
@@ -23,7 +25,21 @@ class OnboardingController extends Controller
 {
     public function pricing(): View
     {
-        return view('pricing', ['plans' => config('plans.plans')]);
+        $payPerEventTiers = AttendeePricingTier::query()
+            ->where('scope_type', AttendeePricingTier::SCOPE_PLATFORM)
+            ->orderBy('band_from')
+            ->get();
+
+        return view('pricing', ['plans' => Plan::allKeyed(), 'payPerEventTiers' => $payPerEventTiers]);
+    }
+
+    public function choosePayPerEvent(Request $request): RedirectResponse
+    {
+        $request->session()->forget('onboarding_payment');
+        $request->session()->put('onboarding_billing_mode', Company::BILLING_MODE_PAY_PER_EVENT);
+
+        return redirect()->route('register')
+            ->with('success', 'Pay-per-event selected. Create your manager account to finish setup.');
     }
 
     public function checkout(string $plan): View
@@ -35,6 +51,7 @@ class OnboardingController extends Controller
     {
         $selectedPlan = $this->plan($plan);
 
+        $request->session()->forget('onboarding_billing_mode');
         $request->session()->put('onboarding_payment', [
             'plan_key' => $plan,
             'price_minor' => $selectedPlan['price_minor'],
@@ -50,23 +67,26 @@ class OnboardingController extends Controller
     public function createAccount(Request $request): View|RedirectResponse
     {
         $payment = $request->session()->get('onboarding_payment');
+        $payPerEvent = $request->session()->get('onboarding_billing_mode') === Company::BILLING_MODE_PAY_PER_EVENT;
 
-        if (! $this->validPaymentSession($payment)) {
+        if (! $payPerEvent && ! $this->validPaymentSession($payment)) {
             return redirect()->route('pricing')
                 ->with('error', 'Select a plan and complete the test payment before creating an account.');
         }
 
         return view('auth.manager-register', [
-            'plan' => $this->plan($payment['plan_key']),
-            'payment' => $payment,
+            'plan' => $payPerEvent ? null : $this->plan($payment['plan_key']),
+            'payment' => $payPerEvent ? null : $payment,
+            'payPerEvent' => $payPerEvent,
         ]);
     }
 
     public function storeAccount(Request $request): RedirectResponse
     {
         $payment = $request->session()->get('onboarding_payment');
+        $payPerEvent = $request->session()->get('onboarding_billing_mode') === Company::BILLING_MODE_PAY_PER_EVENT;
 
-        if (! $this->validPaymentSession($payment)) {
+        if (! $payPerEvent && ! $this->validPaymentSession($payment)) {
             return redirect()->route('pricing')
                 ->with('error', 'Your payment session is missing or invalid. Please select a plan again.');
         }
@@ -79,36 +99,39 @@ class OnboardingController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $plan = $this->plan($payment['plan_key']);
+        $plan = $payPerEvent ? null : $this->plan($payment['plan_key']);
         $logoPath = $request->hasFile('logo') ? $request->file('logo')->store('company-logos', 'public') : null;
 
         try {
-            [$company, $user] = DB::transaction(function () use ($validated, $payment, $plan, $logoPath): array {
+            [$company, $user] = DB::transaction(function () use ($validated, $payment, $plan, $payPerEvent, $logoPath): array {
                 $company = Company::create([
                     'name' => $validated['company_name'],
                     'email' => $validated['email'],
                     'logo_path' => $logoPath,
-                    'subscription_ends_at' => now()->addMonths((int) config('plans.billing_period_months'))->toDateString(),
-                    'subscription_started_at' => now(),
-                    'event_limit' => $plan['event_limit'],
+                    'billing_mode' => $payPerEvent ? Company::BILLING_MODE_PAY_PER_EVENT : Company::BILLING_MODE_SUBSCRIPTION,
+                    'subscription_ends_at' => $payPerEvent ? null : now()->addMonths((int) config('plans.billing_period_months'))->toDateString(),
+                    'subscription_started_at' => $payPerEvent ? null : now(),
+                    'event_limit' => $payPerEvent ? 5 : $plan['event_limit'],
                     'is_active' => true,
-                    'plan_key' => $payment['plan_key'],
-                    'plan_price_minor' => $payment['price_minor'],
-                    'billing_currency' => $payment['currency'],
-                    'payment_reference' => $payment['payment_reference'],
-                    'subscription_auto_renews' => true,
+                    'plan_key' => $payPerEvent ? null : $payment['plan_key'],
+                    'plan_price_minor' => $payPerEvent ? null : $payment['price_minor'],
+                    'billing_currency' => $payPerEvent ? config('plans.currency') : $payment['currency'],
+                    'payment_reference' => $payPerEvent ? null : $payment['payment_reference'],
+                    'subscription_auto_renews' => ! $payPerEvent,
                 ]);
 
-                SubscriptionPayment::create([
-                    'company_id' => $company->id,
-                    'plan_key' => $payment['plan_key'],
-                    'type' => 'initial',
-                    'amount_minor' => $payment['price_minor'],
-                    'currency' => $payment['currency'],
-                    'payment_reference' => $payment['payment_reference'],
-                    'status' => 'paid',
-                    'paid_at' => $payment['paid_at'],
-                ]);
+                if (! $payPerEvent) {
+                    SubscriptionPayment::create([
+                        'company_id' => $company->id,
+                        'plan_key' => $payment['plan_key'],
+                        'type' => 'initial',
+                        'amount_minor' => $payment['price_minor'],
+                        'currency' => $payment['currency'],
+                        'payment_reference' => $payment['payment_reference'],
+                        'status' => 'paid',
+                        'paid_at' => $payment['paid_at'],
+                    ]);
+                }
 
                 $user = User::create([
                     'name' => $validated['name'],
@@ -135,7 +158,7 @@ class OnboardingController extends Controller
         event(new Registered($user));
         $user->notify(new CompanyWelcomeNotification($company));
         Auth::login($user);
-        $request->session()->forget('onboarding_payment');
+        $request->session()->forget(['onboarding_payment', 'onboarding_billing_mode']);
         $request->session()->regenerate();
 
         return redirect()->route('dashboard')
@@ -144,10 +167,7 @@ class OnboardingController extends Controller
 
     private function plan(string $plan): array
     {
-        $selectedPlan = config("plans.plans.{$plan}");
-        abort_unless(is_array($selectedPlan), 404);
-
-        return $selectedPlan;
+        return Plan::arrayByKey($plan);
     }
 
     private function validPaymentSession(mixed $payment): bool
@@ -156,7 +176,7 @@ class OnboardingController extends Controller
             return false;
         }
 
-        $plan = config("plans.plans.{$payment['plan_key']}");
+        $plan = Plan::where('key', $payment['plan_key'])->first();
 
         try {
             $paidAt = Carbon::parse($payment['paid_at']);
@@ -164,8 +184,8 @@ class OnboardingController extends Controller
             return false;
         }
 
-        return is_array($plan)
-            && $payment['price_minor'] === $plan['price_minor']
+        return $plan !== null
+            && $payment['price_minor'] === $plan->price_minor
             && $payment['currency'] === config('plans.currency')
             && str_starts_with($payment['payment_reference'], 'TEST-')
             && $paidAt->isAfter(now()->subMinutes(30));

@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AttendeePricingTier;
 use App\Models\Company;
-use App\Services\AttendeePricingTierParser;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class CompanyController extends Controller
 {
@@ -29,8 +27,9 @@ class CompanyController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
-            'subscription_ends_at' => 'required|date',
-            'event_limit' => 'required|integer|min:1',
+            'billing_mode' => ['required', Rule::in([Company::BILLING_MODE_SUBSCRIPTION, Company::BILLING_MODE_PAY_PER_EVENT])],
+            'subscription_ends_at' => 'required_if:billing_mode,'.Company::BILLING_MODE_SUBSCRIPTION.'|nullable|date',
+            'event_limit' => 'required_if:billing_mode,'.Company::BILLING_MODE_SUBSCRIPTION.'|nullable|integer|min:1',
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
@@ -38,7 +37,7 @@ class CompanyController extends Controller
             $validated['logo_path'] = $request->file('logo')->store('company-logos', 'public');
         }
 
-        Company::create(collect($validated)->only(['name', 'email', 'subscription_ends_at', 'event_limit', 'logo_path'])->all());
+        Company::create(collect($validated)->only(['name', 'email', 'billing_mode', 'subscription_ends_at', 'event_limit', 'logo_path'])->all());
 
         return redirect()->route('companies.index')->with('success', 'Company created successfully!');
     }
@@ -46,33 +45,26 @@ class CompanyController extends Controller
     /**
      * Show the form for editing the specified company.
      */
-    public function edit(Company $company, AttendeePricingTierParser $parser)
+    public function edit(Company $company)
     {
-        $attendeeTiers = AttendeePricingTier::query()
-            ->where('scope_type', AttendeePricingTier::SCOPE_COMPANY)
-            ->where('company_id', $company->id)
-            ->orderBy('band_from')
-            ->get();
-        $attendeeTiersText = $attendeeTiers->isNotEmpty() ? $parser->format($attendeeTiers) : '';
-
-        return view('superadmin.companies.edit', compact('company', 'attendeeTiersText'));
+        return view('superadmin.companies.edit', compact('company'));
     }
 
     /**
      * Update the specified company in storage.
      */
-    public function update(Request $request, Company $company, AttendeePricingTierParser $parser)
+    public function update(Request $request, Company $company)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
-            'subscription_ends_at' => 'required|date',
-            'event_limit' => 'required|integer|min:1',
+            'billing_mode' => ['required', Rule::in([Company::BILLING_MODE_SUBSCRIPTION, Company::BILLING_MODE_PAY_PER_EVENT])],
+            'subscription_ends_at' => 'required_if:billing_mode,'.Company::BILLING_MODE_SUBSCRIPTION.'|nullable|date',
+            'event_limit' => 'required_if:billing_mode,'.Company::BILLING_MODE_SUBSCRIPTION.'|nullable|integer|min:1',
             'is_active' => 'required|boolean',
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
             'sms_sender_status' => ['sometimes', 'in:unconfigured,pending,approved,rejected'],
-            'attendee_tiers' => ['nullable', 'string'],
         ]);
 
         if ($request->boolean('remove_logo') && $company->logo_path) {
@@ -87,18 +79,8 @@ class CompanyController extends Controller
             $company->logo_path = $request->file('logo')->store('company-logos', 'public');
         }
 
-        $attendeeTiersText = trim($validated['attendee_tiers'] ?? '');
-        $tierRows = $attendeeTiersText === '' ? [] : $parser->parse($attendeeTiersText);
-
-        unset($validated['logo'], $validated['remove_logo'], $validated['attendee_tiers']);
+        unset($validated['logo'], $validated['remove_logo']);
         $company->fill($validated)->save();
-
-        DB::transaction(function () use ($company, $tierRows): void {
-            AttendeePricingTier::where('scope_type', AttendeePricingTier::SCOPE_COMPANY)->where('company_id', $company->id)->delete();
-            foreach ($tierRows as $row) {
-                AttendeePricingTier::create($row + ['scope_type' => AttendeePricingTier::SCOPE_COMPANY, 'company_id' => $company->id]);
-            }
-        });
 
         return redirect()->route('companies.index')->with('success', 'Company updated successfully!');
     }

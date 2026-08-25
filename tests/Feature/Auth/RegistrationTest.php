@@ -106,6 +106,43 @@ test('a paid onboarding creates a company manager and opens the dashboard', func
     ]);
 });
 
+test('choosing pay-per-event creates a company with no subscription and no payment record', function () {
+    Notification::fake();
+
+    $this->post(route('onboarding.pay-per-event'))
+        ->assertRedirect(route('register'))
+        ->assertSessionHas('onboarding_billing_mode', Company::BILLING_MODE_PAY_PER_EVENT);
+
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertSee('Pay per event');
+
+    $response = $this->post(route('register'), [
+        'company_name' => 'Acme Events',
+        'name' => 'Manager One',
+        'email' => 'manager@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $response->assertRedirect(route('dashboard'))
+        ->assertSessionMissing('onboarding_billing_mode');
+
+    $company = Company::where('name', 'Acme Events')->firstOrFail();
+    $manager = User::where('email', 'manager@example.com')->firstOrFail();
+
+    expect($company->billing_mode)->toBe(Company::BILLING_MODE_PAY_PER_EVENT)
+        ->and($company->isPayPerEvent())->toBeTrue()
+        ->and($company->subscription_ends_at)->toBeNull()
+        ->and($company->plan_key)->toBeNull()
+        ->and($manager->company_id)->toBe($company->id);
+
+    $this->assertAuthenticatedAs($manager);
+    $this->assertDatabaseCount('subscription_payments', 0);
+
+    $this->actingAs($manager)->get(route('dashboard'))->assertOk();
+});
+
 test('a manager can upload a company logo while registering after payment', function () {
     Storage::fake('public');
 

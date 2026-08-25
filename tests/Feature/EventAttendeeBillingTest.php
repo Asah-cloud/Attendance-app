@@ -224,12 +224,63 @@ it('lets a super admin edit platform and per-company attendee pricing', function
         ->put(route('companies.update', $company), [
             'name' => $company->name,
             'email' => $company->email,
+            'billing_mode' => Company::BILLING_MODE_SUBSCRIPTION,
             'subscription_ends_at' => now()->addYear()->toDateString(),
             'event_limit' => 5,
             'is_active' => 1,
-            'attendee_tiers' => '0-:5.00',
         ])
         ->assertRedirect();
 
+    $this->actingAs($admin)
+        ->put(route('pricing.companies.update', $company), ['tiers' => '0-:5.00'])
+        ->assertRedirect();
+
     $this->assertDatabaseHas('attendee_pricing_tiers', ['scope_type' => 'company', 'company_id' => $company->id, 'band_from' => 0, 'band_to' => null, 'rate_minor' => 500]);
+});
+
+it('lets a super admin set and clear a per-event pricing override that beats company pricing', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $admin = attendeeBillingAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Annual Conference', 'event_date' => now()->addWeek()]);
+    AttendeePricingTier::create(['scope_type' => 'company', 'company_id' => $company->id, 'band_from' => 0, 'band_to' => null, 'rate_minor' => 500]);
+
+    $this->actingAs($admin)->get(route('pricing.companies.index'))->assertOk()->assertSee('Acme Co');
+    $this->actingAs($admin)->get(route('pricing.companies.show', $company))->assertOk()->assertSee('Annual Conference');
+    $this->actingAs($admin)->get(route('pricing.companies.events.edit', [$company, $event]))->assertOk();
+
+    expect(app(AttendeePricingResolver::class)->calculate($company, 10, $event)['amount_minor'])->toBe(10 * 500);
+
+    $this->actingAs($admin)
+        ->put(route('pricing.companies.events.update', [$company, $event]), ['tiers' => '0-:10.00'])
+        ->assertRedirect(route('pricing.companies.show', $company));
+
+    $this->assertDatabaseHas('attendee_pricing_tiers', ['scope_type' => 'event', 'event_id' => $event->id, 'rate_minor' => 1000]);
+    expect(app(AttendeePricingResolver::class)->calculate($company, 10, $event)['amount_minor'])->toBe(10 * 1000)
+        ->and(app(AttendeePricingResolver::class)->calculate($company, 10)['amount_minor'])->toBe(10 * 500);
+
+    $this->actingAs($admin)
+        ->put(route('pricing.companies.events.update', [$company, $event]), ['tiers' => ''])
+        ->assertRedirect(route('pricing.companies.show', $company));
+
+    $this->assertDatabaseMissing('attendee_pricing_tiers', ['scope_type' => 'event', 'event_id' => $event->id]);
+    expect(app(AttendeePricingResolver::class)->calculate($company, 10, $event)['amount_minor'])->toBe(10 * 500);
+});
+
+it('lets a pay-per-event company create unlimited events with no subscription gate', function () {
+    $company = Company::create(['name' => 'Acme Co', 'billing_mode' => Company::BILLING_MODE_PAY_PER_EVENT]);
+    $manager = attendeeBillingManager($company);
+
+    for ($i = 0; $i < $company->event_limit + 2; $i++) {
+        $this->actingAs($manager)
+            ->post(route('events.store'), [
+                'company_id' => $company->id,
+                'title' => "Event {$i}",
+                'event_date' => now()->addWeek()->toDateString(),
+            ])
+            ->assertRedirect('/events');
+    }
+
+    expect($company->events()->count())->toBe($company->event_limit + 2);
+
+    $this->actingAs($manager)->get('/dashboard')->assertOk();
 });
