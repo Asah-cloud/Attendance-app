@@ -8,7 +8,7 @@
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p class="text-xs font-black uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h1 class="mt-2 text-3xl font-black">{{ $meal->name }}</h1><p class="mt-2 text-sm text-slate-500">Scan the attendee's existing event QR code.</p></div><div class="rounded-2xl bg-blue-50 px-5 py-3 text-center"><strong class="block text-2xl text-blue-800" id="remaining-count">{{ $meal->remainingPortions() }}</strong><span class="text-[10px] font-black uppercase text-blue-600">Portions left</span></div></div>
 
             @if($stations->isNotEmpty())
-                <div class="mt-6"><label for="station-select" class="text-xs font-black uppercase text-slate-500">Serving station</label><select id="station-select" class="mt-2 w-full rounded-xl border-slate-300"><option value="">No station</option>@foreach($stations as $station)<option value="{{ $station->id }}">{{ $station->name }}</option>@endforeach</select></div>
+                <div class="mt-6"><label for="station-select" class="text-xs font-black uppercase text-slate-500">Serving station</label><select id="station-select" class="mt-2 w-full rounded-xl border-slate-300"><option value="">No station</option>@foreach($stations as $station)@php $stationRemaining = $meal->remainingPortionsAtStation($station->id); @endphp<option value="{{ $station->id }}">{{ $station->name }}{{ $stationRemaining !== null ? ' ('.$stationRemaining.' left)' : '' }}</option>@endforeach</select></div>
             @endif
 
             <div id="qr-reader" class="mt-7 overflow-hidden rounded-2xl border border-slate-200"></div>

@@ -45,6 +45,11 @@ class MealDistribution extends Model
         return $this->hasMany(MealWasteLog::class);
     }
 
+    public function stationAllocations(): HasMany
+    {
+        return $this->hasMany(MealStationAllocation::class);
+    }
+
     public function issuedPortions(): int
     {
         return (int) ($this->collections_sum_quantity ?? $this->collections()->sum('quantity'));
@@ -53,6 +58,27 @@ class MealDistribution extends Model
     public function remainingPortions(): int
     {
         return max(0, $this->total_portions - $this->issuedPortions());
+    }
+
+    public function allocatedPortionsFor(int $stationId): ?int
+    {
+        if ($this->relationLoaded('stationAllocations')) {
+            return $this->stationAllocations->firstWhere('meal_station_id', $stationId)?->allocated_portions;
+        }
+
+        return $this->stationAllocations()->where('meal_station_id', $stationId)->value('allocated_portions');
+    }
+
+    public function issuedPortionsAtStation(int $stationId): int
+    {
+        return (int) $this->collections()->where('meal_station_id', $stationId)->sum('quantity');
+    }
+
+    public function remainingPortionsAtStation(int $stationId): ?int
+    {
+        $allocated = $this->allocatedPortionsFor($stationId);
+
+        return $allocated === null ? null : max(0, $allocated - $this->issuedPortionsAtStation($stationId));
     }
 
     public function isOpen(): bool

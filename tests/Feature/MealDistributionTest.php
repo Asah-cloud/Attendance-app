@@ -230,6 +230,73 @@ it('records the serving station on a collection and totals them in the report', 
     $this->actingAs($manager)->get(route('events.meals.report', $event))->assertOk()->assertSee('Gate A');
 });
 
+it('lets a manager assign a portion allocation to a station and blocks issuing beyond it', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
+    $this->actingAs($manager)->post(route('events.meals.stations.update', $event), ['stations' => "Gate A\nGate B"])->assertRedirect();
+    $gateA = $event->mealStations()->where('name', 'Gate A')->firstOrFail();
+    $gateB = $event->mealStations()->where('name', 'Gate B')->firstOrFail();
+
+    $this->actingAs($manager)->put(route('events.meals.stations.allocations.update', [$event, $meal]), [
+        'allocations' => [$gateA->id => 1, $gateB->id => ''],
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('meal_station_allocations', ['meal_distribution_id' => $meal->id, 'meal_station_id' => $gateA->id, 'allocated_portions' => 1]);
+    $this->assertDatabaseMissing('meal_station_allocations', ['meal_distribution_id' => $meal->id, 'meal_station_id' => $gateB->id]);
+
+    $first = mealRegistration($event, 'First Guest');
+    $second = mealRegistration($event, 'Second Guest');
+    $third = mealRegistration($event, 'Third Guest');
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
+        'registration_code' => $first->registration_code,
+        'meal_station_id' => $gateA->id,
+    ])->assertOk();
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
+        'registration_code' => $second->registration_code,
+        'meal_station_id' => $gateA->id,
+    ])->assertStatus(422)->assertJsonPath('message', 'No portions remain allocated to this station.');
+
+    // Unallocated station and no station still draw from the shared 10-portion stock.
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
+        'registration_code' => $second->registration_code,
+        'meal_station_id' => $gateB->id,
+    ])->assertOk();
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
+        'registration_code' => $third->registration_code,
+    ])->assertOk();
+
+    expect($meal->fresh()->remainingPortions())->toBe(7)
+        ->and($meal->fresh()->remainingPortionsAtStation($gateA->id))->toBe(0)
+        ->and($meal->fresh()->remainingPortionsAtStation($gateB->id))->toBeNull();
+});
+
+it('lets a manager override a station allocation cap', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
+    $this->actingAs($manager)->post(route('events.meals.stations.update', $event), ['stations' => 'Gate A'])->assertRedirect();
+    $gateA = $event->mealStations()->where('name', 'Gate A')->firstOrFail();
+    $this->actingAs($manager)->put(route('events.meals.stations.allocations.update', [$event, $meal]), ['allocations' => [$gateA->id => 1]])->assertRedirect();
+
+    $first = mealRegistration($event, 'First Guest');
+    $second = mealRegistration($event, 'Second Guest');
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $first->registration_code, 'meal_station_id' => $gateA->id])->assertOk();
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
+        'registration_code' => $second->registration_code,
+        'meal_station_id' => $gateA->id,
+        'override' => 1,
+        'override_reason' => 'Ran out early, replenished on the spot',
+    ])->assertOk();
+
+    expect($meal->fresh()->issuedPortionsAtStation($gateA->id))->toBe(2);
+});
+
 it('reports remaining/low-stock status and alerts managers once when stock dips', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);

@@ -62,6 +62,23 @@
                             <button class="rounded-lg bg-rose-600 px-4 py-2 text-xs font-black text-white">Log waste</button>
                         </form>
                     </details>
+                    @if($stations->isNotEmpty())
+                        <details class="mt-3 border-t border-slate-100 pt-4">
+                            <summary class="cursor-pointer text-xs font-black text-slate-500">Assign portions to stations</summary>
+                            <form method="POST" action="{{ route('events.meals.stations.allocations.update', [$event, $meal]) }}" class="mt-4 space-y-3">
+                                @csrf @method('PUT')
+                                @foreach($stations as $station)
+                                    @php $allocated = $meal->stationAllocations->firstWhere('meal_station_id', $station->id)?->allocated_portions; @endphp
+                                    <div class="flex items-center justify-between gap-3">
+                                        <label for="allocation-{{ $meal->id }}-{{ $station->id }}" class="text-sm font-bold text-slate-700">{{ $station->name }}</label>
+                                        <input id="allocation-{{ $meal->id }}-{{ $station->id }}" type="number" min="0" name="allocations[{{ $station->id }}]" value="{{ old('allocations.'.$station->id, $allocated) }}" placeholder="No cap" class="w-32 rounded-lg border-slate-200 text-sm">
+                                    </div>
+                                @endforeach
+                                <p class="text-xs text-slate-400">Leave a station blank for no per-station cap — it can still serve from the shared {{ $meal->total_portions }}-portion stock. Set a number to stop the scanner from issuing more than that at this station.</p>
+                                <button class="rounded-lg bg-slate-900 px-4 py-2 text-xs font-black text-white">Save station allocations</button>
+                            </form>
+                        </details>
+                    @endif
                 @endcan
             </article>
         @empty

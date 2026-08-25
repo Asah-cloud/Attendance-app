@@ -28,6 +28,7 @@ class MealDistributionController extends Controller
         $meals = $event->mealDistributions()
             ->withSum('collections', 'quantity')
             ->withCount('collections')
+            ->with('stationAllocations')
             ->latest('opens_at')
             ->get();
         $stations = $event->mealStations()->orderBy('name')->get();
@@ -91,6 +92,37 @@ class MealDistributionController extends Controller
         });
 
         return back()->with('success', 'Serving stations updated.');
+    }
+
+    public function updateStationAllocations(Request $request, Event $event, MealDistribution $meal): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $this->ensureMealBelongsToEvent($meal, $event);
+
+        $validated = $request->validate([
+            'allocations' => ['nullable', 'array'],
+            'allocations.*' => ['nullable', 'integer', 'min:0'],
+        ]);
+        $allocations = $validated['allocations'] ?? [];
+
+        DB::transaction(function () use ($event, $meal, $allocations): void {
+            foreach ($event->mealStations()->pluck('id') as $stationId) {
+                $portions = $allocations[$stationId] ?? null;
+
+                if ($portions === null || $portions === '') {
+                    $meal->stationAllocations()->where('meal_station_id', $stationId)->delete();
+
+                    continue;
+                }
+
+                $meal->stationAllocations()->updateOrCreate(
+                    ['meal_station_id' => $stationId],
+                    ['allocated_portions' => (int) $portions]
+                );
+            }
+        });
+
+        return back()->with('success', 'Station allocations updated.');
     }
 
     public function scanner(Request $request, Event $event, MealDistribution $meal): View
@@ -179,6 +211,14 @@ class MealDistributionController extends Controller
             }
             if ($lockedMeal->collections()->sum('quantity') >= $lockedMeal->total_portions && ! $override) {
                 return [false, 'No portions remain for this distribution.', 422];
+            }
+
+            $stationId = $validated['meal_station_id'] ?? null;
+            if ($stationId) {
+                $allocated = $lockedMeal->allocatedPortionsFor((int) $stationId);
+                if ($allocated !== null && $lockedMeal->issuedPortionsAtStation((int) $stationId) >= $allocated && ! $override) {
+                    return [false, 'No portions remain allocated to this station.', 422];
+                }
             }
 
             if ($collection) {
