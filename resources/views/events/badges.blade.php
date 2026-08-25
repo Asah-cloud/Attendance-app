@@ -5,7 +5,7 @@
     <title>Badges &middot; {{ $event->title }}</title>
     <style>
         * { box-sizing: border-box; }
-        :root { --ink:#0f172a; --muted:#64748b; --badge-w:{{ $event->badge_size === 'A5' ? '148mm' : '105mm' }}; --badge-h:{{ $event->badge_size === 'A5' ? '210mm' : '148mm' }}; }
+        :root { --ink:#0f172a; --muted:#64748b; --badge-w:{{ $event->badge_size === 'A5' ? '148mm' : '105mm' }}; --badge-h:{{ $event->badge_size === 'A5' ? '210mm' : '148mm' }}; --print-w:{{ $event->badge_size === 'A5' ? '142mm' : '99mm' }}; --print-h:{{ $event->badge_size === 'A5' ? '204mm' : '142mm' }}; }
         body { margin:0; font-family:Arial,sans-serif; background:#e2e8f0; color:var(--ink); }
         .toolbar { position:sticky; z-index:10; top:0; padding:14px 24px; background:#0f172a; color:white; display:flex; gap:18px; justify-content:space-between; align-items:center; }
         .toolbar small { display:block; margin-top:3px; color:#cbd5e1; }.actions{display:flex;gap:8px}
@@ -18,14 +18,14 @@
         .event-block{z-index:1;flex-shrink:0;margin:5mm 3mm 0;display:flex;align-items:center;gap:3mm;overflow:hidden}.event-copy{min-width:0}.event-title{margin:0;font-size:5.4mm;line-height:1.15;font-weight:900;color:#0f172a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.event-meta{margin:1.5mm 0 0;color:#475569;font-size:2.9mm;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
         .attendee{z-index:1;margin:auto 0 4mm;padding:7mm 5mm 6mm;border-left:1.5mm solid var(--category);border-radius:4mm;background:rgba(255,255,255,.94);box-shadow:0 3mm 9mm rgba(15,23,42,.12);overflow:hidden}.attendee-label{margin:0 0 2mm;color:var(--category);font-size:2.8mm;font-weight:900;letter-spacing:.2em;text-transform:uppercase}.name{margin:0;font-size:9mm;line-height:1.04;font-weight:900;color:#0f172a;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.category{display:inline-block;margin-top:3mm;border-radius:999px;padding:1.3mm 4mm;background:var(--category);color:white;font-size:3mm;font-weight:900;max-width:70mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .credential{z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:4mm;padding:4mm;border:1px solid rgba(255,255,255,.75);border-radius:4mm;background:rgba(255,255,255,.92);box-shadow:0 2mm 7mm rgba(15,23,42,.1)}.credential-copy{align-self:center;min-width:0}.credential-label{margin:0 0 1.5mm;color:#64748b;font-size:2.5mm;font-weight:900;letter-spacing:.16em;text-transform:uppercase}.member-id{margin:0;color:#0f172a;font-size:4mm;font-weight:900;overflow-wrap:anywhere}.scan{margin:3mm 0 0;color:#475569;font-size:2.5mm;font-weight:800;line-height:1.35}.qr{flex-shrink:0;padding:2mm;border:1px solid #cbd5e1;border-radius:2.5mm;background:white;line-height:0}.qr svg{display:block;width:{{ $event->badge_size === 'A5' ? '44mm' : '31mm' }};height:{{ $event->badge_size === 'A5' ? '44mm' : '31mm' }}}.empty{padding:30px;background:white;text-align:center}
-        @page { size:{{ $event->badge_size }} portrait; margin:0; }
-        @media print { body{background:white;print-color-adjust:exact;-webkit-print-color-adjust:exact}.toolbar,.settings,.notice{display:none}.grid{display:block;padding:0}.badge{border:0;border-radius:0;margin:0} }
+        @page { size:{{ $event->badge_size }} portrait; margin:3mm; }
+        @media print { body{background:white;print-color-adjust:exact;-webkit-print-color-adjust:exact}.toolbar,.settings,.notice{display:none}.grid{display:block;padding:0}.badge{width:var(--print-w);height:var(--print-h);padding:5mm;border:0;margin:0}.brand{min-height:17mm;padding:2.5mm 3mm}.event-block{margin:3mm 2mm 0}.attendee{margin-bottom:3mm;padding:5mm 4mm 4mm}.credential{gap:3mm;padding:3mm}.qr{padding:1.5mm} }
         @media(max-width:760px){.toolbar{align-items:flex-start;flex-direction:column}.settings-grid{grid-template-columns:1fr}.grid{padding:12px;overflow:auto}}
     </style>
 </head>
 <body>
     <div class="toolbar">
-        <div><strong>{{ $event->title }} &middot; {{ $registrations->count() }} badge(s)</strong><small>{{ $event->badge_size }} &middot; Print at 100% with background graphics enabled.</small></div>
+        <div><strong>{{ $event->title }} &middot; {{ $registrations->count() }} badge(s)</strong><small>{{ $event->badge_size }} &middot; Print at 100% with background graphics enabled. A printer-safe inset is included.</small></div>
         <div class="actions"><a class="btn alt" href="{{ route('events.registrations.index', $event) }}">Back</a><button class="btn" type="button" onclick="window.print()">Print badges</button></div>
     </div>
     @if(session('success'))<div class="notice">{{ session('success') }}</div>@endif
@@ -48,6 +48,14 @@
             @php
                 $category = $registration->participant->category ?: 'Attendee';
                 $color = $categoryColors[$category] ?? '#0F766E';
+                $nameParts = preg_split('/\s+/u', trim($registration->participant->name), -1, PREG_SPLIT_NO_EMPTY);
+                if (count($nameParts) >= 3) {
+                    $middleInitials = array_map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)).'.', array_slice($nameParts, 1, -1));
+                    $badgeName = implode(' ', [$nameParts[0], ...$middleInitials, $nameParts[array_key_last($nameParts)]]);
+                } else {
+                    $badgeName = $registration->participant->name;
+                }
+                $hasMemberId = filled($registration->participant->member_id);
             @endphp
             <article class="badge" style="--badge-bg:url('{{ asset('images/badges/professional-teal-background-v1.png') }}');--category:{{ $event->badge_design === 'category' ? $color : '#0F766E' }}">
                 <header class="brand">
@@ -55,8 +63,8 @@
                     <span class="company-name">{{ $event->company?->name ?? 'Event Organizer' }}</span>
                 </header>
                 <section class="event-block">@if($event->logo_path)<img class="event-logo" src="{{ Storage::url($event->logo_path) }}" alt="{{ $event->title }} logo">@endif<div class="event-copy"><p class="event-title">{{ $event->title }}</p><p class="event-meta">{{ $event->event_date->format('j M Y') }}@if($event->end_date && !$event->end_date->equalTo($event->event_date)) &ndash; {{ $event->end_date->format('j M Y') }}@endif @if($event->location)<br>{{ $event->location }}@endif</p></div></section>
-                <section class="attendee"><p class="attendee-label">Attendee</p><h1 class="name">{{ $registration->participant->name }}</h1><span class="category">{{ $category }}</span></section>
-                <footer class="credential"><div class="credential-copy"><p class="credential-label">Member ID</p><p class="member-id">{{ $registration->participant->member_id ?: 'Guest attendee' }}</p><p class="scan">Scan for attendance</p></div><div class="qr">{!! QrCode::size(220)->margin(1)->generate('ASAH-ATTENDANCE:'.$registration->registration_code) !!}</div></footer>
+                <section class="attendee"><p class="attendee-label">Attendee</p><h1 class="name" title="{{ $registration->participant->name }}">{{ $badgeName }}</h1><span class="category">{{ $category }}</span></section>
+                <footer class="credential"><div class="credential-copy"><p class="credential-label">{{ $hasMemberId ? 'Member ID' : 'Credential' }}</p><p class="member-id">{{ $hasMemberId ? $registration->participant->member_id : 'Event Pass' }}</p><p class="scan">Attendance &amp; meal collection</p></div><div class="qr">{!! QrCode::size(220)->margin(1)->generate('ASAH-ATTENDANCE:'.$registration->registration_code) !!}</div></footer>
             </article>
         @empty <p class="empty">No confirmed attendees yet.</p> @endforelse
     </main>

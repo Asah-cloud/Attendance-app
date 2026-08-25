@@ -354,9 +354,29 @@ it('generates printable badges with a scannable QR for each confirmed attendee',
         ->assertSee('Accra Conference Centre')
         ->assertSee(Storage::url('company-logos/acme.png'))
         ->assertSee(Storage::url('event-logos/conference.png'))
-        ->assertSee('Scan for attendance')
+        ->assertSee('Attendance &amp; meal collection', false)
         ->assertDontSee('Pending Person')
         ->assertSee('<svg', false);
+});
+
+it('uses an event pass fallback and compacts long badge names', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create([
+        'company_id' => $event->company_id,
+        'name' => 'Asah Ayensu Kofi Isaac',
+        'category' => 'Member',
+        'member_id' => null,
+    ]);
+    $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertSee('Asah A. K. Isaac')
+        ->assertSee('Event Pass')
+        ->assertDontSee('Guest attendee')
+        ->assertSee('margin:3mm', false);
 });
 
 it('prevents an usher from printing badges', function () {
