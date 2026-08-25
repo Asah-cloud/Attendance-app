@@ -54,6 +54,9 @@ class Event extends Model
         'registration_terms_version',
         'confirmation_message',
         'cancelled_at',
+        'badge_size',
+        'badge_design',
+        'badge_category_colors',
     ];
 
     protected $casts = [
@@ -65,6 +68,7 @@ class Event extends Model
         'registration_capacity' => 'integer',
         'registration_requires_approval' => 'boolean',
         'cancelled_at' => 'datetime',
+        'badge_category_colors' => 'array',
     ];
 
     public function attendances(): HasMany

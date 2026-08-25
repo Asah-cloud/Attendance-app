@@ -367,6 +367,29 @@ it('prevents an usher from printing badges', function () {
     $this->actingAs($usher)->get(route('events.badges', $event))->assertForbidden();
 });
 
+it('lets a manager choose A5 or A6 badges and save category colours', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $vip = Participant::create(['company_id' => $event->company_id, 'name' => 'VIP Person', 'category' => 'VIP']);
+    $event->registrations()->create(['participant_id' => $vip->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A5',
+        'badge_design' => 'category',
+        'categories' => ['VIP'],
+        'colors' => ['#FF5500'],
+    ])->assertRedirect()->assertSessionHas('success');
+
+    expect($event->fresh())
+        ->badge_size->toBe('A5')
+        ->badge_design->toBe('category')
+        ->badge_category_colors->toBe(['VIP' => '#FF5500']);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()->assertSee('A5')->assertSee('#FF5500');
+});
+
 it('prevents an usher from editing attendee details', function () {
     $event = publicRegistrationEvent();
     $usher = User::factory()->create(['company_id' => $event->company_id, 'role' => 'usher']);

@@ -146,7 +146,43 @@ class EventRegistrationFormController extends Controller
             ->with('participant')
             ->get();
 
-        return view('events.badges', compact('event', 'registrations'));
+        $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();
+        $palette = ['#7C3AED', '#0F766E', '#B45309', '#BE123C', '#1D4ED8', '#4338CA'];
+        $categoryColors = $categories->mapWithKeys(fn ($category, $index) => [
+            $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
+        ]);
+
+        return view('events.badges', compact('event', 'registrations', 'categories', 'categoryColors'));
+    }
+
+    public function updateBadgeSettings(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $validated = $request->validate([
+            'badge_size' => ['required', 'in:A5,A6'],
+            'badge_design' => ['required', 'in:default,category'],
+            'categories' => ['nullable', 'array'],
+            'categories.*' => ['nullable', 'string', 'max:255'],
+            'colors' => ['nullable', 'array'],
+            'colors.*' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+        ]);
+
+        $available = $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with('participant:id,category')->get()->pluck('participant.category')->filter()->unique();
+        $colors = [];
+        foreach ($validated['categories'] ?? [] as $index => $category) {
+            if ($available->contains($category) && isset($validated['colors'][$index])) {
+                $colors[$category] = strtoupper($validated['colors'][$index]);
+            }
+        }
+
+        $event->update([
+            'badge_size' => $validated['badge_size'],
+            'badge_design' => $validated['badge_design'],
+            'badge_category_colors' => $colors,
+        ]);
+
+        return back()->with('success', 'Badge design saved. The preview is ready to print.');
     }
 
     public function resend(Event $event, EventRegistration $registration): RedirectResponse
