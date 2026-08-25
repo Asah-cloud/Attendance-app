@@ -106,7 +106,24 @@ it('allows only managers to issue an audited extra portion and reverse a collect
         ->and($collection->override_reason)->toBe('Speaker allowance');
 
     $this->actingAs($manager)->delete(route('events.meals.collections.reverse', [$event, $meal, $collection]))->assertRedirect();
-    $this->assertDatabaseMissing('meal_collections', ['id' => $collection->id]);
+    $this->assertDatabaseHas('meal_collections', ['id' => $collection->id, 'quantity' => 1]);
+    $this->assertDatabaseHas('meal_collection_audits', ['meal_distribution_id' => $meal->id, 'action' => 'override', 'quantity_change' => 1]);
+    $this->assertDatabaseHas('meal_collection_audits', ['meal_distribution_id' => $meal->id, 'action' => 'reversed', 'quantity_change' => -1]);
+});
+
+it('provides managers with food reports and prevents stock below issued portions', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    $registration = mealRegistration($event);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 3]);
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $registration->registration_code])->assertOk();
+    $this->actingAs($manager)->get(route('events.meals.report', $event))->assertOk()->assertSee('Food distribution report')->assertSee('Food Guest');
+    $this->actingAs($manager)->get(route('events.meals.report.csv', $event))->assertOk();
+    $this->actingAs($manager)->get(route('events.meals.report.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+
+    $this->actingAs($manager)->patch(route('events.meals.update', [$event, $meal]), ['name' => 'Lunch', 'total_portions' => 0, 'is_active' => 1])->assertSessionHasErrors('total_portions');
 });
 
 it('prevents staff from accessing another event meal', function () {

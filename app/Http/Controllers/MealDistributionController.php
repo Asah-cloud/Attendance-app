@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\MealCollection;
+use App\Models\MealCollectionAudit;
 use App\Models\MealDistribution;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,7 +42,12 @@ class MealDistributionController extends Controller
     {
         $this->authorize('update', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
-        $meal->update($this->validateMeal($request));
+        $validated = $this->validateMeal($request);
+        $issued = $meal->collections()->sum('quantity');
+        if ($validated['total_portions'] < $issued) {
+            return back()->withErrors(['total_portions' => "Stock cannot be lower than the {$issued} portions already issued."])->withInput();
+        }
+        $meal->update($validated);
 
         return back()->with('success', 'Food distribution updated.');
     }
@@ -131,7 +138,7 @@ class MealDistributionController extends Controller
                     'collected_at' => now(),
                 ]);
             } else {
-                $lockedMeal->collections()->create([
+                $collection = $lockedMeal->collections()->create([
                     'event_registration_id' => $registration->id,
                     'participant_id' => $registration->participant_id,
                     'issued_by' => $request->user()->id,
@@ -141,6 +148,18 @@ class MealDistributionController extends Controller
                     'collected_at' => now(),
                 ]);
             }
+
+            MealCollectionAudit::create([
+                'event_id' => $lockedMeal->event_id,
+                'meal_distribution_id' => $lockedMeal->id,
+                'event_registration_id' => $registration->id,
+                'participant_id' => $registration->participant_id,
+                'performed_by' => $request->user()->id,
+                'action' => $override ? 'override' : 'issued',
+                'quantity_change' => 1,
+                'reason' => $override ? $request->string('override_reason')->toString() : null,
+                'occurred_at' => now(),
+            ]);
 
             return [true, "Approved — {$registration->participant->name} received 1 portion.", 200];
         });
@@ -153,9 +172,78 @@ class MealDistributionController extends Controller
         $this->authorize('update', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
         abort_unless($collection->meal_distribution_id === $meal->id, 404);
-        $collection->delete();
+        DB::transaction(function () use ($event, $meal, $collection): void {
+            $locked = MealCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            MealCollectionAudit::create([
+                'event_id' => $event->id,
+                'meal_distribution_id' => $meal->id,
+                'event_registration_id' => $locked->event_registration_id,
+                'participant_id' => $locked->participant_id,
+                'performed_by' => request()->user()->id,
+                'action' => 'reversed',
+                'quantity_change' => -1,
+                'reason' => 'Portion reversed by a manager.',
+                'occurred_at' => now(),
+            ]);
+            if ($locked->quantity > 1) {
+                $locked->decrement('quantity');
+            } else {
+                $locked->delete();
+            }
+        });
 
-        return back()->with('success', 'Food collection reversed and stock restored.');
+        return back()->with('success', 'One food portion was reversed and returned to stock.');
+    }
+
+    public function report(Event $event): View
+    {
+        $this->authorize('update', $event);
+
+        return view('meals.report', $this->reportData($event));
+    }
+
+    public function exportCsv(Event $event)
+    {
+        $this->authorize('update', $event);
+        $collections = $this->reportData($event)['collections'];
+
+        return response()->streamDownload(function () use ($collections): void {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Distribution', 'Attendee', 'Category', 'Email', 'Phone', 'Portions', 'Override', 'Override reason', 'Issued by', 'Last served']);
+            foreach ($collections as $collection) {
+                fputcsv($output, [$collection->distribution->name, $collection->participant->name, $collection->participant->category, $collection->participant->email, $collection->participant->phone, $collection->quantity, $collection->was_overridden ? 'Yes' : 'No', $collection->override_reason, $collection->issuer?->name, $collection->collected_at?->format('Y-m-d H:i:s')]);
+            }
+            fclose($output);
+        }, 'food-report-'.str($event->title)->slug().'.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function exportPdf(Event $event)
+    {
+        $this->authorize('update', $event);
+        return Pdf::loadView('meals.report-pdf', $this->reportData($event))
+            ->setPaper('a4', 'landscape')
+            ->download('food-report-'.str($event->title)->slug().'.pdf');
+    }
+
+    private function reportData(Event $event): array
+    {
+        $meals = $event->mealDistributions()->withSum('collections', 'quantity')->withCount('collections')->orderBy('opens_at')->get();
+        $collections = MealCollection::query()->whereHas('distribution', fn ($query) => $query->where('event_id', $event->id))
+            ->with(['distribution', 'participant', 'issuer'])->latest('collected_at')->get();
+        $audits = MealCollectionAudit::query()->where('event_id', $event->id)
+            ->with(['distribution', 'participant', 'performer'])->latest('occurred_at')->get();
+
+        return [
+            'event' => $event,
+            'meals' => $meals,
+            'collections' => $collections,
+            'audits' => $audits,
+            'totalStock' => $meals->sum('total_portions'),
+            'totalIssued' => $collections->sum('quantity'),
+            'peopleServed' => $collections->pluck('participant_id')->unique()->count(),
+            'overrideCount' => $audits->where('action', 'override')->count(),
+            'reversalCount' => $audits->where('action', 'reversed')->count(),
+        ];
     }
 
     private function validateMeal(Request $request): array
