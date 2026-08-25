@@ -26,7 +26,7 @@ class Participant extends Model
         return '233'.ltrim($phone, '0');
     }
 
-    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'member_id', 'category', 'gender'];
+    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'member_id', 'category', 'gender', 'dietary_notes'];
 
     public function company(): BelongsTo
     {

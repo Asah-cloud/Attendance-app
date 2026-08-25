@@ -95,6 +95,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         ->name('events.scanner.check-in');
     Route::get('/events/{event}/meals', [MealDistributionController::class, 'index'])->name('events.meals.index');
     Route::get('/events/{event}/meals/{meal}/scanner', [MealDistributionController::class, 'scanner'])->name('events.meals.scanner');
+    Route::get('/events/{event}/meals/{meal}/status', [MealDistributionController::class, 'status'])->name('events.meals.status');
     Route::post('/events/{event}/meals/{meal}/issue', [MealDistributionController::class, 'issue'])
         ->middleware('throttle:120,1')->name('events.meals.issue');
     Route::patch('/events/{event}/update-day', [EventController::class, 'updateDay'])->name('events.update-day');
@@ -138,10 +139,13 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
 
         Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
+        Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
+        Route::get('/events/{event}/meals/vouchers', [MealDistributionController::class, 'vouchers'])->name('events.meals.vouchers');
         Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
         Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
         Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');
         Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
+        Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
         Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
         Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->name('events.meals.collections.reverse');
 

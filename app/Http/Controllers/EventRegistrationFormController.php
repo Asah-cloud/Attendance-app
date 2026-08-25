@@ -109,6 +109,7 @@ class EventRegistrationFormController extends Controller
             'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
             'category' => $this->categoryRule($event),
             'member_id' => ['nullable', 'string', 'max:255'],
+            'dietary_notes' => ['nullable', 'string', 'max:500'],
         ]);
         $participant = $registration->participant;
         $changes = collect($validated)

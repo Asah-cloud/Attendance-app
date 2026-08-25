@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MealDistribution extends Model
 {
-    protected $fillable = ['event_id', 'name', 'total_portions', 'opens_at', 'closes_at', 'is_active'];
+    protected $fillable = [
+        'event_id', 'name', 'total_portions', 'opens_at', 'closes_at', 'is_active',
+        'low_stock_threshold', 'low_stock_notified_at',
+    ];
 
     protected function casts(): array
     {
@@ -17,6 +20,8 @@ class MealDistribution extends Model
             'opens_at' => 'datetime',
             'closes_at' => 'datetime',
             'is_active' => 'boolean',
+            'low_stock_threshold' => 'integer',
+            'low_stock_notified_at' => 'datetime',
         ];
     }
 
@@ -28,6 +33,16 @@ class MealDistribution extends Model
     public function collections(): HasMany
     {
         return $this->hasMany(MealCollection::class);
+    }
+
+    public function entitlements(): HasMany
+    {
+        return $this->hasMany(MealEntitlement::class);
+    }
+
+    public function wasteLogs(): HasMany
+    {
+        return $this->hasMany(MealWasteLog::class);
     }
 
     public function issuedPortions(): int
@@ -45,5 +60,19 @@ class MealDistribution extends Model
         return $this->is_active
             && (! $this->opens_at || now()->gte($this->opens_at))
             && (! $this->closes_at || now()->lte($this->closes_at));
+    }
+
+    public function entitlementFor(?string $category): int
+    {
+        if (! $category) {
+            return 1;
+        }
+
+        return $this->entitlements->firstWhere('category', $category)?->portions_allowed ?? 1;
+    }
+
+    public function isLowStock(): bool
+    {
+        return $this->low_stock_threshold !== null && $this->remainingPortions() <= $this->low_stock_threshold;
     }
 }

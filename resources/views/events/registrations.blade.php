@@ -67,6 +67,7 @@
                                 <input name="category" value="{{ old('category', $registration->participant->category) }}" required placeholder="Attendee type" class="rounded-xl border-slate-200 text-sm">
                             @endif
                             <input name="member_id" value="{{ old('member_id', $registration->participant->member_id) }}" placeholder="Member ID" class="rounded-xl border-slate-200 text-sm">
+                            <input name="dietary_notes" value="{{ old('dietary_notes', $registration->participant->dietary_notes) }}" placeholder="Dietary notes (e.g. Vegetarian)" class="rounded-xl border-slate-200 text-sm lg:col-span-2">
                             <button class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white lg:col-span-6 lg:w-fit">Save changes</button>
                         </form>
                     </td>

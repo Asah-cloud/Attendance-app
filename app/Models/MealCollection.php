@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class MealCollection extends Model
 {
     protected $fillable = [
-        'meal_distribution_id', 'event_registration_id', 'participant_id', 'issued_by',
+        'meal_distribution_id', 'event_registration_id', 'participant_id', 'meal_station_id', 'issued_by',
         'quantity', 'was_overridden', 'override_reason', 'collected_at',
     ];
 
@@ -35,5 +35,10 @@ class MealCollection extends Model
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
+    }
+
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(MealStation::class, 'meal_station_id');
     }
 }

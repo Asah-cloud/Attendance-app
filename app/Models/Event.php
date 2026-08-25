@@ -107,6 +107,11 @@ class Event extends Model
         return $this->hasMany(MealDistribution::class);
     }
 
+    public function mealStations(): HasMany
+    {
+        return $this->hasMany(MealStation::class);
+    }
+
     public function ensureSystemRegistrationFields(): void
     {
         foreach (EventRegistrationField::SYSTEM_FIELDS as $key => $definition) {
