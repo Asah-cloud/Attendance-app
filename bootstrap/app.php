@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureCompanyIsActive;
+use App\Http\Middleware\RequirePasswordChange;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->web(append: [RequirePasswordChange::class]);
         $middleware->alias([
             'company.active' => EnsureCompanyIsActive::class,
             'role' => RoleMiddleware::class,

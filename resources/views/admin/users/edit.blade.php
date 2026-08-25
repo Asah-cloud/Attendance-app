@@ -3,6 +3,16 @@
 
     <div class="py-12 bg-[#f8fafc]">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+            @if(session('success'))<div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>@endif
+            @if(session('error'))<div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{{ session('error') }}</div>@endif
+            @if(session('temporary_password'))
+                <div class="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950">
+                    <p class="text-xs font-black uppercase tracking-wider">Copy now — shown only once</p>
+                    <p class="mt-2 text-sm">Temporary password for {{ session('temporary_password_user') }}:</p>
+                    <code class="mt-3 block select-all rounded-xl bg-white px-4 py-3 text-lg font-black">{{ session('temporary_password') }}</code>
+                    <p class="mt-2 text-xs">Give it to the user securely. They must replace it immediately after signing in.</p>
+                </div>
+            @endif
             <div class="bg-white p-8 rounded-[2.5rem] shadow-[0_15px_50px_rgba(0,0,0,0.03)] border border-gray-100">
                 
                 <div class="mb-8">
@@ -78,6 +88,18 @@
                         </a>
                     </div>
                 </form>
+
+                @if(! auth()->user()->is($user) && ! $user->hasRole('admin'))
+                    <div class="mt-8 border-t border-gray-100 pt-7">
+                        <h3 class="text-sm font-black text-gray-900">Password recovery</h3>
+                        <p class="mt-1 text-xs leading-5 text-gray-500">Email a secure reset link, or generate a one-time temporary password when email is unavailable.</p>
+                        @if($user->must_change_password)<p class="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">This user must change their temporary password at next login.</p>@endif
+                        <div class="mt-4 flex flex-wrap gap-3">
+                            <form method="POST" action="{{ route('admin.users.password.link', $user) }}">@csrf<button class="rounded-xl bg-blue-600 px-5 py-3 text-xs font-black text-white hover:bg-blue-700">Send reset link</button></form>
+                            <form method="POST" action="{{ route('admin.users.password.temporary', $user) }}" onsubmit="return confirm('Generate a temporary password and sign this user out of existing sessions?')">@csrf<button class="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 text-xs font-black text-amber-800 hover:bg-amber-100">Generate temporary password</button></form>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
