@@ -6,10 +6,6 @@
     </section>
 
     <section class="mx-auto -mt-12 max-w-7xl px-5 pb-24 lg:px-8">
-        @if(session('error'))
-            <div class="mx-auto mb-6 max-w-2xl rounded-2xl border border-red-200 bg-red-50 p-4 text-center text-sm font-bold text-red-700">{{ session('error') }}</div>
-        @endif
-
         <div class="grid items-stretch gap-6 lg:grid-cols-3">
             @foreach($plans as $key => $plan)
                 @php $featured = $plan['featured'] ?? false; @endphp

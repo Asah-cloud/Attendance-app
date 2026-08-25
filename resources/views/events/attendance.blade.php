@@ -88,13 +88,6 @@
                 </div>
             </section>
             
-            {{-- Flash Messages --}}
-            @if(session('success'))
-                <div data-aos="fade-left" class="mb-6 p-4 bg-green-500 text-white rounded-2xl font-bold shadow-lg shadow-green-100">
-                    {{ session('success') }}
-                </div>
-            @endif
-
             @php $status = $event->status; @endphp
 
             @if($status === 'active')

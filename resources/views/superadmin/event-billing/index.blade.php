@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Event Attendee Billing</x-slot>
     <div class="py-10"><div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="mb-5 rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
 
         <div class="mb-6"><h1 class="text-2xl font-black text-slate-900">Attendee bills awaiting action</h1><p class="text-sm text-slate-500">Pending payments and refunds due across all companies.</p></div>
 

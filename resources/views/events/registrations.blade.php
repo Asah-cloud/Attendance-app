@@ -12,7 +12,6 @@
             </div>
         </div>
         @if($errors->any())<div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
-        @if(session('success'))<div class="mb-5 rounded-xl bg-emerald-50 p-4 text-sm font-bold text-emerald-700">{{ session('success') }}</div>@endif
         <details class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','category'])) open @endif>
             <summary class="cursor-pointer font-black text-slate-900">Manually register an attendee</summary>
             <form method="POST" action="{{ route('events.registrations.store', $event) }}" class="mt-5 grid gap-4 md:grid-cols-2">@csrf

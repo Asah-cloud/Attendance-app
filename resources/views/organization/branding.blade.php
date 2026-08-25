@@ -2,13 +2,6 @@
     <x-slot name="header">Organization settings</x-slot>
 
     <div class="mx-auto max-w-3xl">
-        @if(session('success'))
-            <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-            <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-800">{{ session('error') }}</div>
-        @endif
-
         <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div class="flex flex-col gap-6 border-b border-slate-100 pb-7 sm:flex-row sm:items-center">
                 @if($company->logo_path)

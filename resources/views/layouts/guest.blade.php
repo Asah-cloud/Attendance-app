@@ -13,6 +13,7 @@
         <x-compiled-assets />
     </head>
     <body class="font-sans text-gray-900 antialiased">
+        <x-toast />
         {{-- Background with Church Gradient and subtle pattern overlay --}}
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gradient-to-br from-blue-900 via-blue-800 to-red-700">
             

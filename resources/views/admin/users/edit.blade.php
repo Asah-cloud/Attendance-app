@@ -3,8 +3,6 @@
 
     <div class="py-12 bg-[#f8fafc]">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            @if(session('success'))<div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>@endif
-            @if(session('error'))<div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{{ session('error') }}</div>@endif
             @if(session('temporary_password'))
                 <div class="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950">
                     <p class="text-xs font-black uppercase tracking-wider">Copy now — shown only once</p>

@@ -1,8 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Attendance Confirmations</x-slot>
     <div class="py-10"><div class="mx-auto max-w-5xl space-y-8 px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
-        @if(session('error'))<div class="rounded-2xl bg-red-50 p-4 font-bold text-red-700">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 font-bold text-red-700">{{ $errors->first() }}</div>@endif
 
         <div class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-950 to-blue-800 p-7 text-white shadow-xl">

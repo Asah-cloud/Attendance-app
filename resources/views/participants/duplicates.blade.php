@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Find & Merge Duplicate Attendees</x-slot>
     <div class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="mb-5 rounded-xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
         @if($errors->any())<div class="mb-5 rounded-xl bg-red-50 p-4 font-bold text-red-700">{{ $errors->first() }}</div>@endif
 
         <div class="mb-6">

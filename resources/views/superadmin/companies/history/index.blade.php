@@ -3,10 +3,6 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if(session('success'))
-                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>
-            @endif
-
             <div class="mb-6 flex items-end justify-between gap-4">
                 <div>
                     <p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Archived tenants</p>

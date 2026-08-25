@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">{{ $company->name }} Pricing</x-slot>
     <div class="py-10"><div class="mx-auto max-w-4xl space-y-8 px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
 
         <div class="flex items-center justify-between gap-4">

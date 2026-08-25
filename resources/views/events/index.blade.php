@@ -1,9 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Events</x-slot>
 
-    @if(session('success'))<div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>@endif
-    @if(session('error'))<div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-800">{{ session('error') }}</div>@endif
-
     @role('admin')
         <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div><p class="text-sm font-semibold text-blue-600">Platform events</p><h2 class="mt-1 text-3xl font-black tracking-tight">Company event workspaces</h2><p class="mt-2 text-sm text-slate-500">Review events by company or create a new company workspace.</p></div>

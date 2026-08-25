@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Attendee Pricing</x-slot>
     <div class="py-10"><div class="mx-auto max-w-4xl space-y-8 px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
 
         <p class="text-sm text-gray-500">Graduated (marginal) tiers charged per attendee, upfront, per event. A company's own negotiated rate (set on its edit screen) beats its plan's tiers, which beat the platform default below. One tier per line, <code>from-to:rate</code> (major currency units), last line unbounded.</p>

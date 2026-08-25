@@ -5,7 +5,6 @@
             <div><h1 class="text-2xl font-black text-slate-900">Forms</h1><p class="text-sm text-slate-500">Build feedback and survey forms for this event.</p></div>
             <a href="{{ route('events.forms.create', $event) }}" class="rounded-xl bg-blue-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Create form</a>
         </div>
-        @if(session('success'))<div class="mb-5 rounded-xl bg-emerald-50 p-4 text-sm font-bold text-emerald-700">{{ session('success') }}</div>@endif
 
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-4">Form</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Responses</th><th class="px-5 py-4">Actions</th></tr></thead>

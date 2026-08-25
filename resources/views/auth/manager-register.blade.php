@@ -8,7 +8,6 @@
         <h1 class="mt-3 text-2xl font-black text-gray-900">Create your manager workspace</h1>
         <p class="mt-2 text-sm text-gray-500">Your company and first manager account will be created together.</p>
     </div>
-    @if(session('success'))<div class="mb-5 rounded-2xl bg-green-50 p-4 text-sm font-bold text-green-700">{{ session('success') }}</div>@endif
     <form method="POST" action="{{ route('register') }}" enctype="multipart/form-data" class="space-y-5">
         @csrf
         <div><x-input-label for="company_name" :value="__('Company or organisation name')" /><x-text-input id="company_name" class="mt-1 block w-full" type="text" name="company_name" :value="old('company_name')" required autofocus /><x-input-error :messages="$errors->get('company_name')" class="mt-1" /></div>

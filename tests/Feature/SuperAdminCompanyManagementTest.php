@@ -127,7 +127,7 @@ it('archives a company instead of permanently deleting it, and hides it from the
 
     $this->actingAs($admin)
         ->get(route('companies.index'))
-        ->assertDontSee('Acme Co');
+        ->assertDontSee(route('companies.edit', $company));
 });
 
 it('immediately blocks an archived company\'s manager from the app', function () {

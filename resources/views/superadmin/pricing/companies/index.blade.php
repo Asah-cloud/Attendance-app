@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Company Pricing</x-slot>
     <div class="py-10"><div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="mb-5 rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
 
         <p class="text-sm text-gray-500">Pick a company to set a negotiated per-attendee rate for it, or to override pricing on one of its individual events.</p>
 

@@ -23,6 +23,7 @@
     <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="bg-[#f7f8fb] text-slate-950 antialiased" style="font-family: Manrope, sans-serif">
+    <x-toast />
     <header x-data="{ mobileMenuOpen: false }" @keydown.escape.window="mobileMenuOpen = false" class="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#071426]/90 text-white backdrop-blur-xl">
         <nav class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8" aria-label="Main navigation">
             <a href="{{ route('home') }}" class="flex items-center gap-3" aria-label="Asah Apex Attendance home">

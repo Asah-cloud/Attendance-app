@@ -1,8 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Subscription Plans</x-slot>
     <div class="py-10"><div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="mb-5 rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
-        @if(session('error'))<div class="mb-5 rounded-2xl bg-red-50 p-4 font-bold text-red-700">{{ session('error') }}</div>@endif
 
         <div class="mb-6 flex items-center justify-between gap-4">
             <div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Pricing</p><h2 class="mt-1 text-2xl font-black">Subscription plans</h2><p class="mt-1 text-sm text-slate-500">Prices, limits, and feature bullets shown on the public pricing page and billing screens.</p></div>

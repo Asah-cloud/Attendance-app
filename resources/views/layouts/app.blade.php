@@ -12,6 +12,7 @@
         <style>[x-cloak] { display: none !important; }</style>
     </head>
     <body class="antialiased text-slate-950 selection:bg-blue-600 selection:text-white" style="font-family: Manrope, sans-serif">
+        <x-toast />
         <div data-ui="app" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false" class="min-h-screen bg-slate-50">
             @include('layouts.navigation')
 

@@ -1,8 +1,6 @@
 <x-app-layout>
     <x-slot name="header">{{ $event->title }} · Billing</x-slot>
     <div class="py-10"><div class="mx-auto max-w-3xl space-y-8 px-4 sm:px-6 lg:px-8">
-        @if(session('success'))<div class="rounded-2xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
-        @if(session('error'))<div class="rounded-2xl bg-red-50 p-4 font-bold text-red-700">{{ session('error') }}</div>@endif
 
         @if(!$charge)
             <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">

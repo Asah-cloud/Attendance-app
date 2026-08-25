@@ -1,7 +1,6 @@
 <x-public-layout title="Registration confirmation" :noindex="true">
     <section class="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-32">
         <div class="mx-auto max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/70">
-            @if(session('success'))<div class="mb-5 rounded-xl bg-green-50 p-4 font-bold text-green-700">{{ session('success') }}</div>@endif
 
             @if($registration->event->company?->logo_path || $registration->event->company?->name)
                 <div class="mb-5 flex items-center justify-center gap-2">

@@ -1,8 +1,6 @@
 <x-app-layout>
     <x-slot name="header">Food QR Scanner</x-slot>
 
-    @if(session('success'))<div class="mb-5 rounded-xl bg-emerald-50 p-4 font-bold text-emerald-800">{{ session('success') }}</div>@endif
-    @if(session('error'))<div class="mb-5 rounded-xl bg-red-50 p-4 font-bold text-red-800">{{ session('error') }}</div>@endif
     <div id="low-stock-banner" class="mb-5 hidden rounded-xl bg-amber-50 p-4 font-bold text-amber-800">Stock is running low for this distribution.</div>
 
     <div class="grid gap-6 xl:grid-cols-[1fr_360px]">
