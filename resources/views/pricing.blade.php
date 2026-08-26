@@ -42,9 +42,5 @@
             </form>
         </div>
 
-        <div class="mt-10 rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center">
-            <p class="font-extrabold text-amber-950">Test mode is active.</p>
-            <p class="mt-2 text-sm leading-7 text-amber-800">No real charge will be made. The simulated checkout will be replaced by Card and Mobile Money payment before launch.</p>
-        </div>
     </section>
 </x-public-layout>

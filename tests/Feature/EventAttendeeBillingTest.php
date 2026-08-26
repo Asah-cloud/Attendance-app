@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\AttendeePricingResolver;
 use App\Services\AttendeePricingTierParser;
 use App\Services\EventBillingService;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
@@ -34,6 +36,36 @@ function attendeeBillingAdmin(): User
     $admin->assignRole('admin');
 
     return $admin;
+}
+
+function fakePaystackForEventBilling(): void
+{
+    config()->set('services.paystack', [
+        'secret_key' => 'sk_test_123',
+        'public_key' => 'pk_test_123',
+        'base_url' => 'https://paystack.test',
+    ]);
+
+    Http::fake([
+        'paystack.test/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => ['authorization_url' => 'https://paystack.test/pay/xyz', 'reference' => 'ignored'],
+        ], 200),
+        'paystack.test/transaction/verify/*' => function ($request) {
+            $reference = Str::afterLast($request->url(), '/');
+            $charge = EventAttendeeCharge::where('payment_reference', $reference)->first();
+
+            return Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'amount' => $charge?->amount_minor,
+                    'currency' => $charge?->currency,
+                    'reference' => $reference,
+                ],
+            ], 200);
+        },
+    ]);
 }
 
 function registerConfirmedAttendees(Event $event, int $count): void
@@ -73,6 +105,7 @@ it('lets a company-level override beat both plan and platform tiers', function (
 });
 
 it('lets a manager finalize and pay an event attendee bill', function () {
+    fakePaystackForEventBilling();
     $company = Company::create(['name' => 'Acme Co']);
     $manager = attendeeBillingManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Annual Conference', 'event_date' => now()->addWeek()]);
@@ -96,11 +129,41 @@ it('lets a manager finalize and pay an event attendee bill', function () {
 
     $this->actingAs($manager)
         ->post(route('events.billing.pay', $event))
-        ->assertRedirect(route('events.billing.show', $event));
+        ->assertRedirect('https://paystack.test/pay/xyz');
 
     $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
+        ->and($charge->payment_reference)->toStartWith('EVB-'.$event->id.'-');
+
+    $this->actingAs($manager)
+        ->get(route('events.billing.callback', ['event' => $event, 'reference' => $charge->payment_reference]))
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge->refresh();
     expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PAID)
         ->and($charge->payment_reference)->not->toBeNull();
+});
+
+it('marks the bill payment_failed when Paystack reports the payment did not succeed', function () {
+    config()->set('services.paystack', ['secret_key' => 'sk_test_123', 'public_key' => 'pk_test_123', 'base_url' => 'https://paystack.test']);
+    Http::fake([
+        'paystack.test/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://paystack.test/pay/xyz']], 200),
+        'paystack.test/transaction/verify/*' => Http::response(['status' => true, 'data' => ['status' => 'failed']], 200),
+    ]);
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = attendeeBillingManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Annual Conference', 'event_date' => now()->addWeek()]);
+    registerConfirmedAttendees($event, 3);
+    app(EventBillingService::class)->finalize($event);
+
+    $this->actingAs($manager)->post(route('events.billing.pay', $event));
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+
+    $this->actingAs($manager)
+        ->get(route('events.billing.callback', ['event' => $event, 'reference' => $charge->payment_reference]))
+        ->assertRedirect(route('events.billing.show', $event));
+
+    expect($charge->fresh()->status)->toBe(EventAttendeeCharge::STATUS_PAYMENT_FAILED);
 });
 
 it('reconciles a paid bill and computes a refund for no-shows once the event has closed', function () {
@@ -115,7 +178,7 @@ it('reconciles a paid bill and computes a refund for no-shows once the event has
 
     $billing = app(EventBillingService::class);
     $charge = $billing->finalize($event);
-    $billing->pay($charge->fresh());
+    $billing->confirmPayment($charge->fresh());
     $billing->reconcile($charge->fresh());
 
     $charge->refresh();
@@ -134,7 +197,7 @@ it('reconciles with zero refund when every registrant checked in', function () {
 
     $billing = app(EventBillingService::class);
     $charge = $billing->finalize($event);
-    $billing->pay($charge->fresh());
+    $billing->confirmPayment($charge->fresh());
     $billing->reconcile($charge->fresh());
 
     $charge->refresh();
@@ -149,7 +212,7 @@ it('lets a super admin mark a refund-due charge as refunded', function () {
     registerConfirmedAttendees($event, 1);
     $billing = app(EventBillingService::class);
     $charge = $billing->finalize($event);
-    $billing->pay($charge->fresh());
+    $billing->confirmPayment($charge->fresh());
     $billing->voidForCancellation($event); // event never happened -> full refund due
 
     $this->actingAs($admin)
@@ -179,7 +242,7 @@ it('voids an unpaid bill on cancellation and fully refunds a paid one', function
     registerConfirmedAttendees($paidEvent, 1);
     $billing = app(EventBillingService::class);
     $charge = $billing->finalize($paidEvent);
-    $billing->pay($charge->fresh());
+    $billing->confirmPayment($charge->fresh());
 
     $this->actingAs($manager)->patch(route('events.cancel', $paidEvent))->assertRedirect();
     $charge->refresh();

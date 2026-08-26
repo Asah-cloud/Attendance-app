@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 
 class EventBillingService
 {
-    public function __construct(private AttendeePricingResolver $pricing) {}
+    public function __construct(private AttendeePricingResolver $pricing, private PaystackService $paystack) {}
 
     public function estimate(Event $event): array
     {
@@ -58,15 +58,58 @@ class EventBillingService
         return $charge;
     }
 
-    public function pay(EventAttendeeCharge $charge): void
+    /**
+     * Start a Paystack checkout for a finalized bill and return the
+     * authorization_url to redirect the manager to.
+     */
+    public function startCheckout(EventAttendeeCharge $charge, string $callbackUrl): string
+    {
+        $reference = DB::transaction(function () use ($charge): string {
+            $locked = EventAttendeeCharge::query()->lockForUpdate()->findOrFail($charge->id);
+            abort_unless(
+                in_array($locked->status, [EventAttendeeCharge::STATUS_PENDING_PAYMENT, EventAttendeeCharge::STATUS_PAYMENT_FAILED], true),
+                422,
+                'This bill cannot be paid in its current state.'
+            );
+
+            $reference = 'EVB-'.$locked->event_id.'-'.Str::upper(Str::random(16));
+            $locked->update([
+                'status' => EventAttendeeCharge::STATUS_PENDING_PAYMENT,
+                'payment_reference' => $reference,
+            ]);
+
+            return $reference;
+        });
+
+        $charge->loadMissing('company');
+
+        $data = $this->paystack->initialize(
+            amountMinor: $charge->amount_minor,
+            currency: $charge->currency,
+            email: $charge->company->email ?: 'billing@'.Str::slug($charge->company->name).'.example',
+            reference: $reference,
+            callbackUrl: $callbackUrl,
+            metadata: ['flow' => 'event_billing', 'charge_id' => $charge->id, 'event_id' => $charge->event_id],
+        );
+
+        return $data['authorization_url'];
+    }
+
+    /**
+     * Mark a charge paid. Idempotent — safe to call from both the browser
+     * callback and the webhook, whichever wins the race.
+     */
+    public function confirmPayment(EventAttendeeCharge $charge): void
     {
         DB::transaction(function () use ($charge): void {
             $locked = EventAttendeeCharge::query()->lockForUpdate()->findOrFail($charge->id);
-            abort_unless($locked->status === EventAttendeeCharge::STATUS_PENDING_PAYMENT, 422, 'This bill cannot be paid in its current state.');
+
+            if ($locked->status === EventAttendeeCharge::STATUS_PAID) {
+                return;
+            }
 
             $locked->update([
                 'status' => EventAttendeeCharge::STATUS_PAID,
-                'payment_reference' => 'TEST-'.Str::upper(Str::random(20)),
                 'paid_at' => now(),
             ]);
         });

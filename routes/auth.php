@@ -13,10 +13,11 @@ use App\Http\Controllers\OnboardingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    Route::get('checkout/callback', [OnboardingController::class, 'checkoutCallback'])->name('checkout.callback');
     Route::get('checkout/{plan}', [OnboardingController::class, 'checkout'])->name('checkout');
-    Route::post('checkout/{plan}/test-payment', [OnboardingController::class, 'processTestPayment'])
+    Route::post('checkout/{plan}/start', [OnboardingController::class, 'startCheckout'])
         ->middleware('throttle:10,1')
-        ->name('checkout.test-payment');
+        ->name('checkout.start');
     Route::get('register', [OnboardingController::class, 'createAccount'])->name('register');
     Route::post('register', [OnboardingController::class, 'storeAccount']);
 

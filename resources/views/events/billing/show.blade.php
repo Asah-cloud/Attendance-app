@@ -46,11 +46,16 @@
                 </div>
                 <p class="mt-4 text-2xl font-black">Total: {{ $charge->currency }} {{ number_format($charge->amount_minor / 100, 2) }}</p>
 
-                @if($charge->status === 'pending_payment')
-                    <div class="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">Test mode: no real money or payment information will be collected.</div>
+                @if($errors->has('payment'))
+                    <div class="mt-6 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-900">{{ $errors->first('payment') }}</div>
+                @endif
+                @if($charge->status === 'payment_failed')
+                    <p class="mt-6 text-sm font-bold text-red-700">Your last payment attempt failed.</p>
+                @endif
+                @if(in_array($charge->status, ['pending_payment', 'payment_failed']))
                     <form method="POST" action="{{ route('events.billing.pay', $event) }}" class="mt-4">
                         @csrf
-                        <button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white">Approve test payment</button>
+                        <button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white">{{ $charge->status === 'payment_failed' ? 'Try again' : 'Pay with Paystack' }}</button>
                     </form>
                 @elseif($charge->status === 'paid')
                     <p class="mt-4 text-sm text-gray-500">Paid {{ $charge->paid_at->format('M j, Y g:i A') }} · reference <span class="font-mono">{{ $charge->payment_reference }}</span>. Reconciliation happens automatically once the event closes.</p>

@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [RequirePasswordChange::class]);
+        $middleware->validateCsrfTokens(except: ['webhooks/paystack']);
         $middleware->alias([
             'company.active' => EnsureCompanyIsActive::class,
             'role' => RoleMiddleware::class,

@@ -11,6 +11,8 @@ class EventAttendeeCharge extends Model
 
     public const STATUS_VOIDED = 'voided';
 
+    public const STATUS_PAYMENT_FAILED = 'payment_failed';
+
     public const STATUS_PAID = 'paid';
 
     public const STATUS_RECONCILED = 'reconciled';

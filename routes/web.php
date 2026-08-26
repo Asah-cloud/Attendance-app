@@ -15,6 +15,8 @@ use App\Http\Controllers\MealDistributionController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationBrandingController;
 use App\Http\Controllers\ParticipantMergeController;
+use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Middleware\VerifyPaystackSignature;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
@@ -58,6 +60,10 @@ Route::post('/forms/{eventSlug}/{formSlug}', [PublicFormController::class, 'stor
     ->name('forms.store');
 Route::get('/forms/{eventSlug}/{formSlug}/thank-you', [PublicFormController::class, 'thankYou'])->name('forms.thank-you');
 
+Route::post('/webhooks/paystack', [PaystackWebhookController::class, 'handle'])
+    ->middleware(VerifyPaystackSignature::class)
+    ->name('paystack.webhook');
+
 Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'verified', 'company.active'])
     ->name('dashboard');
@@ -69,10 +75,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('role:manager')->prefix('billing')->name('billing.')->group(function () {
         Route::get('/', [BillingController::class, 'index'])->name('index');
+        Route::get('/checkout/callback', [BillingController::class, 'checkoutCallback'])->name('checkout.callback');
         Route::get('/checkout/{plan}', [BillingController::class, 'checkout'])->name('checkout');
-        Route::post('/checkout/{plan}/test-payment', [BillingController::class, 'processTestPayment'])
+        Route::post('/checkout/{plan}/start', [BillingController::class, 'startCheckout'])
             ->middleware('throttle:10,1')
-            ->name('test-payment');
+            ->name('checkout.start');
         Route::patch('/contact', [BillingController::class, 'updateContact'])->name('contact.update');
         Route::post('/cancel-renewal', [BillingController::class, 'cancelRenewal'])->name('cancel');
         Route::post('/resume-renewal', [BillingController::class, 'resumeRenewal'])->name('resume');
@@ -175,6 +182,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/billing', [EventBillingController::class, 'show'])->name('events.billing.show');
         Route::post('/events/{event}/billing/finalize', [EventBillingController::class, 'finalize'])->name('events.billing.finalize');
         Route::post('/events/{event}/billing/pay', [EventBillingController::class, 'pay'])->name('events.billing.pay');
+        Route::get('/events/{event}/billing/callback', [EventBillingController::class, 'callback'])->name('events.billing.callback');
 
         Route::get('/admin/register-person', [RegisteredUserController::class, 'create'])->name('admin.register-person');
         Route::post('/admin/register-person', [RegisteredUserController::class, 'store'])

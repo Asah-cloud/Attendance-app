@@ -1,19 +1,58 @@
 <?php
 
 use App\Models\Company;
+use App\Models\SubscriptionPayment;
 use App\Models\User;
 use App\Notifications\CompanyWelcomeNotification;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+function fakePaystackForOnboarding(): void
+{
+    config()->set('services.paystack', [
+        'secret_key' => 'sk_test_123',
+        'public_key' => 'pk_test_123',
+        'base_url' => 'https://paystack.test',
+    ]);
+
+    Http::fake([
+        'paystack.test/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => ['authorization_url' => 'https://paystack.test/pay/xyz', 'reference' => 'ignored'],
+        ], 200),
+        'paystack.test/transaction/verify/*' => function ($request) {
+            $reference = Str::afterLast($request->url(), '/');
+
+            return Http::response([
+                'status' => true,
+                'data' => ['status' => 'success', 'amount' => 29900, 'currency' => 'GHS', 'reference' => $reference],
+            ], 200);
+        },
+    ]);
+}
+
+function payForOnboarding(Tests\TestCase $test, string $plan, string $email): string
+{
+    $test->post(route('checkout.start', $plan), ['email' => $email])
+        ->assertRedirect('https://paystack.test/pay/xyz');
+
+    $reference = session('onboarding_checkout_pending')['reference'];
+
+    $test->get(route('checkout.callback', ['reference' => $reference]))
+        ->assertRedirect(route('register'));
+
+    return $reference;
+}
 
 test('pricing displays all three test plan prices', function () {
     $this->get(route('pricing'))
         ->assertOk()
         ->assertSee('GHS 99')
         ->assertSee('GHS 299')
-        ->assertSee('GHS 799')
-        ->assertSee('Test mode is active');
+        ->assertSee('GHS 799');
 });
 
 test('manager registration requires a completed payment session', function () {
@@ -34,7 +73,7 @@ test('manager registration requires a completed payment session', function () {
 
 test('an unknown plan cannot enter checkout', function () {
     $this->get('/checkout/not-a-plan')->assertNotFound();
-    $this->post('/checkout/not-a-plan/test-payment')->assertNotFound();
+    $this->post('/checkout/not-a-plan/start', ['email' => 'a@example.com'])->assertNotFound();
 });
 
 test('tampered or expired payment sessions cannot create manager accounts', function () {
@@ -42,7 +81,8 @@ test('tampered or expired payment sessions cannot create manager accounts', func
         'plan_key' => 'starter',
         'price_minor' => 1,
         'currency' => 'GHS',
-        'payment_reference' => 'TEST-TAMPERED',
+        'payment_reference' => 'ONB-TAMPERED',
+        'email' => 'manager@example.com',
         'paid_at' => now()->subHour()->toIso8601String(),
     ];
 
@@ -53,14 +93,15 @@ test('tampered or expired payment sessions cannot create manager accounts', func
 
 test('a paid onboarding creates a company manager and opens the dashboard', function () {
     Notification::fake();
-    $this->post(route('checkout.test-payment', 'business'))
-        ->assertRedirect(route('register'))
-        ->assertSessionHas('onboarding_payment');
+    fakePaystackForOnboarding();
+
+    payForOnboarding($this, 'business', 'manager@example.com');
 
     $this->get(route('register'))
         ->assertOk()
         ->assertSee('Business plan')
-        ->assertSee('GHS 299.00');
+        ->assertSee('GHS 299.00')
+        ->assertSee('manager@example.com');
 
     $response = $this->post(route('register'), [
         'company_name' => 'Acme Events',
@@ -80,7 +121,7 @@ test('a paid onboarding creates a company manager and opens the dashboard', func
         ->and($company->plan_price_minor)->toBe(29900)
         ->and($company->billing_currency)->toBe('GHS')
         ->and($company->event_limit)->toBe(15)
-        ->and($company->payment_reference)->toStartWith('TEST-')
+        ->and($company->payment_reference)->toStartWith('ONB-')
         ->and($company->subscription_started_at)->not->toBeNull()
         ->and($company->subscription_ends_at)->not->toBeNull()
         ->and($manager->company_id)->toBe($company->id)
@@ -104,6 +145,22 @@ test('a paid onboarding creates a company manager and opens the dashboard', func
         'payment_reference' => $company->payment_reference,
         'status' => 'paid',
     ]);
+});
+
+test('registering with a different email than the one paid with is rejected', function () {
+    fakePaystackForOnboarding();
+    payForOnboarding($this, 'business', 'paid@example.com');
+
+    $this->post(route('register'), [
+        'company_name' => 'Acme Events',
+        'name' => 'Manager One',
+        'email' => 'different@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ])->assertSessionHasErrors('email');
+
+    $this->assertGuest();
+    $this->assertDatabaseCount('companies', 0);
 });
 
 test('choosing pay-per-event creates a company with no subscription and no payment record', function () {
@@ -145,8 +202,9 @@ test('choosing pay-per-event creates a company with no subscription and no payme
 
 test('a manager can upload a company logo while registering after payment', function () {
     Storage::fake('public');
+    fakePaystackForOnboarding();
 
-    $this->post(route('checkout.test-payment', 'business'));
+    payForOnboarding($this, 'business', 'manager@example.com');
 
     $this->post(route('register'), [
         'company_name' => 'Acme Events',
