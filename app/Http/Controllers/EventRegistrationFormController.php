@@ -26,7 +26,7 @@ class EventRegistrationFormController extends Controller
 {
     public function registrations(Request $request, Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $event->ensureSystemRegistrationFields();
         $status = $request->string('status')->toString();
         $registrations = $event->registrations()
@@ -43,12 +43,7 @@ class EventRegistrationFormController extends Controller
 
     public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
     {
-        $this->authorize('update', $event);
-
-        if (in_array($event->status, ['closed', 'cancelled'], true)) {
-            return back()->withErrors(['name' => 'This event is closed — new registrations can no longer be added.'])->withInput();
-        }
-
+        $this->authorize('manageWhenOpen', $event);
         $event->ensureSystemRegistrationFields();
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -146,7 +141,7 @@ class EventRegistrationFormController extends Controller
 
     public function badges(Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
@@ -164,7 +159,7 @@ class EventRegistrationFormController extends Controller
 
     public function badgesPdf(Event $event): Response
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         set_time_limit(300);
         $event->loadMissing('company');
         $registrations = $event->registrations()
@@ -196,7 +191,7 @@ class EventRegistrationFormController extends Controller
 
     public function updateBadgeSettings(Request $request, Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $validated = $request->validate([
             'badge_size' => ['required', 'in:A5,A6'],
             'badge_design' => ['required', 'in:default,category'],
@@ -271,7 +266,7 @@ class EventRegistrationFormController extends Controller
 
     public function export(Event $event): StreamedResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $filename = Str::slug($event->title).'-registrations.csv';
 
         return response()->streamDownload(function () use ($event): void {
@@ -288,7 +283,7 @@ class EventRegistrationFormController extends Controller
 
     public function edit(Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $event->ensureSystemRegistrationFields();
 
         return view('events.registration-form', [
@@ -299,7 +294,7 @@ class EventRegistrationFormController extends Controller
 
     public function updateSettings(Request $request, Event $event, RegistrationLifecycleService $lifecycle): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $validated = $request->validate([
             'registration_enabled' => ['required', 'boolean'],
             'registration_opens_at' => ['nullable', 'date'],
@@ -320,7 +315,7 @@ class EventRegistrationFormController extends Controller
 
     public function updateSystemField(Request $request, Event $event, EventRegistrationField $field): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         abort_unless($field->event_id === $event->id && $field->is_system, 404);
 
         $isCategory = $field->field_key === 'category';
@@ -347,7 +342,7 @@ class EventRegistrationFormController extends Controller
 
     public function storeField(Request $request, Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $validated = $request->validate([
             'label' => ['required', 'string', 'max:255'],
             'field_type' => ['required', Rule::in(EventRegistrationField::CUSTOM_TYPES)],
@@ -376,7 +371,7 @@ class EventRegistrationFormController extends Controller
 
     public function destroyField(Event $event, EventRegistrationField $field): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         abort_unless($field->event_id === $event->id, 404);
         abort_if($field->is_system, 422, 'System fields cannot be removed.');
         $field->delete();
@@ -386,14 +381,14 @@ class EventRegistrationFormController extends Controller
 
     public function printQr(Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
 
         return view('events.registration-qr', compact('event'));
     }
 
     public function downloadQr(Event $event): Response
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $svg = QrCode::format('svg')->size(1000)->generate(route('events.register', $event));
         $filename = Str::slug($event->title).'-registration-qr.svg';
 
@@ -431,7 +426,7 @@ class EventRegistrationFormController extends Controller
 
     private function authorizeRegistration(Event $event, EventRegistration $registration): void
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         abort_unless($registration->event_id === $event->id, 404);
     }
 

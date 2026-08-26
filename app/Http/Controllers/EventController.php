@@ -51,7 +51,7 @@ class EventController extends Controller
      */
     public function import(Request $request, Event $event)
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
 
         // 1. Validate the file
         $request->validate([

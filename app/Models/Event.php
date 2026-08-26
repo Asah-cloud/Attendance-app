@@ -203,6 +203,11 @@ class Event extends Model
             && $day <= $this->currentDay();
     }
 
+    public function isClosed(): bool
+    {
+        return in_array($this->status, ['closed', 'cancelled'], true);
+    }
+
     public function registrationIsOpen(): bool
     {
         return ! $this->cancelled_at

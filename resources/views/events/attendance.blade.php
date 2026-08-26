@@ -75,7 +75,7 @@
                         @can('scanAttendance', $event)
                             <a href="{{ route('events.scanner', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md">Open QR scanner</a>
                         @endcan
-                        @can('update', $event)
+                        @can('manageWhenOpen', $event)
                             <a href="{{ route('events.registration-form.edit', $event) }}" class="rounded-xl bg-amber-100 px-4 py-2.5 text-xs font-extrabold text-amber-900 hover:bg-amber-200">Registration form</a>
                             <a href="{{ route('events.registrations.index', $event) }}" class="rounded-xl bg-emerald-100 px-4 py-2.5 text-xs font-extrabold text-emerald-900 hover:bg-emerald-200">Attendees</a>
                             <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-700">

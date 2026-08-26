@@ -19,7 +19,7 @@ class AttendanceConfirmationController extends Controller
 {
     public function index(Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $event->ensureSystemRegistrationFields();
         $registrations = $event->registrations()
             ->with('participant')
@@ -39,7 +39,7 @@ class AttendanceConfirmationController extends Controller
 
     public function updateMessage(Request $request, Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $validated = $request->validate(['confirmation_message' => ['required', 'string', 'max:2000']]);
         $event->update($validated);
 
@@ -48,7 +48,7 @@ class AttendanceConfirmationController extends Controller
 
     public function import(Request $request, Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $request->validate(['file' => 'required|mimes:xlsx,xls,csv|max:2048']);
 
         try {
@@ -64,7 +64,7 @@ class AttendanceConfirmationController extends Controller
 
     public function remove(Event $event, EventRegistration $registration): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         abort_unless($registration->event_id === $event->id, 404);
         abort_unless($registration->status === EventRegistration::STATUS_AWAITING_CONFIRMATION, 422);
         $registration->delete();
@@ -74,7 +74,7 @@ class AttendanceConfirmationController extends Controller
 
     public function send(Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageWhenOpen', $event);
         $registrations = $event->registrations()
             ->with('participant')
             ->where('status', EventRegistration::STATUS_AWAITING_CONFIRMATION)

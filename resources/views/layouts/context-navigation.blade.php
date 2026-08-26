@@ -60,9 +60,9 @@
 
     $eventLinks = $contextEvent ? array_values(array_filter([
         ['label' => 'Attendance', 'route' => route('events.attendance', $contextEvent), 'active' => request()->routeIs('events.attendance', 'events.scanner')],
-        $user->can('update', $contextEvent) ? ['label' => 'Attendees', 'route' => route('events.registrations.index', $contextEvent), 'active' => request()->routeIs('events.registrations.*', 'events.badges')] : null,
-        $user->can('update', $contextEvent) ? ['label' => 'Registration form', 'route' => route('events.registration-form.edit', $contextEvent), 'active' => request()->routeIs('events.registration-form.*')] : null,
-        $user->can('update', $contextEvent) ? ['label' => 'Confirmations', 'route' => route('events.confirmations.index', $contextEvent), 'active' => request()->routeIs('events.confirmations.*')] : null,
+        $user->can('manageWhenOpen', $contextEvent) ? ['label' => 'Attendees', 'route' => route('events.registrations.index', $contextEvent), 'active' => request()->routeIs('events.registrations.*', 'events.badges')] : null,
+        $user->can('manageWhenOpen', $contextEvent) ? ['label' => 'Registration form', 'route' => route('events.registration-form.edit', $contextEvent), 'active' => request()->routeIs('events.registration-form.*')] : null,
+        $user->can('manageWhenOpen', $contextEvent) ? ['label' => 'Confirmations', 'route' => route('events.confirmations.index', $contextEvent), 'active' => request()->routeIs('events.confirmations.*')] : null,
         $user->can('update', $contextEvent) ? ['label' => 'Forms', 'route' => route('events.forms.index', $contextEvent), 'active' => request()->routeIs('events.forms.*')] : null,
         ['label' => 'Food', 'route' => route('events.meals.index', $contextEvent), 'active' => request()->routeIs('events.meals.*')],
         ['label' => 'Reports', 'route' => route('reports.event', $contextEvent), 'active' => request()->routeIs('reports.*')],

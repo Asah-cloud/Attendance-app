@@ -29,6 +29,11 @@ class EventPolicy
             && $user->company_id === $event->company_id;
     }
 
+    public function manageWhenOpen(User $user, Event $event): bool
+    {
+        return $this->update($user, $event) && ! $event->isClosed();
+    }
+
     public function scanAttendance(User $user, Event $event): bool
     {
         if ($user->hasRole('manager')) {
