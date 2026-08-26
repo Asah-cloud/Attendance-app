@@ -37,8 +37,8 @@
         .member-id { margin: 0; color: #0f172a; font-size: 4mm; font-weight: bold; }
         .scan { margin: 3mm 0 0; color: #475569; font-size: 2.5mm; font-weight: bold; }
         .qr-box { border-radius: 2.5mm; background: white; padding: 2mm; text-align: center; }
-        .custom-art { height: 30mm; border-radius: 4mm; background-size: cover; background-repeat: no-repeat; margin-bottom: 3mm; }
-        .custom-brand { min-height: 14mm; padding: 2mm 3mm; }
+        .custom-art { height: 16mm; border-radius: 4mm; background-size: cover; background-repeat: no-repeat; margin-bottom: 2mm; }
+        .custom-brand { padding: 2mm 3mm; }
         .custom-event { margin-top: 2.5mm; }
         .split-art { width: 33mm; height: 43mm; border-radius: 4mm; background-size: cover; background-repeat: no-repeat; }
         .split-copy { padding-left: 3mm; vertical-align: top; }
@@ -70,7 +70,7 @@
             @elseif($layout === 'split' && $badgeImage)
                 <table class="row"><tr><td style="width:33mm;vertical-align:top"><div class="split-art" style="background-image:url('{{ $badgeImage }}');background-position:{{ $event->badge_image_position_x ?? 50 }}% {{ $event->badge_image_position_y ?? 50 }}%;"></div></td><td class="split-copy">
             @endif
-            <div class="box brand-box">
+            <div class="box brand-box {{ $layout === 'image_header' ? 'custom-brand' : '' }}">
                 <table class="row"><tr>
                     <td style="width: 12mm; vertical-align: middle;">
                         @if($companyLogo)
@@ -82,7 +82,7 @@
                     <td class="company-name" style="vertical-align: middle;">{{ $event->company?->name ?? 'Event Organizer' }}</td>
                 </tr></table>
             </div>
-            <div class="event-block">
+            <div class="event-block {{ $layout === 'image_header' ? 'custom-event' : '' }}">
                 <table class="row"><tr>
                     @if($eventLogo)
                         <td style="width: 14mm; vertical-align: middle;"><img src="{{ $eventLogo }}" style="width: 12mm; height: 12mm;"></td>
