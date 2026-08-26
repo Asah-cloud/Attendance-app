@@ -1,6 +1,8 @@
 <x-app-layout>
     <x-slot name="header">Food Distribution</x-slot>
 
+    <x-event-closed-banner :event="$event" />
+
     <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and use attendee QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) for this event.</p></div>@can('update', $event)<div class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
 
     @can('update', $event)

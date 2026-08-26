@@ -170,6 +170,11 @@ class MealDistributionController extends Controller
     {
         $this->authorize('scanAttendance', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
+
+        if (in_array($event->status, ['closed', 'cancelled'], true)) {
+            return $this->issueResponse($request, false, 'This event is closed — food can no longer be distributed.', 422);
+        }
+
         $validated = $request->validate([
             'registration_code' => ['required', 'string', 'max:100'],
             'override' => ['nullable', 'boolean'],

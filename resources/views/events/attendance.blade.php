@@ -115,6 +115,8 @@
                 </div>
             @endif
 
+            <x-event-closed-banner :event="$event" />
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {{-- Left Side Stats --}}
                 <div class="lg:col-span-1 space-y-8" data-aos="fade-right" data-aos-delay="200">

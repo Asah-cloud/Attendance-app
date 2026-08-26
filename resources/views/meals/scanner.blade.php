@@ -1,6 +1,8 @@
 <x-app-layout>
     <x-slot name="header">Food QR Scanner</x-slot>
 
+    <x-event-closed-banner :event="$event" />
+
     <div id="low-stock-banner" class="mb-5 hidden rounded-xl bg-amber-50 p-4 font-bold text-amber-800">Stock is running low for this distribution.</div>
 
     <div class="grid gap-6 xl:grid-cols-[1fr_360px]">

@@ -44,6 +44,11 @@ class EventRegistrationFormController extends Controller
     public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
     {
         $this->authorize('update', $event);
+
+        if (in_array($event->status, ['closed', 'cancelled'], true)) {
+            return back()->withErrors(['name' => 'This event is closed — new registrations can no longer be added.'])->withInput();
+        }
+
         $event->ensureSystemRegistrationFields();
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
