@@ -64,7 +64,7 @@
                 ['04', 'Multi-day tracking', 'Track attendance day by day without mixing sessions or losing the full event picture.', 'feature-days.webp', 'Multi-day attendance tracking on a tablet'],
                 ['05', 'Clear reporting', 'See present and absent participants, attendance rates, and downloadable summaries.', 'feature-reports.webp', 'An event coordinator reviewing attendance reports'],
                 ['06', 'Company controls', 'Keep teams and data separated with role-based access, multi-manager accounts, and subscription or pay-per-event billing controls.', 'feature-controls.webp', 'A company administrator managing permissions'],
-                ['07', 'Everything around the event', 'Custom registration forms, food distribution tracking, printable A5/A6 badges, and Excel/CSV/PDF exports — plus your own logo, flyer, SMS sender ID and email domain.', null, null],
+                ['07', 'Everything around the event', 'Custom registration forms, food distribution tracking, printable A5/A6 badges, and Excel/CSV/PDF exports — plus your own logo, flyer, SMS sender ID and email domain.', 'feature-event-operations.webp', 'An event coordinator managing badges and meal collection'],
             ] as [$number, $heading, $copy, $image, $alt])
                 <article class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-950/5">
                     @if($image)
