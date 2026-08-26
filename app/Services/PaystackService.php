@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PlatformSetting;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -42,10 +43,15 @@ class PaystackService
     private function request(): PendingRequest
     {
         return Http::asJson()
-            ->withHeader('Authorization', 'Bearer '.config('services.paystack.secret_key'))
+            ->withHeader('Authorization', 'Bearer '.$this->secretKey())
             ->baseUrl(config('services.paystack.base_url'))
             ->timeout(10)
             ->retry(3, 500, throw: false);
+    }
+
+    private function secretKey(): string
+    {
+        return PlatformSetting::get('paystack_secret_key') ?: (string) config('services.paystack.secret_key');
     }
 
     private function data(Response $response, string $errorMessage): array

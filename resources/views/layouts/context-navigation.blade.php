@@ -10,6 +10,7 @@
         request()->routeIs('companies.history.*') => ['Company history', route('companies.history.index')],
         request()->routeIs('companies.*') => ['Companies', route('companies.index')],
         request()->routeIs('pricing.plans.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') => ['Pricing', route('pricing.plans.index')],
+        request()->routeIs('integrations.*') => ['Integrations', route('integrations.edit')],
         request()->routeIs('billing.*') => ['Billing', route('billing.index')],
         request()->routeIs('organization.*') => ['Organization', route('organization.branding.edit')],
         request()->routeIs('participants.duplicates.*') => ['Merge duplicates', route('participants.duplicates.index')],

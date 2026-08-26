@@ -26,6 +26,7 @@ use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
 use App\Http\Controllers\SuperAdmin\CompanyPricingController;
+use App\Http\Controllers\SuperAdmin\IntegrationSettingsController;
 use App\Http\Controllers\SuperAdmin\PlanController;
 use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
 use Illuminate\Support\Facades\Route;
@@ -231,6 +232,11 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/pricing/plans/{plan}/edit', [PlanController::class, 'edit'])->name('pricing.plans.edit');
         Route::put('/pricing/plans/{plan}', [PlanController::class, 'update'])->name('pricing.plans.update');
         Route::delete('/pricing/plans/{plan}', [PlanController::class, 'destroy'])->name('pricing.plans.destroy');
+
+        // Platform-wide integration credentials (e.g. Paystack keys), editable
+        // from the admin UI instead of the server .env.
+        Route::get('/integrations', [IntegrationSettingsController::class, 'edit'])->name('integrations.edit');
+        Route::put('/integrations', [IntegrationSettingsController::class, 'update'])->name('integrations.update');
 
         // Attendee pricing: platform default + per-plan tier tables (per-company
         // overrides live on the company edit screen instead).
