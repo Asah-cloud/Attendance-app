@@ -11,7 +11,7 @@
             width: 100%;
             height: {{ $event->badge_size === 'A5' ? '210mm' : '148mm' }};
             background-color: #faf9f5;
-            @if($backgroundImage)
+            @if(($event->badge_layout ?? 'standard') === 'standard' && $backgroundImage)
                 background-image: url('{{ $backgroundImage }}');
                 background-size: cover;
                 background-position: center;
@@ -37,6 +37,12 @@
         .member-id { margin: 0; color: #0f172a; font-size: 4mm; font-weight: bold; }
         .scan { margin: 3mm 0 0; color: #475569; font-size: 2.5mm; font-weight: bold; }
         .qr-box { border-radius: 2.5mm; background: white; padding: 2mm; text-align: center; }
+        .custom-art { height: 30mm; border-radius: 4mm; background-size: cover; background-repeat: no-repeat; margin-bottom: 3mm; }
+        .custom-brand { min-height: 14mm; padding: 2mm 3mm; }
+        .custom-event { margin-top: 2.5mm; }
+        .split-art { width: 33mm; height: 43mm; border-radius: 4mm; background-size: cover; background-repeat: no-repeat; }
+        .split-copy { padding-left: 3mm; vertical-align: top; }
+        .custom-attendee { margin-top: 3mm; padding: 4mm; }
     </style>
 </head>
 <body>
@@ -44,7 +50,9 @@
     @php
         $category = $registration->participant->category ?: 'Attendee';
         $color = $categoryColors[$category] ?? '#0F766E';
-        $categoryColor = $event->badge_design === 'category' ? $color : '#0F766E';
+        $categoryColor = $event->badge_design === 'category' ? $color : ($event->badge_primary_color ?? '#0F766E');
+        $accentColor = $event->badge_accent_color ?? '#0F172A';
+        $layout = $event->badge_layout ?? 'standard';
         $nameParts = preg_split('/\s+/u', trim($registration->participant->name), -1, PREG_SPLIT_NO_EMPTY);
         if (count($nameParts) >= 3) {
             $middleInitials = array_map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)).'.', array_slice($nameParts, 1, -1));
@@ -57,6 +65,11 @@
     @endphp
     <div class="page"@if(!$loop->last) style="page-break-after: always;"@endif>
         <div class="top">
+            @if($layout === 'image_header' && $badgeImage)
+                <div class="custom-art" style="background-image:url('{{ $badgeImage }}');background-position:{{ $event->badge_image_position_x ?? 50 }}% {{ $event->badge_image_position_y ?? 50 }}%;"></div>
+            @elseif($layout === 'split' && $badgeImage)
+                <table class="row"><tr><td style="width:33mm;vertical-align:top"><div class="split-art" style="background-image:url('{{ $badgeImage }}');background-position:{{ $event->badge_image_position_x ?? 50 }}% {{ $event->badge_image_position_y ?? 50 }}%;"></div></td><td class="split-copy">
+            @endif
             <div class="box brand-box">
                 <table class="row"><tr>
                     <td style="width: 12mm; vertical-align: middle;">
@@ -80,9 +93,10 @@
                     </td>
                 </tr></table>
             </div>
-            <div class="attendee-box" style="border-left: 1.5mm solid {{ $categoryColor }};">
+            @if($layout === 'split' && $badgeImage)</td></tr></table>@endif
+            <div class="attendee-box {{ $layout === 'standard' ? '' : 'custom-attendee' }}" style="border-left: 1.5mm solid {{ $categoryColor }};">
                 <p class="attendee-label" style="color: {{ $categoryColor }};">Attendee</p>
-                <h1 class="name">{{ $badgeName }}</h1>
+                <h1 class="name" style="color:{{ $accentColor }}">{{ $badgeName }}</h1>
                 <span class="category-pill" style="background: {{ $categoryColor }};">{{ $category }}</span>
             </div>
         </div>

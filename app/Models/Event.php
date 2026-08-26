@@ -57,6 +57,12 @@ class Event extends Model
         'badge_size',
         'badge_design',
         'badge_category_colors',
+        'badge_layout',
+        'badge_image_path',
+        'badge_primary_color',
+        'badge_accent_color',
+        'badge_image_position_x',
+        'badge_image_position_y',
     ];
 
     protected $casts = [

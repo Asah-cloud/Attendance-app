@@ -6,7 +6,9 @@ use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\EventRegistrationSubmitted;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -49,7 +51,6 @@ it('allows managers to configure their event form while protecting system fields
     $event = publicRegistrationEvent();
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
     $manager->assignRole('manager');
-
     $this->actingAs($manager)
         ->get(route('events.registration-form.edit', $event))
         ->assertOk()
@@ -408,6 +409,64 @@ it('lets a manager choose A5 or A6 badges and save category colours', function (
 
     $this->actingAs($manager)->get(route('events.badges', $event))
         ->assertOk()->assertSee('A5')->assertSee('#FF5500');
+});
+
+it('lets a manager customize a sectioned badge with uploaded artwork', function () {
+    Storage::fake('public');
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Custom Badge Person', 'category' => 'Delegate']);
+    $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6',
+        'badge_design' => 'default',
+        'badge_layout' => 'split',
+        'badge_image' => UploadedFile::fake()->image('badge-art.jpg', 1200, 800),
+        'badge_primary_color' => '#115E59',
+        'badge_accent_color' => '#172554',
+        'badge_image_position_x' => 35,
+        'badge_image_position_y' => 70,
+    ])->assertRedirect()->assertSessionHas('success');
+
+    $event->refresh();
+    expect($event)
+        ->badge_layout->toBe('split')
+        ->badge_primary_color->toBe('#115E59')
+        ->badge_accent_color->toBe('#172554')
+        ->badge_image_position_x->toBe(35)
+        ->badge_image_position_y->toBe(70)
+        ->badge_image_path->not->toBeNull();
+    Storage::disk('public')->assertExists($event->badge_image_path);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertSee('Customize Badge')
+        ->assertSee('layout-split')
+        ->assertSee(Storage::url($event->badge_image_path));
+
+    $this->actingAs($manager)->get(route('events.badges.pdf', $event))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+});
+
+it('requires artwork for a customized badge layout', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)->from(route('events.badges', $event))->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6',
+        'badge_design' => 'default',
+        'badge_layout' => 'image_header',
+        'badge_primary_color' => '#0F766E',
+        'badge_accent_color' => '#0F172A',
+        'badge_image_position_x' => 50,
+        'badge_image_position_y' => 50,
+    ])->assertRedirect(route('events.badges', $event))->assertSessionHasErrors('badge_image');
+
+    expect($event->fresh()->badge_layout)->toBe('standard');
 });
 
 it('prevents an usher from editing attendee details', function () {

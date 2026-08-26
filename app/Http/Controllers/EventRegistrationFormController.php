@@ -178,11 +178,12 @@ class EventRegistrationFormController extends Controller
         };
 
         $backgroundImage = $localFilePath(public_path('images/badges/professional-teal-background-v1.png'));
+        $badgeImage = $event->badge_image_path ? $localFilePath(Storage::disk('public')->path($event->badge_image_path)) : null;
         $companyLogo = $event->company?->logo_path ? $localFilePath(Storage::disk('public')->path($event->company->logo_path)) : null;
         $eventLogo = $event->logo_path ? $localFilePath(Storage::disk('public')->path($event->logo_path)) : null;
 
         $pdf = Pdf::loadView('events.badges-pdf', compact(
-            'event', 'registrations', 'categoryColors', 'backgroundImage', 'companyLogo', 'eventLogo'
+            'event', 'registrations', 'categoryColors', 'backgroundImage', 'badgeImage', 'companyLogo', 'eventLogo'
         ))->setPaper($event->badge_size === 'A5' ? 'a5' : 'a6', 'portrait');
 
         return $pdf->download('badges-'.$event->slug.'.pdf');
@@ -194,6 +195,13 @@ class EventRegistrationFormController extends Controller
         $validated = $request->validate([
             'badge_size' => ['required', 'in:A5,A6'],
             'badge_design' => ['required', 'in:default,category'],
+            'badge_layout' => ['sometimes', 'in:standard,image_header,split'],
+            'badge_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'remove_badge_image' => ['nullable', 'boolean'],
+            'badge_primary_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'badge_accent_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'badge_image_position_x' => ['sometimes', 'integer', 'between:0,100'],
+            'badge_image_position_y' => ['sometimes', 'integer', 'between:0,100'],
             'categories' => ['nullable', 'array'],
             'categories.*' => ['nullable', 'string', 'max:255'],
             'colors' => ['nullable', 'array'],
@@ -209,11 +217,38 @@ class EventRegistrationFormController extends Controller
             }
         }
 
-        $event->update([
+        $layout = $validated['badge_layout'] ?? $event->badge_layout ?? 'standard';
+        $removingImage = $request->boolean('remove_badge_image');
+        if ($layout !== 'standard'
+            && ! $request->hasFile('badge_image')
+            && ($removingImage || ! $event->badge_image_path)) {
+            throw ValidationException::withMessages([
+                'badge_image' => 'Upload an image before using a customized badge layout.',
+            ]);
+        }
+
+        if ($removingImage && $event->badge_image_path) {
+            Storage::disk('public')->delete($event->badge_image_path);
+            $event->badge_image_path = null;
+        }
+
+        if ($request->hasFile('badge_image')) {
+            if ($event->badge_image_path) {
+                Storage::disk('public')->delete($event->badge_image_path);
+            }
+            $event->badge_image_path = $request->file('badge_image')->store('badge-images', 'public');
+        }
+
+        $event->fill([
             'badge_size' => $validated['badge_size'],
             'badge_design' => $validated['badge_design'],
             'badge_category_colors' => $colors,
-        ]);
+            'badge_layout' => $layout,
+            'badge_primary_color' => strtoupper($validated['badge_primary_color'] ?? $event->badge_primary_color ?? '#0F766E'),
+            'badge_accent_color' => strtoupper($validated['badge_accent_color'] ?? $event->badge_accent_color ?? '#0F172A'),
+            'badge_image_position_x' => $validated['badge_image_position_x'] ?? $event->badge_image_position_x ?? 50,
+            'badge_image_position_y' => $validated['badge_image_position_y'] ?? $event->badge_image_position_y ?? 50,
+        ])->save();
 
         return back()->with('success', 'Badge design saved. The preview is ready to print.');
     }
