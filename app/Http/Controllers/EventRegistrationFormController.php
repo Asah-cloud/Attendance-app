@@ -9,10 +9,12 @@ use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -153,6 +155,37 @@ class EventRegistrationFormController extends Controller
         ]);
 
         return view('events.badges', compact('event', 'registrations', 'categories', 'categoryColors'));
+    }
+
+    public function badgesPdf(Event $event): Response
+    {
+        $this->authorize('update', $event);
+        set_time_limit(300);
+        $event->loadMissing('company');
+        $registrations = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with('participant')
+            ->get();
+
+        $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();
+        $palette = ['#7C3AED', '#0F766E', '#B45309', '#BE123C', '#1D4ED8', '#4338CA'];
+        $categoryColors = $categories->mapWithKeys(fn ($category, $index) => [
+            $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
+        ]);
+
+        $localFilePath = function (?string $absolutePath): ?string {
+            return $absolutePath && is_file($absolutePath) ? str_replace('\\', '/', $absolutePath) : null;
+        };
+
+        $backgroundImage = $localFilePath(public_path('images/badges/professional-teal-background-v1.png'));
+        $companyLogo = $event->company?->logo_path ? $localFilePath(Storage::disk('public')->path($event->company->logo_path)) : null;
+        $eventLogo = $event->logo_path ? $localFilePath(Storage::disk('public')->path($event->logo_path)) : null;
+
+        $pdf = Pdf::loadView('events.badges-pdf', compact(
+            'event', 'registrations', 'categoryColors', 'backgroundImage', 'companyLogo', 'eventLogo'
+        ))->setPaper($event->badge_size === 'A5' ? 'a5' : 'a6', 'portrait');
+
+        return $pdf->download('badges-'.$event->slug.'.pdf');
     }
 
     public function updateBadgeSettings(Request $request, Event $event): RedirectResponse
