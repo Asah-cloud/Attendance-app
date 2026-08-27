@@ -31,7 +31,7 @@
                     @if($selectedDay === 'all')
                         ✨ All Event Days Consolidated
                     @else
-                        📅 Day {{ $selectedDay }} Report
+                        📅 {{ $event->attendanceSessionLabel($selectedDay) }} Report
                     @endif
                 </span>
                 <svg class="ml-2 h-4 w-4 text-gray-400 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,6 +61,13 @@
                 </div>
 
                 <div class="py-1">
+                    @if($event->has_arrival_session)
+                        <a href="{{ route('reports.event', ['event' => $event->id, 'day' => 0]) }}"
+                           class="flex items-center justify-between px-4 py-2.5 text-xs font-semibold {{ (string)$selectedDay === '0' ? 'bg-cyan-50 text-cyan-700 font-bold' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span>Arrival</span>
+                            @if((string)$selectedDay === '0')<span class="h-1.5 w-1.5 rounded-full bg-cyan-600"></span>@endif
+                        </a>
+                    @endif
                     @for($i = 1; $i <= $totalDays; $i++)
                         <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $i]) }}" 
                            class="flex items-center justify-between px-4 py-2.5 text-xs font-semibold transition-colors

@@ -59,6 +59,19 @@
                         </div>
                     </div>
 
+                    <div x-data="{ enabled: {{ old('has_arrival_session', $event->has_arrival_session) ? 'true' : 'false' }} }" class="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-6">
+                        <label class="flex cursor-pointer items-start gap-3">
+                            <input type="checkbox" name="has_arrival_session" value="1" x-model="enabled" class="mt-1 rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500">
+                            <span><span class="block text-sm font-black text-cyan-950">Separate Arrival check-in</span><span class="mt-1 block text-xs leading-5 text-cyan-800/70">Keep arrival, tag collection, and essentials separate from daily attendance.</span></span>
+                        </label>
+                        <div x-show="enabled" x-cloak class="mt-5">
+                            <label class="block text-xs font-black uppercase tracking-widest text-cyan-800">Arrival date</label>
+                            <input type="date" name="arrival_date" value="{{ old('arrival_date', $event->arrival_date?->format('Y-m-d')) }}" :required="enabled" class="mt-2 w-full rounded-xl border-cyan-200 bg-white px-4 py-3">
+                            <p class="mt-2 text-xs text-cyan-700">This may be the same date as Day 1 or an earlier date.</p>
+                            @error('arrival_date') <p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
                     {{-- Description --}}
                     <div>
                         <label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Event Description</label>

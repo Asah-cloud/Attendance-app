@@ -20,7 +20,7 @@
 <body>
     <h1>{{ $event->title }}</h1>
     <div class="meta">
-        Attendance report &middot; {{ $selectedDay === 'all' ? 'All days' : 'Day '.$selectedDay }} &middot; Generated {{ now()->format('M j, Y g:i A') }}
+        Attendance report &middot; {{ $event->attendanceSessionLabel($selectedDay) }} &middot; Generated {{ now()->format('M j, Y g:i A') }}
     </div>
 
     <table class="stats">

@@ -105,6 +105,8 @@ class EventController extends Controller
             'end_date' => 'nullable|date|after_or_equal:event_date',
             'description' => 'nullable|string',
             'day' => 'nullable|integer|min:1',
+            'has_arrival_session' => ['nullable', 'boolean'],
+            'arrival_date' => ['nullable', 'date', 'required_if:has_arrival_session,1', 'before_or_equal:event_date'],
             'company_id' => ['nullable', Rule::exists('companies', 'id')],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
@@ -134,6 +136,9 @@ class EventController extends Controller
             $validated['flyer_path'] = $request->file('flyer')->store('event-flyers', 'public');
         }
         unset($validated['logo'], $validated['flyer']);
+        $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
+        $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
+        $validated['day'] = $validated['has_arrival_session'] ? 0 : 1;
 
         // Enforce active subscription limits
         $created = DB::transaction(function () use ($companyId, $validated) {
@@ -172,12 +177,12 @@ class EventController extends Controller
         $maxDays = $start->diffInDays($end) + 1;
 
         $validated = $request->validate([
-            'day' => "required|integer|min:1|max:{$maxDays}",
+            'day' => ['required', 'integer', 'max:'.$maxDays, Rule::when($event->has_arrival_session, 'min:0', 'min:1')],
         ]);
 
         $event->update(['day' => $validated['day']]);
 
-        return back()->with('success', "Switched to Day {$validated['day']} successfully.");
+        return back()->with('success', 'Active check-in session switched to '.$event->attendanceSessionLabel($validated['day']).'.');
     }
 
     public function edit(Event $event)
@@ -196,11 +201,18 @@ class EventController extends Controller
             'end_date' => 'nullable|date|after_or_equal:event_date',
             'description' => 'nullable|string',
             'location' => 'nullable|string',
+            'has_arrival_session' => ['nullable', 'boolean'],
+            'arrival_date' => ['nullable', 'date', 'required_if:has_arrival_session,1', 'before_or_equal:event_date'],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_flyer' => ['nullable', 'boolean'],
         ]);
+        $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
+        $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
+        if (! $validated['has_arrival_session'] && (int) $event->day === 0) {
+            $validated['day'] = 1;
+        }
 
         $detailsChanged = $event->event_date?->toDateString() !== $validated['event_date']
             || $event->end_date?->toDateString() !== ($validated['end_date'] ?? null)

@@ -66,7 +66,7 @@ it('rejects personal QR check in outside the event dates', function () {
 
     $this->get(route('attendance.personal', $registration->registration_code))
         ->assertOk()
-        ->assertSee('Staff scan required');
+        ->assertSee('Event check-in');
 
     $this->assertDatabaseCount('attendances', 0);
 });

@@ -53,7 +53,7 @@ class ReportController extends Controller
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
         // Accepts route parameter directly to match Excel route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.xlsx';
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.xlsx';
 
         return Excel::download(new AttendanceExport($event, $day), $fileName);
     }
@@ -63,7 +63,7 @@ class ReportController extends Controller
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
         // Accepts route parameter directly to match CSV route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$day.'.csv';
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.csv';
 
         return Excel::download(new AttendanceExport($event, $day), $fileName, \Maatwebsite\Excel\Excel::CSV);
     }
@@ -79,7 +79,7 @@ class ReportController extends Controller
             $reportData
         ))->setPaper('a4');
 
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_Day_'.$selectedDay.'.pdf';
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($selectedDay)).'.pdf';
 
         return $pdf->download($fileName);
     }
@@ -144,7 +144,8 @@ class ReportController extends Controller
         $day = filter_var($day, FILTER_VALIDATE_INT);
         $totalDays = $event->event_date->diffInDays($event->end_date ?? $event->event_date) + 1;
 
-        if ($day === false || $day < 1 || $day > $totalDays) {
+        $minimum = $event->has_arrival_session ? 0 : 1;
+        if ($day === false || $day < $minimum || $day > $totalDays) {
             throw ValidationException::withMessages(['day' => 'The selected event day is invalid.']);
         }
 

@@ -56,10 +56,10 @@ class SummaryReportController extends Controller
             // Get users who attended at least once
             $presentUsers = $event->confirmedParticipants()
                 ->whereHas('attendances', function ($q) use ($event) {
-                    $q->where('event_id', $event->id);
+                    $q->where('event_id', $event->id)->where('day', '>=', 1);
                 })
                 ->with(['attendances' => function ($q) use ($event) {
-                    $q->where('event_id', $event->id);
+                    $q->where('event_id', $event->id)->where('day', '>=', 1);
                 }])
                 ->get()
                 ->map(function ($user) use ($totalEventDays) {
@@ -73,7 +73,7 @@ class SummaryReportController extends Controller
             // Get users who never showed up
             $absentUsers = $event->confirmedParticipants()
                 ->whereDoesntHave('attendances', function ($q) use ($event) {
-                    $q->where('event_id', $event->id);
+                    $q->where('event_id', $event->id)->where('day', '>=', 1);
                 })
                 ->get();
 

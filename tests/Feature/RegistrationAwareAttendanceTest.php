@@ -53,10 +53,10 @@ it('does not allow public personal QR links to mark attendance', function () {
 
     $this->get(route('attendance.personal', $confirmedRegistration->registration_code))
         ->assertOk()
-        ->assertSee('Staff scan required');
+        ->assertSee('Event check-in');
     $this->get(route('attendance.personal', $unconfirmedRegistration->registration_code))
         ->assertOk()
-        ->assertSee('Staff scan required');
+        ->assertSee('Event check-in');
 
     $this->assertDatabaseMissing('attendances', ['event_id' => $event->id, 'participant_id' => $confirmed->id]);
     $this->assertDatabaseMissing('attendances', ['event_id' => $event->id, 'participant_id' => $unregistered->id]);

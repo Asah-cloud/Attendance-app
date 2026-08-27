@@ -128,7 +128,7 @@
                 <div x-data="{ open: true }" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in slide-in-from-left-4 duration-500">
                     <button type="button" @click="open = !open" :aria-expanded="open.toString()" class="w-full px-6 py-5 bg-green-600 flex justify-between items-center text-left hover:bg-green-700">
                         <h3 class="font-black text-white uppercase text-xs tracking-widest">Present Registry</h3>
-                        <span class="flex items-center gap-2 bg-white/20 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">{{ $selectedDay === 'all' ? 'All Days' : 'Day '.$selectedDay }}<svg class="h-4 w-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg></span>
+                        <span class="flex items-center gap-2 bg-white/20 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter">{{ $event->attendanceSessionLabel($selectedDay) }}<svg class="h-4 w-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg></span>
                     </button>
                     <div x-cloak x-show="open" x-transition class="overflow-x-auto">
                         <table class="w-full text-left">

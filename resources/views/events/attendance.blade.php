@@ -40,7 +40,7 @@
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    Day {{ $currentDay }} Report
+                    {{ $event->attendanceSessionLabel($currentDay) }} Report
                 </a>
 
                 <a href="{{ route('events.index') }}" class="p-2.5 bg-white/10 text-white hover:bg-white/20 hover:rotate-[-10deg] rounded-xl transition-all" title="Back to Events">
@@ -74,6 +74,7 @@
                     <div class="flex flex-wrap gap-2 lg:justify-end">
                         @can('scanAttendance', $event)
                             <a href="{{ route('events.scanner', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md">Open QR scanner</a>
+                            <a href="{{ URL::signedRoute('scan.events', ['event' => $event->id]) }}" target="_blank" class="rounded-xl bg-cyan-100 px-4 py-2.5 text-xs font-extrabold text-cyan-900 hover:bg-cyan-200">Phone check-in page</a>
                         @endcan
                         @can('manageWhenOpen', $event)
                             <a href="{{ route('events.registration-form.edit', $event) }}" class="rounded-xl bg-amber-100 px-4 py-2.5 text-xs font-extrabold text-amber-900 hover:bg-amber-200">Registration form</a>
@@ -82,7 +83,7 @@
                                 <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12" /></svg>Import
                             </button>
                         @endcan
-                        <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $currentDay]) }}" class="rounded-xl bg-violet-100 px-4 py-2.5 text-xs font-extrabold text-violet-800 hover:bg-violet-200">Day {{ $currentDay }} report</a>
+                        <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $currentDay]) }}" class="rounded-xl bg-violet-100 px-4 py-2.5 text-xs font-extrabold text-violet-800 hover:bg-violet-200">{{ $event->attendanceSessionLabel($currentDay) }} report</a>
                         <a href="{{ route('events.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50">Back</a>
                     </div>
                 </div>
@@ -103,15 +104,15 @@
                         </div>
                         <div>
                             <span class="block text-[10px] uppercase font-black text-blue-200 tracking-[0.2em] leading-none mb-1">Live Tracking Enabled</span>
-                            <span class="text-xl font-black italic">Session Day {{ $currentDay }}</span>
+                            <span class="text-xl font-black italic">{{ $event->attendanceSessionLabel($currentDay) }}</span>
                         </div>
                     </div>
                    
-                    @if(auth()->user()->hasRole('admin'))
+                    @can('update', $event)
                         <div class="bg-white/10 p-1.5 rounded-xl border border-white/10 hover:bg-white/20 transition-colors">
                             <x-day-switcher :event="$event" />
                         </div>
-                    @endif
+                    @endcan
                 </div>
             @endif
 
@@ -121,8 +122,8 @@
                 {{-- Left Side Stats --}}
                 <div class="lg:col-span-1 space-y-8" data-aos="fade-right" data-aos-delay="200">
                     <div class="rounded-3xl border border-blue-100 bg-white p-8 shadow-sm">
-                        <h3 class="text-xs font-black uppercase tracking-widest text-blue-900">Personal QR check-in</h3>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">Use the secure scanner while logged in. Only managers and ushers assigned to this event can use an attendee QR to record attendance.</p>
+                        <h3 class="text-xs font-black uppercase tracking-widest text-blue-900">Flexible check-in</h3>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">Members can scan their personal QR and enter their phone number. Ushers can use the same phone check-in page, the secure QR scanner, or the manual registry.</p>
                     </div>
 
                     <div class="group bg-blue-900 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-300">

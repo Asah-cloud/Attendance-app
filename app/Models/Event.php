@@ -41,6 +41,8 @@ class Event extends Model
         'day',
         'event_date',
         'end_date',
+        'has_arrival_session',
+        'arrival_date',
         'description',
         'location',
         'logo_path',
@@ -68,6 +70,8 @@ class Event extends Model
     protected $casts = [
         'event_date' => 'date',
         'end_date' => 'date',
+        'has_arrival_session' => 'boolean',
+        'arrival_date' => 'date',
         'registration_enabled' => 'boolean',
         'registration_opens_at' => 'datetime',
         'registration_closes_at' => 'datetime',
@@ -196,8 +200,31 @@ class Event extends Model
         return (int) min($this->totalDays(), max(1, $start->diffInDays(now()->startOfDay()) + 1));
     }
 
+    public function activeAttendanceSession(): int
+    {
+        $session = (int) ($this->day ?? 1);
+
+        return $session === 0 && $this->has_arrival_session ? 0 : max(1, min($this->totalDays(), $session));
+    }
+
+    public function attendanceSessionLabel(int|string $session): string
+    {
+        if ($session === 'all') {
+            return 'All sessions';
+        }
+
+        return (int) $session === 0 ? 'Arrival' : 'Day '.(int) $session;
+    }
+
     public function canMarkAttendanceForDay(int $day): bool
     {
+        if ($day === 0) {
+            return $this->has_arrival_session
+                && ! $this->cancelled_at
+                && $this->arrival_date
+                && now()->startOfDay()->gte($this->arrival_date->startOfDay());
+        }
+
         return $this->status === 'active'
             && $day >= 1
             && $day <= $this->currentDay();

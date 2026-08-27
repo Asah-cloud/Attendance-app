@@ -33,9 +33,9 @@
                 <div class="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-6">
                     <p class="text-xs font-black uppercase tracking-widest text-blue-700">Your personal check-in QR</p>
                     <div class="mx-auto mt-5 inline-block rounded-2xl bg-white p-4 shadow-sm">
-                        {!! QrCode::size(240)->margin(1)->generate('ASAH-ATTENDANCE:'.$registration->registration_code) !!}
+                        {!! QrCode::size(240)->margin(1)->generate(route('attendance.personal', $registration->registration_code)) !!}
                     </div>
-                    <p class="mt-4 text-sm text-slate-600">Keep this QR private and show it at the event entrance.</p>
+                    <p class="mt-4 text-sm text-slate-600">Scan this QR when you arrive, then enter your registered phone number to check in. An usher can also help you.</p>
                 </div>
             @else
                 <p class="mt-6 text-sm text-slate-600">Your check-in QR will appear here once your registration is confirmed.</p>

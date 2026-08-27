@@ -45,13 +45,13 @@ function qrStaff(EventRegistration $registration, string $role = 'manager', ?Com
     return $user;
 }
 
-it('never records attendance when the public QR link is opened', function () {
+it('opens the phone check-in page without recording attendance', function () {
     $registration = personalQrRegistration();
 
     $this->get(route('attendance.personal', $registration->registration_code))
         ->assertOk()
-        ->assertSee('Staff scan required')
-        ->assertSee('You are all set!');
+        ->assertSee('Event check-in')
+        ->assertSee('Enter your registered phone number');
 
     $this->assertDatabaseCount('attendances', 0);
 });
@@ -82,6 +82,23 @@ it('allows a company manager to scan a confirmed attendee', function () {
         'participant_id' => $registration->participant_id,
         'day' => 1,
         'marked_by' => $manager->id,
+    ]);
+});
+
+it('allows staff to scan the same personal QR URL used for self check-in', function () {
+    $registration = personalQrRegistration();
+    $manager = qrStaff($registration);
+
+    $this->actingAs($manager)
+        ->postJson(route('events.scanner.check-in', $registration->event), [
+            'registration_code' => route('attendance.personal', $registration->registration_code),
+        ])
+        ->assertOk()
+        ->assertJsonPath('name', 'Ama Attendee');
+
+    $this->assertDatabaseHas('attendances', [
+        'event_id' => $registration->event_id,
+        'participant_id' => $registration->participant_id,
     ]);
 });
 

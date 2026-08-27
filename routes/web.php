@@ -16,7 +16,6 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationBrandingController;
 use App\Http\Controllers\ParticipantMergeController;
 use App\Http\Controllers\PaystackWebhookController;
-use App\Http\Middleware\VerifyPaystackSignature;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
@@ -26,9 +25,10 @@ use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
 use App\Http\Controllers\SuperAdmin\CompanyPricingController;
+use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
 use App\Http\Controllers\SuperAdmin\IntegrationSettingsController;
 use App\Http\Controllers\SuperAdmin\PlanController;
-use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
+use App\Http\Middleware\VerifyPaystackSignature;
 use Illuminate\Support\Facades\Route;
 
 // Public marketing pages
@@ -50,6 +50,12 @@ Route::post('/registrations/{code}/cancel', [PublicEventRegistrationController::
 Route::get('/check-in/{code}', [AttendanceController::class, 'personalCheckIn'])
     ->middleware('throttle:30,1')
     ->name('attendance.personal');
+Route::get('/events/{event}/public-check-in', [AttendanceController::class, 'publicCheckIn'])
+    ->middleware(['signed', 'throttle:60,1'])
+    ->name('scan.events');
+Route::post('/events/{event}/public-check-in', [AttendanceController::class, 'checkInByPhone'])
+    ->middleware(['signed', 'throttle:20,1'])
+    ->name('attendance.check');
 Route::get('/confirm/{code}', [PublicEventRegistrationController::class, 'showConfirm'])->name('attendance.confirm.show');
 Route::post('/confirm/{code}', [PublicEventRegistrationController::class, 'storeConfirm'])
     ->middleware('throttle:10,1')
