@@ -23,7 +23,11 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection(): Enumerable
     {
-        return $this->event->confirmedParticipants()
+        $participants = $this->day === 'all' || (int) $this->day === 0
+            ? $this->event->confirmedParticipants()
+            : $this->event->attendanceEligibleParticipants();
+
+        return $participants
             ->whereHas('attendances', function ($query) {
                 $query->where('event_id', $this->event->id);
 

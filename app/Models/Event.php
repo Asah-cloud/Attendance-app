@@ -156,6 +156,29 @@ class Event extends Model
             ->wherePivot('status', EventRegistration::STATUS_CONFIRMED);
     }
 
+    public function arrivedParticipants(): BelongsToMany
+    {
+        return $this->confirmedParticipants()
+            ->whereHas('attendances', fn ($query) => $query
+                ->where('event_id', $this->id)
+                ->where('day', 0));
+    }
+
+    public function attendanceEligibleParticipants(): BelongsToMany
+    {
+        return $this->has_arrival_session
+            ? $this->arrivedParticipants()
+            : $this->confirmedParticipants();
+    }
+
+    public function participantHasArrived(int $participantId): bool
+    {
+        return ! $this->has_arrival_session || $this->attendances()
+            ->where('participant_id', $participantId)
+            ->where('day', 0)
+            ->exists();
+    }
+
     public function staff(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'event_staff')->withTimestamps();
@@ -204,7 +227,7 @@ class Event extends Model
     {
         $session = (int) ($this->day ?? 1);
 
-        return $session === 0 && $this->has_arrival_session ? 0 : max(1, min($this->totalDays(), $session));
+        return max(1, min($this->totalDays(), $session));
     }
 
     public function attendanceSessionLabel(int|string $session): string

@@ -46,7 +46,9 @@
                     <div class="flex flex-wrap gap-2 lg:justify-end">
                         @can('scanAttendance', $event)
                             <a href="{{ route('events.scanner', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md">Open QR scanner</a>
+                            @unless($event->has_arrival_session)
                             <a href="{{ URL::signedRoute('scan.events', ['event' => $event->slug]) }}" target="_blank" class="rounded-xl bg-cyan-100 px-4 py-2.5 text-xs font-extrabold text-cyan-900 hover:bg-cyan-200">Phone check-in page</a>
+                            @endunless
                         @endcan
                         @can('manageWhenOpen', $event)
                             <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-700">
@@ -90,15 +92,15 @@
                 {{-- Left Side Stats --}}
                 <div class="lg:col-span-1 space-y-8" data-aos="fade-right" data-aos-delay="200">
                     <div class="rounded-3xl border border-blue-100 bg-white p-8 shadow-sm">
-                        <h3 class="text-xs font-black uppercase tracking-widest text-blue-900">Flexible check-in</h3>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">Members can scan their personal QR and enter their phone number. Ushers can use the same phone check-in page, the secure QR scanner, or the manual registry.</p>
+                        <h3 class="text-xs font-black uppercase tracking-widest text-blue-900">Daily attendance</h3>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ $event->has_arrival_session ? 'Only members who completed Arrival check-in appear here. Mark their attendance separately for each program day.' : 'Members can use phone or QR check-in, while staff can use the scanner or manual registry.' }}</p>
                     </div>
 
                     <div class="group bg-blue-900 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-300">
                         <h3 class="font-bold text-blue-300 mb-6 text-xs uppercase tracking-widest">Current Stats</h3>
                         <div class="space-y-4">
                             <div class="flex justify-between items-end border-b border-white/10 pb-2">
-                                <span class="text-blue-100/70 text-sm">Total Invited</span>
+                                <span class="text-blue-100/70 text-sm">Eligible attendees</span>
                                 <span class="text-2xl font-black">{{ number_format($totalMembers) }}</span>
                             </div>
                             <div class="flex justify-between items-end">

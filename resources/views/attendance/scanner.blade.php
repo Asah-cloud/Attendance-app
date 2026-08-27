@@ -1,12 +1,12 @@
 <x-app-layout>
-    <x-slot name="header">QR Scanner</x-slot>
+    <x-slot name="header">{{ $event->attendanceSessionLabel($session) }} QR Scanner</x-slot>
 
     <div class="bg-slate-50 py-10">
         <div class="mx-auto max-w-3xl px-4 sm:px-6">
             <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                 <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                     <div>
-                        <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Secure staff scanner</p>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-600">{{ $event->attendanceSessionLabel($session) }} · Secure staff scanner</p>
                         <h1 class="mt-2 text-3xl font-black tracking-tight text-slate-950">{{ $event->title }}</h1>
                         <p class="mt-2 text-sm text-slate-500">Welcome! Allow camera access, then point it at the attendee's personal QR code.</p>
                     </div>
@@ -42,7 +42,7 @@
                 if (busy || !value) return;
                 busy = true;
                 try {
-                    const response = await fetch(@js(route('events.scanner.check-in', $event)), {
+                    const response = await fetch(@js($checkInUrl), {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token())},
                         body: JSON.stringify({registration_code: value.trim()}),

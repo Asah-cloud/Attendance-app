@@ -40,6 +40,12 @@
             </div>
 
             {{-- 2. Performance Stats --}}
+            <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <x-summary-card title="Registered" :value="$registeredCount" color="blue" />
+                <x-summary-card title="Confirmed" :value="$confirmedCount" color="blue" />
+                <x-summary-card title="Arrived" :value="$arrivedCount" color="green" />
+                <x-summary-card title="Present at least once" :value="$presentUsers->count()" color="green" />
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                 <div class="group bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between hover:-translate-y-1 hover:shadow-xl">
                     <div>

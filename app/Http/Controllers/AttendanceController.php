@@ -35,8 +35,8 @@ class AttendanceController extends Controller
         $this->authorize('view', $event);
 
         $currentDay = $this->getEventDay($request, $event);
-        $stats = $this->cache->rememberEvent($event->id, "attendance-stats:day:{$currentDay}", fn () => [
-            'totalMembers' => $event->confirmedParticipants()->count(),
+        $stats = $this->cache->rememberEvent($event->id, "attendance-stats:v2:day:{$currentDay}", fn () => [
+            'totalMembers' => $event->attendanceEligibleParticipants()->count(),
             'presentCount' => Attendance::query()
                 ->where('event_id', '=', $event->id)
                 ->where('day', '=', $currentDay)
@@ -50,12 +50,23 @@ class AttendanceController extends Controller
         ));
     }
 
+    public function arrival(Event $event)
+    {
+        $this->authorize('view', $event);
+        abort_unless($event->has_arrival_session, 404);
+
+        $confirmedCount = $event->confirmedParticipants()->count();
+        $arrivedCount = $event->arrivedParticipants()->count();
+
+        return view('events.arrival', compact('event', 'confirmedCount', 'arrivedCount'));
+    }
+
     public function store(Request $request, Event $event)
     {
         $this->authorize('update', $event);
 
         $request->validate(['participant_id' => 'required|integer']);
-        $targetParticipant = $event->confirmedParticipants()->findOrFail($request->integer('participant_id'));
+        $targetParticipant = $event->attendanceEligibleParticipants()->findOrFail($request->integer('participant_id'));
         $currentDay = $this->getEventDay($request, $event);
         $this->ensureAttendanceCanBeMarked($event, $currentDay);
 
@@ -68,6 +79,10 @@ class AttendanceController extends Controller
             'marked_by' => Auth::id(),
         ]);
 
+        if ($attendance->wasRecentlyCreated) {
+            $this->cache->invalidateEvent($event->id, $event->company_id);
+        }
+
         if (! $attendance->wasRecentlyCreated) {
             return back()->with('info', 'Member already marked present for '.$event->attendanceSessionLabel($currentDay).'.');
         }
@@ -78,7 +93,7 @@ class AttendanceController extends Controller
     public function destroy(Request $request, Event $event, int $participant_id)
     {
         $this->authorize('update', $event);
-        $event->confirmedParticipants()->findOrFail($participant_id);
+        $event->attendanceEligibleParticipants()->findOrFail($participant_id);
 
         $currentDay = $this->getEventDay($request, $event);
         $this->ensureAttendanceCanBeMarked($event, $currentDay);
@@ -109,6 +124,7 @@ class AttendanceController extends Controller
         return view('attendance.public-scan', [
             'event' => $event,
             'registration' => $registration,
+            'session' => $event->has_arrival_session ? 0 : $event->activeAttendanceSession(),
         ]);
     }
 
@@ -117,10 +133,34 @@ class AttendanceController extends Controller
         return view('attendance.public-scan', [
             'event' => $event,
             'registration' => null,
+            'session' => $event->activeAttendanceSession(),
+        ]);
+    }
+
+    public function publicArrivalCheckIn(Event $event)
+    {
+        abort_unless($event->has_arrival_session, 404);
+
+        return view('attendance.public-scan', [
+            'event' => $event,
+            'registration' => null,
+            'session' => 0,
         ]);
     }
 
     public function checkInByPhone(Request $request, Event $event)
+    {
+        return $this->checkInByPhoneForSession($request, $event, $event->activeAttendanceSession());
+    }
+
+    public function checkInArrivalByPhone(Request $request, Event $event)
+    {
+        abort_unless($event->has_arrival_session, 404);
+
+        return $this->checkInByPhoneForSession($request, $event, 0);
+    }
+
+    private function checkInByPhoneForSession(Request $request, Event $event, int $day)
     {
         $validated = $request->validate(['phone' => ['required', 'string', 'max:30']]);
         $phone = $this->registrations->normalizePhone($validated['phone']);
@@ -141,7 +181,10 @@ class AttendanceController extends Controller
             return back()->withInput()->with('error', 'We could not find a confirmed attendee with that phone number. Please check the number or ask an usher for help.');
         }
 
-        $day = $event->activeAttendanceSession();
+        if ($day > 0 && ! $event->participantHasArrived($registration->participant_id)) {
+            return back()->withInput()->with('error', 'Arrival check-in must be completed before daily attendance can be marked.');
+        }
+
         if (! $event->canMarkAttendanceForDay($day)) {
             return back()->with('error', 'Attendance is not open for this event right now. Please ask an event manager for help.');
         }
@@ -170,12 +213,42 @@ class AttendanceController extends Controller
     {
         $this->authorize('scanAttendance', $event);
 
-        return view('attendance.scanner', ['event' => $event]);
+        return view('attendance.scanner', [
+            'event' => $event,
+            'session' => $event->activeAttendanceSession(),
+            'checkInUrl' => route('events.scanner.check-in', $event),
+        ]);
+    }
+
+    public function arrivalScanner(Event $event)
+    {
+        $this->authorize('scanAttendance', $event);
+        abort_unless($event->has_arrival_session, 404);
+
+        return view('attendance.scanner', [
+            'event' => $event,
+            'session' => 0,
+            'checkInUrl' => route('events.arrival.scanner.check-in', $event),
+        ]);
     }
 
     public function scan(Request $request, Event $event)
     {
         $this->authorize('scanAttendance', $event);
+
+        return $this->scanForSession($request, $event, $event->activeAttendanceSession());
+    }
+
+    public function scanArrival(Request $request, Event $event)
+    {
+        $this->authorize('scanAttendance', $event);
+        abort_unless($event->has_arrival_session, 404);
+
+        return $this->scanForSession($request, $event, 0);
+    }
+
+    private function scanForSession(Request $request, Event $event, int $day)
+    {
 
         $validated = $request->validate([
             'registration_code' => ['required', 'string', 'max:500'],
@@ -196,7 +269,9 @@ class AttendanceController extends Controller
             return response()->json(['message' => "Welcome, {$registration->participant->name}. Your registration is not confirmed yet. Please speak with an event manager for assistance."], 422);
         }
 
-        $day = $event->activeAttendanceSession();
+        if ($day > 0 && ! $event->participantHasArrived($registration->participant_id)) {
+            return response()->json(['message' => "{$registration->participant->name} has not completed Arrival check-in yet."], 422);
+        }
 
         if (! $event->canMarkAttendanceForDay($day)) {
             return response()->json(['message' => 'Thanks for checking in! Attendance is not open for this event right now. Please confirm the event date or ask a manager for help.'], 422);
@@ -245,7 +320,7 @@ class AttendanceController extends Controller
 
     private function ensureValidDay(Event $event, int $day): void
     {
-        if ($day < ($event->has_arrival_session ? 0 : 1) || $day > $this->totalDays($event)) {
+        if ($day < 1 || $day > $this->totalDays($event)) {
             throw ValidationException::withMessages(['day' => 'The selected event day is invalid.']);
         }
     }

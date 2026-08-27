@@ -86,7 +86,7 @@ class ReportController extends Controller
 
     private function reportData(Event $event, int|string $selectedDay): array
     {
-        $data = $this->cache->rememberEvent($event->id, "attendance-report:{$selectedDay}", function () use ($event, $selectedDay): array {
+        $data = $this->cache->rememberEvent($event->id, "attendance-report:v2:{$selectedDay}", function () use ($event, $selectedDay): array {
             if ($selectedDay === 'all') {
                 // 1. Get users who attended at least ONCE during the entire event
                 $presentUsers = $event->confirmedParticipants()
@@ -105,8 +105,11 @@ class ReportController extends Controller
                     ->get();
 
             } else {
+                $participants = (int) $selectedDay === 0
+                    ? $event->confirmedParticipants()
+                    : $event->attendanceEligibleParticipants();
                 // Standard single-day logic (Fixed for PostgreSQL ambiguity)
-                $presentUsers = $event->confirmedParticipants()
+                $presentUsers = $participants
                     ->whereHas('attendances', function ($query) use ($event, $selectedDay) {
                         $query->where('event_id', $event->id)
                             ->where('day', $selectedDay);
@@ -117,7 +120,9 @@ class ReportController extends Controller
                     ->get();
 
                 $presentIds = $presentUsers->pluck('id');
-                $absentUsers = $event->confirmedParticipants()
+                $absentUsers = ((int) $selectedDay === 0
+                    ? $event->confirmedParticipants()
+                    : $event->attendanceEligibleParticipants())
                     ->whereNotIn('participants.id', $presentIds)
                     ->get();
             }
@@ -125,7 +130,9 @@ class ReportController extends Controller
             return [
                 'presentUsers' => $presentUsers,
                 'absentUsers' => $absentUsers,
-                'totalExpected' => $event->confirmedParticipants()->count(),
+                'totalExpected' => $selectedDay === 'all' || (int) $selectedDay === 0
+                    ? $event->confirmedParticipants()->count()
+                    : $event->attendanceEligibleParticipants()->count(),
             ];
         }, ApplicationCache::REPORT_TTL);
 

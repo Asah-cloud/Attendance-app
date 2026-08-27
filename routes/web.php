@@ -56,6 +56,12 @@ Route::get('/events/{event:slug}/public-check-in', [AttendanceController::class,
 Route::post('/events/{event:slug}/public-check-in', [AttendanceController::class, 'checkInByPhone'])
     ->middleware(['signed', 'throttle:20,1'])
     ->name('attendance.check');
+Route::get('/events/{event:slug}/arrival/check-in', [AttendanceController::class, 'publicArrivalCheckIn'])
+    ->middleware(['signed', 'throttle:60,1'])
+    ->name('arrival.public');
+Route::post('/events/{event:slug}/arrival/check-in', [AttendanceController::class, 'checkInArrivalByPhone'])
+    ->middleware(['signed', 'throttle:20,1'])
+    ->name('arrival.check');
 Route::get('/confirm/{code}', [PublicEventRegistrationController::class, 'showConfirm'])->name('attendance.confirm.show');
 Route::post('/confirm/{code}', [PublicEventRegistrationController::class, 'storeConfirm'])
     ->middleware('throttle:10,1')
@@ -106,6 +112,11 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     // --- SHARED ROUTES (Admins, Managers & Markers) ---
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
     Route::get('/events/{event}/attendance', [AttendanceController::class, 'show'])->name('events.attendance');
+    Route::get('/events/{event}/arrival', [AttendanceController::class, 'arrival'])->name('events.arrival');
+    Route::get('/events/{event}/arrival/scanner', [AttendanceController::class, 'arrivalScanner'])->name('events.arrival.scanner');
+    Route::post('/events/{event}/arrival/scanner/check-in', [AttendanceController::class, 'scanArrival'])
+        ->middleware('throttle:60,1')
+        ->name('events.arrival.scanner.check-in');
     Route::get('/events/{event}/scanner', [AttendanceController::class, 'scanner'])->name('events.scanner');
     Route::post('/events/{event}/scanner/check-in', [AttendanceController::class, 'scan'])
         ->middleware('throttle:60,1')

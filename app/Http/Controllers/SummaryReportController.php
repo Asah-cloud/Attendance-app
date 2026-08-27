@@ -20,11 +20,14 @@ class SummaryReportController extends Controller
             'presentUsers' => $presentUsers,
             'absentUsers' => $absentUsers,
             'totalEventDays' => $totalEventDays,
+            'registeredCount' => $registeredCount,
+            'confirmedCount' => $confirmedCount,
+            'arrivedCount' => $arrivedCount,
             'categoryBreakdown' => $categoryBreakdown,
             'genderBreakdown' => $genderBreakdown,
         ] = $this->summaryData($event);
 
-        return view('reports.summary', compact('event', 'presentUsers', 'absentUsers', 'totalEventDays', 'categoryBreakdown', 'genderBreakdown'));
+        return view('reports.summary', compact('event', 'presentUsers', 'absentUsers', 'totalEventDays', 'registeredCount', 'confirmedCount', 'arrivedCount', 'categoryBreakdown', 'genderBreakdown'));
     }
 
     public function download(Event $event)
@@ -48,13 +51,16 @@ class SummaryReportController extends Controller
 
     private function summaryData(Event $event): array
     {
-        $data = $this->cache->rememberEvent($event->id, 'summary-report', function () use ($event): array {
+        $data = $this->cache->rememberEvent($event->id, 'summary-report:v2', function () use ($event): array {
             $start = Carbon::parse($event->event_date);
             $end = $event->end_date ? Carbon::parse($event->end_date) : $start;
             $totalEventDays = $start->diffInDays($end) + 1;
+            $registeredCount = $event->registrations()->count();
+            $confirmedCount = $event->confirmedParticipants()->count();
+            $arrivedCount = $event->has_arrival_session ? $event->arrivedParticipants()->count() : $confirmedCount;
 
             // Get users who attended at least once
-            $presentUsers = $event->confirmedParticipants()
+            $presentUsers = $event->attendanceEligibleParticipants()
                 ->whereHas('attendances', function ($q) use ($event) {
                     $q->where('event_id', $event->id)->where('day', '>=', 1);
                 })
@@ -71,13 +77,13 @@ class SummaryReportController extends Controller
                 });
 
             // Get users who never showed up
-            $absentUsers = $event->confirmedParticipants()
+            $absentUsers = $event->attendanceEligibleParticipants()
                 ->whereDoesntHave('attendances', function ($q) use ($event) {
                     $q->where('event_id', $event->id)->where('day', '>=', 1);
                 })
                 ->get();
 
-            return compact('presentUsers', 'absentUsers', 'totalEventDays');
+            return compact('presentUsers', 'absentUsers', 'totalEventDays', 'registeredCount', 'confirmedCount', 'arrivedCount');
         }, ApplicationCache::REPORT_TTL);
 
         $data['categoryBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();

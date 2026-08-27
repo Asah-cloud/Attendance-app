@@ -5,7 +5,7 @@
                 <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/15 text-2xl">✓</div>
                 <p class="mt-5 text-xs font-black uppercase tracking-[0.2em] text-blue-200">Event check-in</p>
                 <h1 class="mt-2 text-2xl font-black">{{ $event->title }}</h1>
-                <p class="mt-2 text-sm font-bold text-blue-100">{{ $event->attendanceSessionLabel($event->activeAttendanceSession()) }}</p>
+                <p class="mt-2 text-sm font-bold text-blue-100">{{ $event->attendanceSessionLabel($session) }}</p>
             </div>
 
             <div class="p-7 sm:p-8">
@@ -25,7 +25,7 @@
                     <p class="mb-6 text-center text-sm leading-6 text-slate-600">Enter the phone number used for your confirmed attendance. Members, ushers, and managers can all use this page.</p>
                 @endif
 
-                <form action="{{ URL::signedRoute('attendance.check', ['event' => $event->slug]) }}" method="POST" class="space-y-5">
+                <form action="{{ URL::signedRoute($session === 0 ? 'arrival.check' : 'attendance.check', ['event' => $event->slug]) }}" method="POST" class="space-y-5">
                     @csrf
                     <div>
                         <label for="phone" class="block text-xs font-black uppercase tracking-widest text-slate-500">Registered phone number</label>

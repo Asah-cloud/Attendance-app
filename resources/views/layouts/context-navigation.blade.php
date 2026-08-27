@@ -22,6 +22,7 @@
         request()->routeIs('events.create') => 'Create event',
         request()->routeIs('events.edit') => 'Edit event',
         request()->routeIs('events.attendance') => 'Attendance',
+        request()->routeIs('events.arrival*') => 'Arrival',
         request()->routeIs('events.scanner') => 'QR scanner',
         request()->routeIs('events.registrations.index') => 'Attendees',
         request()->routeIs('events.registration-form.*') => 'Registration form',
@@ -59,6 +60,7 @@
     ] : [];
 
     $eventLinks = $contextEvent ? array_values(array_filter([
+        $contextEvent->has_arrival_session ? ['label' => 'Arrival', 'route' => route('events.arrival', $contextEvent), 'active' => request()->routeIs('events.arrival*')] : null,
         ['label' => 'Attendance', 'route' => route('events.attendance', $contextEvent), 'active' => request()->routeIs('events.attendance', 'events.scanner')],
         $user->can('manageWhenOpen', $contextEvent) ? ['label' => 'Attendees', 'route' => route('events.registrations.index', $contextEvent), 'active' => request()->routeIs('events.registrations.*', 'events.badges')] : null,
         $user->can('manageWhenOpen', $contextEvent) ? ['label' => 'Registration form', 'route' => route('events.registration-form.edit', $contextEvent), 'active' => request()->routeIs('events.registration-form.*')] : null,

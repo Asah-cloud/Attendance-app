@@ -138,7 +138,7 @@ class EventController extends Controller
         unset($validated['logo'], $validated['flyer']);
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
-        $validated['day'] = $validated['has_arrival_session'] ? 0 : 1;
+        $validated['day'] = 1;
 
         // Enforce active subscription limits
         $created = DB::transaction(function () use ($companyId, $validated) {
@@ -177,7 +177,7 @@ class EventController extends Controller
         $maxDays = $start->diffInDays($end) + 1;
 
         $validated = $request->validate([
-            'day' => ['required', 'integer', 'max:'.$maxDays, Rule::when($event->has_arrival_session, 'min:0', 'min:1')],
+            'day' => ['required', 'integer', 'min:1', 'max:'.$maxDays],
         ]);
 
         $event->update(['day' => $validated['day']]);

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Attendance;
 use App\Models\Event;
+use App\Services\ApplicationCache;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,6 +21,8 @@ class AttendanceSearch extends Component
 
     public $selectedDay = 1; // This is the property name we must use everywhere
 
+    public string $mode = 'attendance';
+
     protected $queryString = [
         'selectedDay' => ['except' => 1],
         'search' => ['except' => ''],
@@ -29,7 +32,7 @@ class AttendanceSearch extends Component
         'refreshAttendeeList' => '$refresh',
     ];
 
-    public function mount($event)
+    public function mount($event, ?int $day = null, string $mode = 'attendance')
     {
         $this->event = $event instanceof Event
             ? $event
@@ -37,7 +40,8 @@ class AttendanceSearch extends Component
 
         Gate::authorize('view', $this->event);
 
-        $this->selectedDay = (int) request()->query('day', 1);
+        $this->mode = $mode;
+        $this->selectedDay = $day ?? (int) request()->query('day', 1);
         $this->loadAttendedUserIds();
     }
 
@@ -111,6 +115,7 @@ class AttendanceSearch extends Component
             ]);
         }
 
+        app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
         $this->loadAttendedUserIds();
     }
 
@@ -127,7 +132,9 @@ class AttendanceSearch extends Component
         Gate::authorize('view', $this->event);
         $words = explode(' ', trim($this->search));
 
-        $users = $this->event->confirmedParticipants()
+        $users = ($this->mode === 'arrival'
+            ? $this->event->confirmedParticipants()
+            : $this->event->attendanceEligibleParticipants())
             ->where(function ($q) use ($words) {
                 foreach ($words as $word) {
                     if (! empty($word)) {
