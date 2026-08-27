@@ -4,18 +4,6 @@
     <div class="py-12 bg-[#fcfcfd]">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 pb-12">
             
-            {{-- Navigation Back --}}
-            <div class="mb-8">
-                <a href="{{ route('events.index') }}" class="group inline-flex items-center text-blue-700 hover:text-red-600 font-semibold text-sm transition-colors">
-                    <div class="p-1 bg-blue-50 group-hover:bg-red-50 rounded-md me-2 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                        </svg>
-                    </div>
-                    Back to Event List
-                </a>
-            </div>
-
             <div class="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 overflow-hidden">
                 {{-- Form Header with subtle gradient accent --}}
                 <div class="relative bg-gray-50/50 p-8 border-b border-gray-100">

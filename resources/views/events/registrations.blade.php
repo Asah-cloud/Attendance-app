@@ -5,10 +5,7 @@
             <div><h1 class="text-2xl font-black text-slate-900">Registrations</h1><p class="text-sm text-slate-500">Review and manage this event’s attendees.</p></div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('events.registrations.export', $event) }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export CSV</a>
-                <a href="{{ route('events.registration-form.edit', $event) }}" class="rounded-xl bg-amber-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-amber-950">Form & sharing</a>
-                <a href="{{ route('events.confirmations.index', $event) }}" class="rounded-xl bg-violet-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-violet-950">Hard-copy confirmations</a>
                 <a href="{{ route('events.badges', $event) }}" target="_blank" class="rounded-xl bg-teal-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-teal-950">Print badges</a>
-                <a href="{{ route('events.attendance', $event) }}" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Attendance</a>
             </div>
         </div>
         <x-event-closed-banner :event="$event" />

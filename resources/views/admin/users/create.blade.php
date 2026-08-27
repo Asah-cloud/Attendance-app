@@ -8,7 +8,6 @@
                 <h2 class="mt-1 text-2xl font-black">Add an usher</h2>
                 <p class="mt-2 text-sm text-slate-500">Create a staff login for attendance and QR scanning.</p>
             </div>
-            <a href="{{ route('admin.users.index') }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-xs font-extrabold text-slate-600 hover:border-blue-300 hover:text-blue-700">Back to team</a>
         </div>
 
         <form method="POST" action="{{ route('admin.register.store') }}" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">

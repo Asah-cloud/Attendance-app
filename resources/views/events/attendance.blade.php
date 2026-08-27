@@ -19,34 +19,6 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-3">
-                @can('update', $event)
-                <a href="{{ route('events.registration-form.edit', $event) }}" class="inline-flex items-center rounded-xl bg-amber-300 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-amber-950">Registration Form</a>
-                <a href="{{ route('events.registrations.index', $event) }}" class="inline-flex items-center rounded-xl bg-emerald-300 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-950">Attendees</a>
-                @endcan
-                {{-- 1. IMPORT BUTTON (Triggers Modal) --}}
-                @can('update', $event)
-                <button onclick="document.getElementById('importModal').classList.remove('hidden')"
-                   class="inline-flex items-center px-5 py-2.5 bg-blue-500 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-blue-400 hover:-translate-y-1 transition-all active:scale-95 border border-white/20">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                    </svg>
-                    Import
-                </button>
-                @endcan
-
-                <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $currentDay]) }}" 
-                   class="inline-flex items-center px-5 py-2.5 bg-white text-purple-700 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-purple-50 hover:-translate-y-1 transition-all active:scale-95">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    {{ $event->attendanceSessionLabel($currentDay) }} Report
-                </a>
-
-                <a href="{{ route('events.index') }}" class="p-2.5 bg-white/10 text-white hover:bg-white/20 hover:rotate-[-10deg] rounded-xl transition-all" title="Back to Events">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </a>
-            </div>
         </div>
     </x-slot>
 
@@ -77,14 +49,10 @@
                             <a href="{{ URL::signedRoute('scan.events', ['event' => $event->id]) }}" target="_blank" class="rounded-xl bg-cyan-100 px-4 py-2.5 text-xs font-extrabold text-cyan-900 hover:bg-cyan-200">Phone check-in page</a>
                         @endcan
                         @can('manageWhenOpen', $event)
-                            <a href="{{ route('events.registration-form.edit', $event) }}" class="rounded-xl bg-amber-100 px-4 py-2.5 text-xs font-extrabold text-amber-900 hover:bg-amber-200">Registration form</a>
-                            <a href="{{ route('events.registrations.index', $event) }}" class="rounded-xl bg-emerald-100 px-4 py-2.5 text-xs font-extrabold text-emerald-900 hover:bg-emerald-200">Attendees</a>
                             <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-700">
                                 <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12" /></svg>Import
                             </button>
                         @endcan
-                        <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $currentDay]) }}" class="rounded-xl bg-violet-100 px-4 py-2.5 text-xs font-extrabold text-violet-800 hover:bg-violet-200">{{ $event->attendanceSessionLabel($currentDay) }} report</a>
-                        <a href="{{ route('events.index') }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-slate-50">Back</a>
                     </div>
                 </div>
             </section>

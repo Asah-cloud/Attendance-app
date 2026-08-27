@@ -17,11 +17,6 @@
             </div>
             
             <div class="flex items-center gap-3 print:hidden">
-                <a href="{{ route('events.attendance', ['event' => $event->id, 'day' => ($selectedDay === 'all' ? 1 : $selectedDay)]) }}" 
-                   class="inline-flex items-center px-4 py-2 bg-white border-2 border-gray-100 rounded-xl font-black text-xs text-gray-600 uppercase tracking-widest hover:bg-gray-50 transition-all active:scale-95 shadow-sm">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                    Back
-                </a>
                 
                 <a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" 
                    class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-700 transition-all shadow-lg shadow-green-100 active:scale-95">
@@ -42,7 +37,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="mb-6 flex flex-col justify-between gap-4 print:hidden sm:flex-row sm:items-center">
                 <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance analytics</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">Detailed attendance breakdown and registry logs.</p></div>
-                <div class="flex flex-wrap gap-2"><a href="{{ route('events.attendance', ['event' => $event->id, 'day' => ($selectedDay === 'all' ? 1 : $selectedDay)]) }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:border-blue-300 hover:text-blue-700">Back to attendance</a><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
+                <div class="flex flex-wrap gap-2"><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
             </div>
             
             {{-- Print-Only Header (Hidden on Web) --}}

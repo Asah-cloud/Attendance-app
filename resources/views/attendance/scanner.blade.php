@@ -10,7 +10,6 @@
                         <h1 class="mt-2 text-3xl font-black tracking-tight text-slate-950">{{ $event->title }}</h1>
                         <p class="mt-2 text-sm text-slate-500">Welcome! Allow camera access, then point it at the attendee's personal QR code.</p>
                     </div>
-                    <a href="{{ route('events.attendance', $event) }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-center text-xs font-extrabold text-slate-600 hover:bg-slate-50">Back to attendance</a>
                 </div>
 
                 <div id="qr-reader" class="mt-8 overflow-hidden rounded-2xl border border-slate-200"></div>

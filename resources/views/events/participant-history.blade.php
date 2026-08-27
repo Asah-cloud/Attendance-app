@@ -6,7 +6,6 @@
                 <h1 class="text-2xl font-black text-slate-900">{{ $registration->participant->name }}</h1>
                 <p class="text-sm text-slate-500">Every change made to this attendee's details, most recent first.</p>
             </div>
-            <a href="{{ route('events.registrations.index', $event) }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-600 hover:border-blue-300 hover:text-blue-700">Back to attendees</a>
         </div>
 
         <div class="space-y-4">

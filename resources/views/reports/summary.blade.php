@@ -12,9 +12,6 @@
                     {{ __('Final Performance Summary') }}
                 </h2>
             </div>
-            <a href="{{ route('events.index') }}" class="px-4 py-2 bg-white border border-gray-200 rounded-xl font-black text-[10px] text-gray-500 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm">
-                &larr; Exit to Events
-            </a>
         </div>
     </x-slot>
 

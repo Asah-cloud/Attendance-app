@@ -62,7 +62,7 @@ it('keeps authenticated team creation inside the application navigation', functi
         ->get(route('admin.register-person'))
         ->assertOk()
         ->assertSee('data-ui="app"', false)
-        ->assertSee('Back to team')
+        ->assertSee('Cancel')
         ->assertSee(route('admin.users.index'), false)
         ->assertDontSee('Back to System Login');
 });
