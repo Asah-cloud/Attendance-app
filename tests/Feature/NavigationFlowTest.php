@@ -33,10 +33,24 @@ it('shows breadcrumbs and complete event workspace navigation to managers', func
         ->assertOk()
         ->assertSee('Dashboard')
         ->assertSee('Annual Summit')
-        ->assertSeeInOrder(['Attendance', 'Attendees', 'Registration form', 'Confirmations', 'Reports', 'Settings'])
+        ->assertSeeInOrder(['Attendance', 'Attendees', 'Forms', 'Reports', 'Settings'])
         ->assertSee(route('events.registrations.index', $event), false)
-        ->assertSee(route('events.registration-form.edit', $event), false)
+        ->assertDontSee(route('events.registration-form.edit', $event), false)
         ->assertSee(route('reports.event', $event), false);
+});
+
+it('groups registration and confirmations inside the forms page', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = navigationUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Annual Summit', 'event_date' => now()]);
+
+    $this->actingAs($manager)
+        ->get(route('events.forms.index', $event))
+        ->assertOk()
+        ->assertSee('Registration form')
+        ->assertSee('Confirmations')
+        ->assertSee(route('events.registration-form.edit', $event), false)
+        ->assertSee(route('events.confirmations.index', $event), false);
 });
 
 it('limits event workspace navigation for ushers to authorized operational pages', function () {
