@@ -4,7 +4,7 @@
     <h3 class="font-black text-gray-400 mb-6 uppercase text-[10px] tracking-widest">Attendance QR</h3>
     
     <div class="inline-block p-6 bg-white border border-gray-100 rounded-3xl mb-6 shadow-sm">
-        {!! QrCode::size(250)->color(30, 58, 138)->generate(URL::signedRoute('scan.events', ['event' => $event->id, 'day' => $currentDay])) !!}
+        {!! QrCode::size(250)->color(30, 58, 138)->generate(URL::signedRoute('scan.events', ['event' => $event->slug, 'day' => $currentDay])) !!}
     </div>
 
     <div class="mb-6">

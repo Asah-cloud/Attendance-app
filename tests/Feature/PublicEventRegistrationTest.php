@@ -49,6 +49,9 @@ function registrationPayload(array $overrides = []): array
 
 it('allows managers to configure their event form while protecting system fields', function () {
     $event = publicRegistrationEvent();
+    expect(route('events.register', $event))
+        ->toContain('/events/public-registration-event/register')
+        ->not->toContain('/events/'.$event->id.'/register');
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
     $manager->assignRole('manager');
     $this->actingAs($manager)

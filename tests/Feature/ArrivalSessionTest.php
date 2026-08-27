@@ -62,7 +62,7 @@ it('lets a manager configure arrival on the same date as day one', function () {
 
 it('records arrival separately and then allows day one attendance', function () {
     [$company, $event, $participant] = arrivalEvent();
-    $url = URL::signedRoute('attendance.check', ['event' => $event->id]);
+    $url = URL::signedRoute('attendance.check', ['event' => $event->slug]);
 
     $this->post($url, ['phone' => '0241234567'])
         ->assertSessionHas('success', 'Welcome, Arrival Guest! Your Arrival check-in is complete.');
@@ -79,7 +79,7 @@ it('provides a separate arrival report', function () {
     [$company, $event] = arrivalEvent();
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
     $manager->assignRole('manager');
-    $this->post(URL::signedRoute('attendance.check', ['event' => $event->id]), ['phone' => '0241234567']);
+    $this->post(URL::signedRoute('attendance.check', ['event' => $event->slug]), ['phone' => '0241234567']);
 
     $this->actingAs($manager)
         ->get(route('reports.event', ['event' => $event, 'day' => 0]))

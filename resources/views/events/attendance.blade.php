@@ -46,7 +46,7 @@
                     <div class="flex flex-wrap gap-2 lg:justify-end">
                         @can('scanAttendance', $event)
                             <a href="{{ route('events.scanner', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md">Open QR scanner</a>
-                            <a href="{{ URL::signedRoute('scan.events', ['event' => $event->id]) }}" target="_blank" class="rounded-xl bg-cyan-100 px-4 py-2.5 text-xs font-extrabold text-cyan-900 hover:bg-cyan-200">Phone check-in page</a>
+                            <a href="{{ URL::signedRoute('scan.events', ['event' => $event->slug]) }}" target="_blank" class="rounded-xl bg-cyan-100 px-4 py-2.5 text-xs font-extrabold text-cyan-900 hover:bg-cyan-200">Phone check-in page</a>
                         @endcan
                         @can('manageWhenOpen', $event)
                             <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-700">

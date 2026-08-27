@@ -25,7 +25,7 @@
                     <p class="mb-6 text-center text-sm leading-6 text-slate-600">Enter the phone number used for your confirmed attendance. Members, ushers, and managers can all use this page.</p>
                 @endif
 
-                <form action="{{ URL::signedRoute('attendance.check', ['event' => $event->id]) }}" method="POST" class="space-y-5">
+                <form action="{{ URL::signedRoute('attendance.check', ['event' => $event->slug]) }}" method="POST" class="space-y-5">
                     @csrf
                     <div>
                         <label for="phone" class="block text-xs font-black uppercase tracking-widest text-slate-500">Registered phone number</label>

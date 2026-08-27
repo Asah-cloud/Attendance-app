@@ -18,7 +18,7 @@
 </head>
 <body>
     <div class="card">
-        {!! QrCode::size(450)->color(30, 58, 138)->generate(URL::signedRoute('scan.events', ['event' => $event->id, 'day' => $currentDay])) !!}
+        {!! QrCode::size(450)->color(30, 58, 138)->generate(URL::signedRoute('scan.events', ['event' => $event->slug, 'day' => $currentDay])) !!}
         <h1>{{ $event->title }}</h1>
         <p>Day {{ $currentDay }} Check-in</p>
     </div>

@@ -29,17 +29,22 @@ function phoneCheckInRegistration(string $phone = '201234567', string $status = 
 
 it('shows the shared check-in page only with a valid event signature', function () {
     $registration = phoneCheckInRegistration();
+    $url = URL::signedRoute('scan.events', ['event' => $registration->event->slug]);
 
-    $this->get(URL::signedRoute('scan.events', ['event' => $registration->event_id]))
+    expect($url)
+        ->toContain('/events/arrival-event/public-check-in')
+        ->not->toContain('/events/'.$registration->event_id.'/public-check-in');
+
+    $this->get($url)
         ->assertOk()
         ->assertSee('Members, ushers, and managers can all use this page.');
 
-    $this->get(route('scan.events', $registration->event_id))->assertForbidden();
+    $this->get(route('scan.events', $registration->event->slug))->assertForbidden();
 });
 
 it('checks in a confirmed attendee using common Ghana phone formats', function () {
     $registration = phoneCheckInRegistration();
-    $url = URL::signedRoute('attendance.check', ['event' => $registration->event_id]);
+    $url = URL::signedRoute('attendance.check', ['event' => $registration->event->slug]);
 
     $this->post($url, ['phone' => '+233 20 123 4567'])
         ->assertRedirect()
@@ -55,7 +60,7 @@ it('checks in a confirmed attendee using common Ghana phone formats', function (
 
 it('does not duplicate a phone check-in', function () {
     $registration = phoneCheckInRegistration();
-    $url = URL::signedRoute('attendance.check', ['event' => $registration->event_id]);
+    $url = URL::signedRoute('attendance.check', ['event' => $registration->event->slug]);
 
     $this->post($url, ['phone' => '0201234567']);
     $this->post($url, ['phone' => '201234567'])
@@ -66,7 +71,7 @@ it('does not duplicate a phone check-in', function () {
 
 it('rejects unknown and unconfirmed phone numbers', function () {
     $registration = phoneCheckInRegistration(status: EventRegistration::STATUS_PENDING);
-    $url = URL::signedRoute('attendance.check', ['event' => $registration->event_id]);
+    $url = URL::signedRoute('attendance.check', ['event' => $registration->event->slug]);
 
     $this->post($url, ['phone' => '0201234567'])->assertSessionHas('error');
     $this->post($url, ['phone' => '0555555555'])->assertSessionHas('error');
@@ -78,7 +83,7 @@ it('does not check anyone in outside the active event dates', function () {
     $registration = phoneCheckInRegistration();
     $registration->event->update(['event_date' => now()->addDay()]);
 
-    $this->post(URL::signedRoute('attendance.check', ['event' => $registration->event_id]), [
+    $this->post(URL::signedRoute('attendance.check', ['event' => $registration->event->slug]), [
         'phone' => '0201234567',
     ])->assertSessionHas('error', 'Attendance is not open for this event right now. Please ask an event manager for help.');
 

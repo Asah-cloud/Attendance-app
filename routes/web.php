@@ -39,8 +39,8 @@ Route::get('/', function () {
 Route::get('/pricing', [OnboardingController::class, 'pricing'])->name('pricing');
 Route::post('/pricing/pay-per-event', [OnboardingController::class, 'choosePayPerEvent'])->name('onboarding.pay-per-event');
 
-Route::get('/events/{event}/register', [PublicEventRegistrationController::class, 'create'])->name('events.register');
-Route::post('/events/{event}/register', [PublicEventRegistrationController::class, 'store'])
+Route::get('/events/{event:slug}/register', [PublicEventRegistrationController::class, 'create'])->name('events.register');
+Route::post('/events/{event:slug}/register', [PublicEventRegistrationController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('events.register.store');
 Route::get('/registrations/{code}/confirmation', [PublicEventRegistrationController::class, 'confirmation'])->name('registrations.confirmation');
@@ -50,10 +50,10 @@ Route::post('/registrations/{code}/cancel', [PublicEventRegistrationController::
 Route::get('/check-in/{code}', [AttendanceController::class, 'personalCheckIn'])
     ->middleware('throttle:30,1')
     ->name('attendance.personal');
-Route::get('/events/{event}/public-check-in', [AttendanceController::class, 'publicCheckIn'])
+Route::get('/events/{event:slug}/public-check-in', [AttendanceController::class, 'publicCheckIn'])
     ->middleware(['signed', 'throttle:60,1'])
     ->name('scan.events');
-Route::post('/events/{event}/public-check-in', [AttendanceController::class, 'checkInByPhone'])
+Route::post('/events/{event:slug}/public-check-in', [AttendanceController::class, 'checkInByPhone'])
     ->middleware(['signed', 'throttle:20,1'])
     ->name('attendance.check');
 Route::get('/confirm/{code}', [PublicEventRegistrationController::class, 'showConfirm'])->name('attendance.confirm.show');
