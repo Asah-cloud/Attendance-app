@@ -7,7 +7,12 @@ use Illuminate\View\View;
 
 class PublicLayout extends Component
 {
-    public function __construct(public ?string $title = null, public bool $noindex = false) {}
+    public function __construct(
+        public ?string $title = null,
+        public bool $noindex = false,
+        public ?string $description = null,
+        public ?string $image = null,
+    ) {}
 
     public function render(): View
     {

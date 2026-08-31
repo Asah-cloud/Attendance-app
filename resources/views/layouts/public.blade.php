@@ -3,24 +3,42 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Asah Apex Attendance helps organisations run faster event check-ins, live attendance tracking, and clear reporting.">
+    @php
+        $metaTitle = $title ?? 'Asah Apex Attendance';
+        $metaDescription = $description ?? 'Asah Apex Attendance helps organisations run faster event check-ins, live attendance tracking, and clear reporting.';
+        $metaImage = $image ?? asset('og-asah-apex-attendance.webp');
+    @endphp
+    <meta name="description" content="{{ $metaDescription }}">
     @if($noindex)
         <meta name="robots" content="noindex, nofollow">
     @else
         <link rel="canonical" href="{{ url()->current() }}">
     @endif
-    <meta property="og:title" content="Asah Apex Attendance">
-    <meta property="og:description" content="Attendance, made effortless. QR check-in, live insights, and clear reports for every event.">
+    <meta property="og:title" content="{{ $metaTitle }}">
+    <meta property="og:description" content="{{ $metaDescription }}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ url()->current() }}">
-    <meta property="og:image" content="{{ asset('og-asah-apex-attendance.webp') }}">
+    <meta property="og:image" content="{{ $metaImage }}">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="{{ asset('og-asah-apex-attendance.webp') }}">
-    <title>{{ $title ?? 'Asah Apex Attendance' }}</title>
+    <meta name="twitter:title" content="{{ $metaTitle }}">
+    <meta name="twitter:description" content="{{ $metaDescription }}">
+    <meta name="twitter:image" content="{{ $metaImage }}">
+    <title>{{ $metaTitle }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800&display=swap" rel="stylesheet">
     <x-compiled-assets />
     <style>[x-cloak] { display: none !important; }</style>
+    @unless($noindex)
+        <script type="application/ld+json">
+        {
+            "@@context": "https://schema.org",
+            "@@type": "Organization",
+            "name": "Asah Apex Attendance",
+            "url": "{{ url('/') }}",
+            "logo": "{{ asset('og-asah-apex-attendance.webp') }}"
+        }
+        </script>
+    @endunless
 </head>
 <body class="bg-[#f7f8fb] text-slate-950 antialiased" style="font-family: Manrope, sans-serif">
     <x-toast />

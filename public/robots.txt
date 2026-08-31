@@ -1,9 +1,0 @@
-User-agent: *
-Disallow: /
-
-Allow: /$
-Allow: /pricing$
-Allow: /build/
-Allow: /og-asah-apex-attendance.webp$
-
-Sitemap: https://attendance.asah-apex.com/sitemap.xml

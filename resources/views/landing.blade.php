@@ -1,4 +1,7 @@
-<x-public-layout title="Asah Apex Attendance — Attendance, made effortless">
+<x-public-layout
+    title="Asah Apex Attendance — Attendance, made effortless"
+    description="QR check-in, live attendance tracking, and clear reporting for every event. Built for organisations that need a faster, more accountable headcount."
+>
     <section class="relative overflow-hidden bg-[#071426] pt-20 text-white">
         <div class="absolute inset-0 opacity-40" style="background-image: radial-gradient(circle at 75% 20%, rgba(36,107,253,.4), transparent 28%), radial-gradient(circle at 20% 70%, rgba(244,184,96,.15), transparent 24%)"></div>
         <div class="relative mx-auto grid min-h-[760px] max-w-7xl items-center gap-14 px-5 py-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8">

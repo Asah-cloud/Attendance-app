@@ -1,8 +1,30 @@
-<x-public-layout title="Pricing — Asah Apex Attendance">
+<x-public-layout
+    title="Pricing — Asah Apex Attendance"
+    description="Straightforward monthly plans from GHS {{ number_format(($plans[array_key_first($plans)]['price_minor'] ?? 9900) / 100, 0) }}, or pay only per confirmed attendee with no subscription. Compare plans and get started."
+>
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "Product",
+        "name": "Asah Apex Attendance",
+        "description": "Event attendance and check-in software with QR check-in, live tracking, and reporting.",
+        "offers": [
+            @foreach($plans as $key => $plan)
+            {
+                "@@type": "Offer",
+                "name": "{{ $plan['name'] }}",
+                "price": "{{ number_format($plan['price_minor'] / 100, 2, '.', '') }}",
+                "priceCurrency": "GHS",
+                "url": "{{ route('checkout', $key) }}"
+            }{{ ! $loop->last ? ',' : '' }}
+            @endforeach
+        ]
+    }
+    </script>
     <section class="bg-[#071426] px-5 pb-24 pt-40 text-center text-white">
         <p class="text-xs font-extrabold uppercase tracking-[0.25em] text-amber-300">Straightforward pricing</p>
         <h1 class="mx-auto mt-5 max-w-3xl text-5xl font-extrabold tracking-[-0.05em] sm:text-6xl">Choose your workspace plan.</h1>
-        <p class="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-300">Select a plan, complete test checkout, and create your company manager account.</p>
+        <p class="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-300">Select a plan, complete checkout, and create your company manager account.</p>
     </section>
 
     <section class="mx-auto -mt-12 max-w-7xl px-5 pb-24 lg:px-8">

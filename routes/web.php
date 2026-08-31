@@ -20,6 +20,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
@@ -35,6 +36,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('landing');
 })->name('home');
+
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
 
 Route::get('/pricing', [OnboardingController::class, 'pricing'])->name('pricing');
 Route::post('/pricing/pay-per-event', [OnboardingController::class, 'choosePayPerEvent'])->name('onboarding.pay-per-event');
