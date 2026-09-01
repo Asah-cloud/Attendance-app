@@ -7,6 +7,7 @@ use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\EventRegistrationSubmitted;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Maatwebsite\Excel\Facades\Excel;
@@ -88,7 +89,7 @@ it('blocks users whose company subscription is inactive', function () {
     $this->actingAs($manager)->get(route('events.index'))->assertForbidden();
 });
 
-it('imports participants into the event company with normalized phones and emails them a confirmation', function () {
+it('imports participants into the event company with normalized phones without sending notifications', function () {
     Notification::fake();
 
     $company = Company::create(['name' => 'One']);
@@ -107,10 +108,10 @@ it('imports participants into the event company with normalized phones and email
         ->and($user->category)->toBe('Member')
         ->and($event->confirmedParticipants()->whereKey($user->id)->exists())->toBeTrue();
 
-    Notification::assertSentTo($user, EventRegistrationSubmitted::class);
+    Notification::assertNothingSent();
 });
 
-it('does not re-notify a participant when the same import row is processed again', function () {
+it('does not notify a participant when the same import row is processed again', function () {
     Notification::fake();
 
     $company = Company::create(['name' => 'One']);
@@ -123,11 +124,36 @@ it('does not re-notify a participant when the same import row is processed again
     Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
     Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
 
-    $user = Participant::where('member_id', $company->id.':42')->firstOrFail();
+    Participant::where('member_id', $company->id.':42')->firstOrFail();
+    Notification::assertNothingSent();
+});
 
-    // Sent twice total: once per eligible channel (mail + SMS) for the one
-    // logical notification event, not once per import attempt.
-    Notification::assertSentToTimes($user, EventRegistrationSubmitted::class, 2);
+it('sends notifications after a registered participant import when requested', function () {
+    Notification::fake();
+
+    $company = Company::create(['name' => 'One']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'Import Event',
+        'event_date' => now(),
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'participants.csv',
+        file_get_contents(base_path('tests/Fixtures/participants.csv'))
+    );
+
+    $this->actingAs($manager)
+        ->post(route('events.import.store', $event), [
+            'file' => $file,
+            'send_notifications' => '1',
+        ])
+        ->assertSessionHas('success', 'Participants imported successfully! Email and SMS notifications are being sent.');
+
+    $participant = Participant::where('member_id', $company->id.':42')->firstOrFail();
+    Notification::assertSentTo($participant, EventRegistrationSubmitted::class);
 });
 
 it('allows a manager to reach the import workflow for their company event', function () {

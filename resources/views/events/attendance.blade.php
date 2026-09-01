@@ -151,6 +151,15 @@
                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-widest file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all border border-gray-100 rounded-2xl p-2">
                     </div>
 
+                    <label class="mb-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <input type="checkbox" name="send_notifications" value="1" @checked(old('send_notifications'))
+                               class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                        <span>
+                            <span class="block text-sm font-black text-gray-900">Send email and SMS after import</span>
+                            <span class="mt-1 block text-xs leading-5 text-gray-500">Only newly registered participants in this file will be notified. Leave this unchecked to import without sending messages.</span>
+                        </span>
+                    </label>
+
                     <div class="flex flex-col gap-3">
                         <button type="submit" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all uppercase text-xs tracking-widest">
                             Start Import

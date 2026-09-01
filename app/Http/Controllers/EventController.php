@@ -56,13 +56,23 @@ class EventController extends Controller
         // 1. Validate the file
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv|max:2048',
+            'send_notifications' => ['nullable', 'boolean'],
         ]);
 
         try {
             // 2. Run the import using your UsersImport class
-            Excel::import(new UsersImport($event), $request->file('file'));
+            $import = new UsersImport($event);
+            Excel::import($import, $request->file('file'));
 
-            return back()->with('success', 'Participants imported successfully!');
+            if ($request->boolean('send_notifications')) {
+                $import->sendNotifications();
+            }
+
+            $message = $request->boolean('send_notifications')
+                ? 'Participants imported successfully! Email and SMS notifications are being sent.'
+                : 'Participants imported successfully! No email or SMS notifications were sent.';
+
+            return back()->with('success', $message);
         } catch (\Throwable $exception) {
             Log::error('Participant import failed.', [
                 'event_id' => $event->id,

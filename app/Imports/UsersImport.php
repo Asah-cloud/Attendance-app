@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Event;
+use App\Models\EventRegistration;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
@@ -12,6 +13,9 @@ use Maatwebsite\Excel\Row;
 class UsersImport implements OnEachRow
 {
     private $event;
+
+    /** @var array<int, int> */
+    private array $newRegistrationIds = [];
 
     public function __construct(Event $event)
     {
@@ -37,7 +41,7 @@ class UsersImport implements OnEachRow
         $legacyEmail = 'event'.$this->event->id.'_user'.$id.'@example.invalid';
         $companyEmail = 'company'.$this->event->company_id.'_member'.$id.'@example.invalid';
 
-        [$participant, $registration] = app(ParticipantRegistrationService::class)->register($this->event, [
+        [, $registration] = app(ParticipantRegistrationService::class)->register($this->event, [
             'name' => $name,
             'email' => $rawEmail,
             'phone' => $rawPhone,
@@ -47,11 +51,21 @@ class UsersImport implements OnEachRow
             'generated_email' => $companyEmail,
         ], 'import');
 
-        // Only notify the first time a row registers this participant for
-        // this event, so re-importing a corrected file doesn't re-send mail.
         if ($registration->wasRecentlyCreated) {
-            $registration->loadMissing(['event', 'participant']);
-            NotifiesPerChannel::send($participant, new EventRegistrationSubmitted($registration));
+            $this->newRegistrationIds[] = $registration->id;
         }
+    }
+
+    public function sendNotifications(): void
+    {
+        EventRegistration::query()
+            ->whereIn('id', $this->newRegistrationIds)
+            ->with(['event', 'participant'])
+            ->each(function (EventRegistration $registration): void {
+                NotifiesPerChannel::send(
+                    $registration->participant,
+                    new EventRegistrationSubmitted($registration)
+                );
+            });
     }
 }
