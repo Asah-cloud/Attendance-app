@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Company;
-use App\Models\SubscriptionPayment;
 use App\Models\User;
 use App\Notifications\CompanyWelcomeNotification;
 use Illuminate\Http\UploadedFile;
@@ -9,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\TestCase;
 
 function fakePaystackForOnboarding(): void
 {
@@ -34,7 +34,7 @@ function fakePaystackForOnboarding(): void
     ]);
 }
 
-function payForOnboarding(Tests\TestCase $test, string $plan, string $email): string
+function payForOnboarding(TestCase $test, string $plan, string $email): string
 {
     $test->post(route('checkout.start', $plan), ['email' => $email])
         ->assertRedirect('https://paystack.test/pay/xyz');

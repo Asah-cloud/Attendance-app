@@ -17,7 +17,18 @@ class MealCollectionAudit extends Model
         return ['quantity_change' => 'integer', 'occurred_at' => 'datetime'];
     }
 
-    public function distribution(): BelongsTo { return $this->belongsTo(MealDistribution::class, 'meal_distribution_id'); }
-    public function participant(): BelongsTo { return $this->belongsTo(Participant::class); }
-    public function performer(): BelongsTo { return $this->belongsTo(User::class, 'performed_by'); }
+    public function distribution(): BelongsTo
+    {
+        return $this->belongsTo(MealDistribution::class, 'meal_distribution_id');
+    }
+
+    public function participant(): BelongsTo
+    {
+        return $this->belongsTo(Participant::class);
+    }
+
+    public function performer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'performed_by');
+    }
 }

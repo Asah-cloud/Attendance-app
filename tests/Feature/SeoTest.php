@@ -2,6 +2,8 @@
 
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\User;
+use Spatie\Permission\Models\Role;
 
 it('publishes a robots.txt that points to the sitemap and allows crawling everything', function () {
     $response = $this->get('/robots.txt');
@@ -57,8 +59,8 @@ it('blocks search engines from indexing auth pages', function () {
 
 it('blocks search engines from indexing the authenticated app', function () {
     $company = Company::create(['name' => 'Acme Co']);
-    $manager = \App\Models\User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
-    \Spatie\Permission\Models\Role::findOrCreate('manager');
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    Role::findOrCreate('manager');
     $manager->assignRole('manager');
 
     $this->actingAs($manager)->get(route('dashboard'))->assertOk()->assertSee('noindex, nofollow', false);

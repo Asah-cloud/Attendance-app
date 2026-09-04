@@ -4,6 +4,7 @@ use App\Models\Company;
 use App\Models\PlatformSetting;
 use App\Models\User;
 use App\Services\PaystackService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Spatie\Permission\Models\Role;
 
@@ -59,7 +60,7 @@ it('keeps the existing key when the field is submitted blank', function () {
 it('encrypts the stored value at rest', function () {
     PlatformSetting::set('paystack_secret_key', 'sk_test_original');
 
-    $raw = \Illuminate\Support\Facades\DB::table('platform_settings')->where('key', 'paystack_secret_key')->value('value');
+    $raw = DB::table('platform_settings')->where('key', 'paystack_secret_key')->value('value');
 
     expect($raw)->not->toContain('sk_test_original');
 });

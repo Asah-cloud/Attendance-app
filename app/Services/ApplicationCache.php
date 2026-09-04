@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class ApplicationCache
@@ -51,20 +52,21 @@ class ApplicationCache
     }
 
     private function remember(string $scope, string $section, int $ttl, callable $callback): mixed
-{
-    $version = Cache::rememberForever($this->versionKey($scope), fn () => 1);
+    {
+        $version = Cache::rememberForever($this->versionKey($scope), fn () => 1);
 
-    return Cache::remember("attendance:{$scope}:v{$version}:{$section}", $ttl, function () use ($callback) {
-        $result = $callback();
-        
-        // Automatically convert collections to arrays for safe caching
-        if ($result instanceof \Illuminate\Support\Collection) {
-            return $result->toArray();
-        }
+        return Cache::remember("attendance:{$scope}:v{$version}:{$section}", $ttl, function () use ($callback) {
+            $result = $callback();
 
-        return $result;
-    });
-}
+            // Automatically convert collections to arrays for safe caching
+            if ($result instanceof Collection) {
+                return $result->toArray();
+            }
+
+            return $result;
+        });
+    }
+
     private function advance(string $scope): void
     {
         $key = $this->versionKey($scope);

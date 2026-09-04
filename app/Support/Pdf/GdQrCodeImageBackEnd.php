@@ -38,7 +38,7 @@ final class GdQrCodeImageBackEnd implements ImageBackEndInterface
     {
         $this->image = imagecreatetruecolor($size, $size);
         imagefilledrectangle($this->image, 0, 0, $size, $size, $this->allocate($backgroundColor));
-        $this->matrices = [new TransformationMatrix()];
+        $this->matrices = [new TransformationMatrix];
         $this->matrixIndex = 0;
     }
 
@@ -124,7 +124,7 @@ final class GdQrCodeImageBackEnd implements ImageBackEndInterface
     }
 
     /**
-     * @param array<int, array<int, float[]>> $subpaths
+     * @param  array<int, array<int, float[]>>  $subpaths
      */
     private function fillEvenOdd(array $subpaths, int $gdColor): void
     {
