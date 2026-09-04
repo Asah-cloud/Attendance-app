@@ -33,8 +33,56 @@ class MealDistributionController extends Controller
             ->get();
         $stations = $event->mealStations()->orderBy('name')->get();
         $confirmedCount = $event->confirmedParticipants()->count();
+        $registrations = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with('participant')
+            ->orderByDesc('food_required')
+            ->get();
 
-        return view('meals.index', compact('event', 'meals', 'stations', 'confirmedCount'));
+        return view('meals.index', compact('event', 'meals', 'stations', 'confirmedCount', 'registrations'));
+    }
+
+    public function updateSettings(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $wasRequired = $event->food_registration_required;
+        $nowRequired = $request->boolean('food_registration_required');
+        $event->update(['food_registration_required' => $nowRequired]);
+
+        $message = 'Food settings updated.';
+        if ($nowRequired && ! $wasRequired) {
+            $marked = $event->registrations()
+                ->where('status', EventRegistration::STATUS_CONFIRMED)
+                ->where('food_required', false)
+                ->update(['food_required' => true]);
+            $message .= " {$marked} already-confirmed attendee(s) were kept eligible for food. New registrations must now ask for food to be eligible.";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function updateRequirement(Request $request, Event $event, EventRegistration $registration): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        abort_unless($registration->event_id === $event->id, 404);
+        $registration->update(['food_required' => $request->boolean('food_required')]);
+
+        return back()->with('success', 'Food requirement updated.');
+    }
+
+    public function markAllRequired(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        if (trim((string) $request->input('confirm_title')) !== $event->title) {
+            return back()->with('error', 'Type the exact event title to confirm.');
+        }
+
+        $count = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->where('food_required', false)
+            ->update(['food_required' => true]);
+
+        return back()->with('success', "{$count} attendee(s) marked as needing food.");
     }
 
     public function store(Request $request, Event $event): RedirectResponse
@@ -197,6 +245,10 @@ class MealDistributionController extends Controller
             abort(403);
         }
 
+        if ($event->food_registration_required && ! $registration->food_required && ! $override) {
+            return $this->issueResponse($request, false, "{$registration->participant->name} did not sign up for food. A manager can override this.", 422);
+        }
+
         $collectedAt = isset($validated['scanned_at']) ? min(now(), Carbon::parse($validated['scanned_at'])) : now();
 
         $result = DB::transaction(function () use ($meal, $registration, $request, $override, $validated, $collectedAt): array {
@@ -316,6 +368,7 @@ class MealDistributionController extends Controller
         $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->when($event->food_registration_required, fn ($query) => $query->where('food_required', true))
             ->with('participant')
             ->get();
         $meals = $event->mealDistributions()->with('entitlements')->orderBy('opens_at')->get();
@@ -364,7 +417,12 @@ class MealDistributionController extends Controller
         $wasteLogs = MealWasteLog::query()->whereHas('distribution', fn ($query) => $query->where('event_id', $event->id))
             ->with(['distribution', 'loggedBy'])->latest('occurred_at')->get();
 
-        $confirmedByCategory = $event->confirmedParticipants()->get()->countBy(fn ($participant) => $participant->category ?: 'Unspecified');
+        $confirmedByCategory = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->when($event->food_registration_required, fn ($query) => $query->where('food_required', true))
+            ->with('participant')
+            ->get()
+            ->countBy(fn ($registration) => $registration->participant->category ?: 'Unspecified');
         $forecast = $meals->map(fn ($meal) => [
             'meal' => $meal,
             'suggested' => $confirmedByCategory->sum(fn ($count, $category) => $count * $meal->entitlementFor($category === 'Unspecified' ? null : $category)),

@@ -32,6 +32,7 @@
         .attendee-label { margin: 0 0 2mm; font-size: 2.8mm; font-weight: bold; letter-spacing: .2em; text-transform: uppercase; }
         .name { margin: 0; font-size: 8mm; line-height: 1.1; font-weight: bold; color: #0f172a; }
         .category-pill { display: inline-block; margin-top: 2.5mm; border-radius: 999px; padding: 1.3mm 4mm; color: white; font-size: 3mm; font-weight: bold; }
+        .room-line { margin: 2mm 0 0; color: #334155; font-size: 3mm; font-weight: bold; }
         .credential-box { padding: 4mm; }
         .credential-label { margin: 0 0 1.5mm; color: #64748b; font-size: 2.5mm; font-weight: bold; letter-spacing: .16em; text-transform: uppercase; }
         .member-id { margin: 0; color: #0f172a; font-size: 4mm; font-weight: bold; }
@@ -98,6 +99,9 @@
                 <p class="attendee-label" style="color: {{ $categoryColor }};">Attendee</p>
                 <h1 class="name" style="color:{{ $accentColor }}">{{ $badgeName }}</h1>
                 <span class="category-pill" style="background: {{ $categoryColor }};">{{ $category }}</span>
+                @if($event->accommodation_published && $registration->roomAssignment)
+                    <p class="room-line">Room {{ $registration->roomAssignment->room->name }} &middot; {{ $registration->roomAssignment->room->floor->block->name }}, {{ $registration->roomAssignment->room->floor->name }}</p>
+                @endif
             </div>
         </div>
         <div class="bottom">

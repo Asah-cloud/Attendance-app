@@ -7,6 +7,7 @@ use App\Models\EventRegistration;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
+use App\Services\RegistrationLifecycleService;
 use Maatwebsite\Excel\Concerns\OnEachRow;
 use Maatwebsite\Excel\Row;
 
@@ -14,12 +15,15 @@ class UsersImport implements OnEachRow
 {
     private $event;
 
+    private bool $needsRoom;
+
     /** @var array<int, int> */
     private array $newRegistrationIds = [];
 
-    public function __construct(Event $event)
+    public function __construct(Event $event, bool $needsRoom = false)
     {
         $this->event = $event;
+        $this->needsRoom = $needsRoom;
     }
 
     public function onRow(Row $row): void
@@ -53,6 +57,11 @@ class UsersImport implements OnEachRow
 
         if ($registration->wasRecentlyCreated) {
             $this->newRegistrationIds[] = $registration->id;
+
+            if ($this->needsRoom && $this->event->accommodation_enabled) {
+                $registration->update(['accommodation_required' => true]);
+                app(RegistrationLifecycleService::class)->allocateAccommodation($registration);
+            }
         }
     }
 

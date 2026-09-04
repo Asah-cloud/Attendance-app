@@ -6,11 +6,14 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\RegistrationLifecycleNotification;
+use App\Notifications\RoomAssigned;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class RegistrationLifecycleService
 {
+    public function __construct(private readonly RoomAllocationService $rooms) {}
+
     public function approve(EventRegistration $registration): void
     {
         DB::transaction(function () use ($registration): void {
@@ -30,6 +33,7 @@ class RegistrationLifecycleService
         });
 
         $this->notify($registration, 'approved');
+        $this->allocateAccommodation($registration);
     }
 
     public function reject(EventRegistration $registration): void
@@ -40,6 +44,7 @@ class RegistrationLifecycleService
             'approved_at' => null,
             'cancelled_at' => null,
         ]);
+        $registration->roomAssignment()->where('status', '!=', 'checked_in')->delete();
         $this->notify($registration, 'rejected');
 
         if ($wasConfirmed) {
@@ -59,6 +64,7 @@ class RegistrationLifecycleService
             'approved_at' => null,
             'cancelled_at' => now(),
         ]);
+        $registration->roomAssignment()->where('status', '!=', 'checked_in')->delete();
         $this->notify($registration, 'cancelled');
 
         if ($wasConfirmed) {
@@ -135,6 +141,31 @@ class RegistrationLifecycleService
 
         foreach ($promoted as $registration) {
             $this->notify($registration, 'promoted');
+            $this->allocateAccommodation($registration);
+        }
+    }
+
+    public function allocateAccommodation(EventRegistration $registration): void
+    {
+        $registration->loadMissing('event');
+        if ($registration->status !== EventRegistration::STATUS_CONFIRMED
+            || ! $registration->accommodation_required
+            || ! $registration->event->accommodation_enabled) {
+            return;
+        }
+
+        // While attendees are choosing their own rooms, don't pre-assign one — the cutoff job fills the rest.
+        if ($registration->event->accommodationSelfSelectOpen()) {
+            return;
+        }
+
+        // Place just this attendee — a manager's "Assign rooms now" still does the whole-event pass.
+        $assignment = $this->rooms->allocateOne($registration);
+
+        if ($assignment && ! $assignment->notification_sent_at && $registration->event->accommodation_published) {
+            $assignment->loadMissing(['registration.participant', 'registration.event.company', 'room.floor.block.site']);
+            NotifiesPerChannel::send($assignment->registration->participant, new RoomAssigned($assignment));
+            $assignment->update(['notification_sent_at' => now()]);
         }
     }
 

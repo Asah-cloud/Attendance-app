@@ -100,6 +100,34 @@ class EventRegistrationFormController extends Controller
         return back()->with('success', 'Registration cancelled.');
     }
 
+    public function destroyAll(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+
+        if (trim((string) $request->input('confirm_title')) !== $event->title) {
+            throw ValidationException::withMessages(['confirm_title' => 'Type the exact event title to confirm.']);
+        }
+
+        // Registrations whose participant has no attendance recorded for this event.
+        $deletable = fn () => $event->registrations()->whereNotExists(fn ($query) => $query
+            ->selectRaw('1')
+            ->from('attendances')
+            ->whereColumn('attendances.participant_id', 'event_registrations.participant_id')
+            ->where('attendances.event_id', $event->id));
+
+        $total = $event->registrations()->count();
+        $removed = $deletable()->count();
+        $deletable()->delete();
+        $kept = $total - $removed;
+
+        $message = "{$removed} attendee(s) removed.";
+        if ($kept > 0) {
+            $message .= " {$kept} kept because they have already checked in.";
+        }
+
+        return redirect()->route('events.registrations.index', $event)->with('success', $message);
+    }
+
     public function updateParticipant(Request $request, Event $event, EventRegistration $registration): RedirectResponse
     {
         $this->authorizeRegistration($event, $registration);
@@ -145,7 +173,7 @@ class EventRegistrationFormController extends Controller
         $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->with('participant')
+            ->with(['participant', 'roomAssignment.room.floor.block'])
             ->get();
 
         $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();
@@ -164,7 +192,7 @@ class EventRegistrationFormController extends Controller
         $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->with('participant')
+            ->with(['participant', 'roomAssignment.room.floor.block'])
             ->get();
 
         $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();

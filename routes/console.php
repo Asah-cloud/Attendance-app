@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Notifications\CompanySubscriptionNotification;
 use App\Notifications\Concerns\NotifiesPerChannel;
@@ -8,6 +9,7 @@ use App\Services\ConfirmationReminderSender;
 use App\Services\EmailDomainLifecycleManager;
 use App\Services\EventBillingService;
 use App\Services\RegistrationLifecycleService;
+use App\Services\RoomAllocationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -71,3 +73,19 @@ Schedule::call(fn () => app(EventBillingService::class)->finalizeDue())
 
 Schedule::call(fn () => app(EventBillingService::class)->reconcileDue())
     ->dailyAt('07:00')->name('reconcile-event-attendee-charges')->withoutOverlapping();
+
+Schedule::call(function (): void {
+    Event::query()
+        ->where('accommodation_enabled', true)
+        ->whereNotNull('accommodation_self_select_closes_at')
+        ->where('accommodation_self_select_closes_at', '<', now())
+        ->whereHas('registrations', fn ($query) => $query
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->where('accommodation_required', true)
+            ->whereDoesntHave('roomAssignment'))
+        ->chunkById(50, function ($events): void {
+            foreach ($events as $event) {
+                app(RoomAllocationService::class)->commit($event, null);
+            }
+        });
+})->hourly()->name('allocate-accommodation-after-self-select')->withoutOverlapping();

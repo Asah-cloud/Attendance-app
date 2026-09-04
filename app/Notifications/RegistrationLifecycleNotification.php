@@ -22,6 +22,7 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
         $company = $event->company;
         $organization = $company?->name ?? 'The event team';
         $subject = $this->subject().' - '.$event->title;
+        $needsRoomPick = $this->needsRoomPick();
 
         $mail = (new MailMessage)
             ->subject($subject)
@@ -37,10 +38,13 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
                     'Event: '.$event->title,
                     'Date: '.$event->event_date->format('M j, Y'),
                     $event->location ? 'Location: '.$event->location : null,
+                    $needsRoomPick ? 'You asked for a room — please choose one before selection closes.' : null,
                     'Please keep your personal registration link safe. We look forward to welcoming you!',
                 ])),
-                'actionLabel' => $this->actionLabel(),
-                'actionUrl' => route('registrations.confirmation', $this->registration->registration_code),
+                'actionLabel' => $needsRoomPick ? 'Select your room' : $this->actionLabel(),
+                'actionUrl' => $needsRoomPick
+                    ? route('registrations.room.select', $this->registration->registration_code)
+                    : route('registrations.confirmation', $this->registration->registration_code),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
@@ -58,10 +62,25 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
     {
         $event = $this->registration->event;
         $organization = $event->company?->name ?? config('app.name');
+        $needsRoomPick = $this->needsRoomPick();
+        $link = $needsRoomPick
+            ? route('registrations.room.select', $this->registration->registration_code)
+            : route('registrations.confirmation', $this->registration->registration_code);
 
         return 'Hello '.$notifiable->name.'! '.$this->smsMessage().' Event: '.$event->title.', '
-            .$event->event_date->format('M j, Y').'. From '.$organization.'. Details: '
-            .route('registrations.confirmation', $this->registration->registration_code);
+            .$event->event_date->format('M j, Y').'. From '.$organization.'. '
+            .($needsRoomPick ? 'Please choose your room: ' : 'Details: ').$link;
+    }
+
+    /** Whether this attendee still needs to pick a room while self-selection is open. */
+    private function needsRoomPick(): bool
+    {
+        $registration = $this->registration;
+
+        return $registration->status === EventRegistration::STATUS_CONFIRMED
+            && $registration->accommodation_required
+            && ! $registration->roomAssignment
+            && $registration->event->accommodationSelfSelectOpen();
     }
 
     private function subject(): string

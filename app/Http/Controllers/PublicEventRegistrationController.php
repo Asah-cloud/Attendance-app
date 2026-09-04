@@ -6,8 +6,10 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
+use App\Notifications\RoomAssigned;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
+use App\Services\RoomAllocationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +32,7 @@ class PublicEventRegistrationController extends Controller
         ]);
     }
 
-    public function store(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
+    public function store(Request $request, Event $event, ParticipantRegistrationService $participants, RegistrationLifecycleService $lifecycle): RedirectResponse
     {
         $event->ensureSystemRegistrationFields();
         $fields = $event->registrationFields()->where('is_active', true)->get();
@@ -75,22 +77,74 @@ class PublicEventRegistrationController extends Controller
                 'custom_answers' => $validated['custom'] ?? [],
                 'consented_at' => now(),
                 'terms_version' => $event->registration_terms_version,
+                'accommodation_required' => $event->accommodation_enabled && ($validated['accommodation_required'] ?? false),
+                'accessibility_required' => $event->accommodation_enabled && ($validated['accommodation_required'] ?? false) && ($validated['accessibility_required'] ?? false),
+                'accommodation_notes' => $event->accommodation_enabled ? ($validated['accommodation_notes'] ?? null) : null,
+                'food_required' => $event->food_registration_required && ($validated['food_required'] ?? false),
             ]);
         });
 
         $registration->load(['event.company', 'participant']);
+        $lifecycle->allocateAccommodation($registration);
         NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration));
 
-        return redirect()->route('registrations.confirmation', $registration->registration_code);
+        return $this->afterRegistration($registration);
     }
 
     public function confirmation(string $code): View
     {
-        $registration = EventRegistration::with(['event.company', 'participant'])
+        $registration = EventRegistration::with(['event.company', 'participant', 'roomAssignment.room.floor.block.site'])
             ->where('registration_code', $code)
             ->firstOrFail();
 
         return view('registrations.confirmation', compact('registration'));
+    }
+
+    public function roomSelect(string $code, RoomAllocationService $allocator): View
+    {
+        $registration = EventRegistration::with(['event.company', 'participant', 'roomAssignment.room.floor.block.site'])
+            ->where('registration_code', $code)
+            ->firstOrFail();
+
+        abort_unless($this->selfSelectAllowed($registration), 404);
+
+        $rooms = $allocator->selectableRooms($registration)
+            ->groupBy(fn ($room) => $room->floor->block->name)
+            ->map(fn ($blockRooms) => $blockRooms->groupBy(fn ($room) => $room->floor->name));
+
+        return view('registrations.room-select', compact('registration', 'rooms'));
+    }
+
+    public function roomClaim(Request $request, string $code, RoomAllocationService $allocator): RedirectResponse
+    {
+        $registration = EventRegistration::with(['event.company', 'participant', 'roomAssignment'])
+            ->where('registration_code', $code)
+            ->firstOrFail();
+
+        abort_unless($this->selfSelectAllowed($registration), 404);
+
+        $data = $request->validate(['room_id' => ['required', 'integer']]);
+        $result = $allocator->claim($registration, $data['room_id']);
+
+        if ($result['ok'] && $registration->event->accommodation_published) {
+            $assignment = $registration->roomAssignment()
+                ->with(['registration.participant', 'registration.event.company', 'room.floor.block.site'])
+                ->first();
+            if ($assignment && ! $assignment->notification_sent_at) {
+                NotifiesPerChannel::send($registration->participant, new RoomAssigned($assignment));
+                $assignment->update(['notification_sent_at' => now()]);
+            }
+        }
+
+        return redirect()->route('registrations.room.select', $registration->registration_code)
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    private function selfSelectAllowed(EventRegistration $registration): bool
+    {
+        return $registration->status === EventRegistration::STATUS_CONFIRMED
+            && $registration->accommodation_required
+            && $registration->event->accommodationSelfSelectOpen();
     }
 
     public function cancel(string $code, RegistrationLifecycleService $lifecycle): RedirectResponse
@@ -145,6 +199,22 @@ class PublicEventRegistrationController extends Controller
         ]);
 
         $lifecycle->notify($registration, 'confirmed');
+        $lifecycle->allocateAccommodation($registration);
+
+        return $this->afterRegistration($registration->fresh());
+    }
+
+    /** Send a confirmed attendee who needs a room straight to the room picker while self-selection is open. */
+    private function afterRegistration(EventRegistration $registration): RedirectResponse
+    {
+        $registration->loadMissing('event');
+
+        if ($registration->status === EventRegistration::STATUS_CONFIRMED
+            && $registration->accommodation_required
+            && ! $registration->roomAssignment()->exists()
+            && $registration->event->accommodationSelfSelectOpen()) {
+            return redirect()->route('registrations.room.select', ['code' => $registration->registration_code, 'new' => 1]);
+        }
 
         return redirect()->route('registrations.confirmation', $registration->registration_code);
     }
@@ -163,6 +233,10 @@ class PublicEventRegistrationController extends Controller
                 ? ['required', Rule::in($categoryField->options ?? [])]
                 : ['required', 'string', 'max:100'],
             'consent' => ['required', 'accepted'],
+            'accommodation_required' => ['nullable', 'boolean'],
+            'accessibility_required' => ['nullable', 'boolean'],
+            'accommodation_notes' => ['nullable', 'string', 'max:2000'],
+            'food_required' => ['nullable', 'boolean'],
         ];
 
         return array_merge($rules, $this->customFieldRules($fields->where('is_system', false)));

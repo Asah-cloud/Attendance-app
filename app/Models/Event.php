@@ -43,6 +43,10 @@ class Event extends Model
         'end_date',
         'has_arrival_session',
         'arrival_date',
+        'accommodation_enabled',
+        'accommodation_published',
+        'accommodation_self_select_closes_at',
+        'food_registration_required',
         'description',
         'location',
         'logo_path',
@@ -72,6 +76,10 @@ class Event extends Model
         'end_date' => 'date',
         'has_arrival_session' => 'boolean',
         'arrival_date' => 'date',
+        'accommodation_enabled' => 'boolean',
+        'accommodation_published' => 'boolean',
+        'accommodation_self_select_closes_at' => 'datetime',
+        'food_registration_required' => 'boolean',
         'registration_enabled' => 'boolean',
         'registration_opens_at' => 'datetime',
         'registration_closes_at' => 'datetime',
@@ -124,6 +132,18 @@ class Event extends Model
     public function mealStations(): HasMany
     {
         return $this->hasMany(MealStation::class);
+    }
+
+    public function accommodationSites(): HasMany
+    {
+        return $this->hasMany(AccommodationSite::class);
+    }
+
+    public function accommodationSelfSelectOpen(): bool
+    {
+        return $this->accommodation_enabled
+            && $this->accommodation_self_select_closes_at !== null
+            && $this->accommodation_self_select_closes_at->isFuture();
     }
 
     public function ensureSystemRegistrationFields(): void

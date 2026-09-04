@@ -31,6 +31,50 @@
                 <button class="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Save stations</button>
             </form>
         </details>
+
+        <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm" @if($event->food_registration_required) open @endif>
+            <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">Food sign-up requirement</summary>
+            <form method="POST" action="{{ route('events.meals.settings', $event) }}" class="border-t border-slate-100 p-6">
+                @csrf @method('PATCH')
+                <label class="flex items-start gap-3">
+                    <input type="checkbox" name="food_registration_required" value="1" @checked($event->food_registration_required) class="mt-1 rounded border-slate-300 text-blue-600">
+                    <span>
+                        <span class="block text-sm font-black text-gray-900">Require food sign-up</span>
+                        <span class="mt-1 block text-xs leading-5 text-slate-500">When on, only attendees who asked for food during registration can collect it — the scanner blocks everyone else unless a manager overrides. Already-confirmed attendees are kept eligible the moment you turn this on. New registrations must tick a box to opt in.</span>
+                    </span>
+                </label>
+                <button class="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Save</button>
+            </form>
+        </details>
+
+        @if($event->food_registration_required)
+            <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">Who needs food ({{ $registrations->where('food_required', true)->count() }} of {{ $registrations->count() }})</summary>
+                <div class="border-t border-slate-100 p-6">
+                    <details class="mb-4">
+                        <summary class="cursor-pointer text-xs font-black text-slate-500">Mark every confirmed attendee as needing food</summary>
+                        <form method="POST" action="{{ route('events.meals.mark-all-required', $event) }}" class="mt-3 flex flex-wrap items-center gap-2">
+                            @csrf
+                            <span class="text-xs text-slate-600">Type <strong>{{ $event->title }}</strong> to confirm:</span>
+                            <input name="confirm_title" placeholder="{{ $event->title }}" class="rounded-lg border-slate-300 text-xs">
+                            <button class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white">Apply</button>
+                        </form>
+                    </details>
+                    <div class="max-h-96 overflow-y-auto rounded-xl border border-slate-100">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-2">Attendee</th><th class="px-4 py-2">Needs food</th></tr></thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse($registrations as $registration)
+                                    <tr><td class="px-4 py-2"><strong>{{ $registration->participant->name }}</strong><div class="text-xs text-slate-500">{{ $registration->participant->category ?: 'No category' }}</div></td><td class="px-4 py-2"><form method="POST" action="{{ route('events.meals.requirements.update', [$event, $registration]) }}">@csrf @method('PATCH')<label class="flex items-center gap-2"><input type="checkbox" name="food_required" value="1" onchange="this.form.requestSubmit()" @checked($registration->food_required)> {{ $registration->food_required ? 'Yes' : 'No' }}</label></form></td></tr>
+                                @empty
+                                    <tr><td colspan="2" class="p-6 text-center text-slate-500">No confirmed attendees yet.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+        @endif
     @endcan
 
     <div class="grid gap-5 lg:grid-cols-2">

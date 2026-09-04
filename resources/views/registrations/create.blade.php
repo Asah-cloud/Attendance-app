@@ -107,6 +107,26 @@
                         </div>
                     @endif
 
+                    @if($event->accommodation_enabled)
+                        <div x-data="{ needed: {{ old('accommodation_required') ? 'true' : 'false' }} }" class="space-y-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
+                            <p class="text-xs font-black uppercase tracking-wide text-indigo-700">Where you'll sleep</p>
+                            <input type="hidden" name="accommodation_required" value="0">
+                            <label class="flex items-start gap-3"><input type="checkbox" name="accommodation_required" value="1" x-model="needed" class="mt-1 rounded border-indigo-300 text-indigo-600"><span><strong class="block text-sm text-slate-800">I need a room for this event</strong><span class="text-xs text-slate-500">{{ $event->accommodationSelfSelectOpen() ? "You'll pick your room on the next step." : 'A room is given to you automatically after your place is confirmed.' }}</span></span></label>
+                            <div x-show="needed" x-cloak class="space-y-3 border-t border-indigo-100 pt-4">
+                                <input type="hidden" name="accessibility_required" value="0"><label class="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" name="accessibility_required" value="1" @checked(old('accessibility_required'))> I need a step-free room (no stairs)</label>
+                                <textarea name="accommodation_notes" rows="2" placeholder="Anything else about your room needs (optional)" class="w-full rounded-xl border-indigo-200 bg-white text-sm">{{ old('accommodation_notes') }}</textarea>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($event->food_registration_required)
+                        <div class="rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
+                            <p class="text-xs font-black uppercase tracking-wide text-amber-700">Food</p>
+                            <input type="hidden" name="food_required" value="0">
+                            <label class="mt-3 flex items-start gap-3"><input type="checkbox" name="food_required" value="1" @checked(old('food_required')) class="mt-1 rounded border-amber-300 text-amber-600"><span><strong class="block text-sm text-slate-800">I want food at this event</strong><span class="text-xs text-slate-500">Only attendees who tick this can collect a meal at the event.</span></span></label>
+                        </div>
+                    @endif
+
                     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
                         <div class="prose prose-sm max-w-none text-slate-600">{{ $event->registration_terms }}</div>
                         <label class="mt-4 flex items-start gap-3">

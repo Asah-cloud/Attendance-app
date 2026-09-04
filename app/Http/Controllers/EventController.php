@@ -57,11 +57,12 @@ class EventController extends Controller
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv|max:2048',
             'send_notifications' => ['nullable', 'boolean'],
+            'needs_room' => ['nullable', 'boolean'],
         ]);
 
         try {
             // 2. Run the import using your UsersImport class
-            $import = new UsersImport($event);
+            $import = new UsersImport($event, $event->accommodation_enabled && $request->boolean('needs_room'));
             Excel::import($import, $request->file('file'));
 
             if ($request->boolean('send_notifications')) {
@@ -71,6 +72,9 @@ class EventController extends Controller
             $message = $request->boolean('send_notifications')
                 ? 'Participants imported successfully! Email and SMS notifications are being sent.'
                 : 'Participants imported successfully! No email or SMS notifications were sent.';
+            if ($event->accommodation_enabled && $request->boolean('needs_room')) {
+                $message .= ' They were marked as needing a room.';
+            }
 
             return back()->with('success', $message);
         } catch (\Throwable $exception) {

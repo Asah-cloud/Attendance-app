@@ -22,6 +22,7 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
         $company = $event->company;
         $organization = $company?->name ?? 'The event team';
         $subject = 'Thank you for registering - '.$event->title;
+        $needsRoomPick = $this->needsRoomPick();
 
         $mail = (new MailMessage)
             ->subject($subject)
@@ -37,10 +38,13 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
                     'Status: '.ucfirst($this->registration->status),
                     'Date: '.$event->event_date->format('M j, Y'),
                     $event->location ? 'Location: '.$event->location : null,
+                    $needsRoomPick ? 'You asked for a room — please choose one before selection closes.' : null,
                     'Please keep this personal link safe. We will send you another update if your registration status changes.',
                 ])),
-                'actionLabel' => 'View my registration and QR code',
-                'actionUrl' => route('registrations.confirmation', $this->registration->registration_code),
+                'actionLabel' => $needsRoomPick ? 'Select your room' : 'View my registration and QR code',
+                'actionUrl' => $needsRoomPick
+                    ? route('registrations.room.select', $this->registration->registration_code)
+                    : route('registrations.confirmation', $this->registration->registration_code),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
@@ -53,10 +57,25 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
     {
         $event = $this->registration->event;
         $organization = $event->company?->name ?? config('app.name');
+        $needsRoomPick = $this->needsRoomPick();
+        $link = $needsRoomPick
+            ? route('registrations.room.select', $this->registration->registration_code)
+            : route('registrations.confirmation', $this->registration->registration_code);
 
         return 'Hello '.$notifiable->name.'! Thank you for registering for '.$event->title.'. We received your details. Status: '
-            .ucfirst($this->registration->status).'. From '.$organization.'. Details: '
-            .route('registrations.confirmation', $this->registration->registration_code);
+            .ucfirst($this->registration->status).'. From '.$organization.'. '
+            .($needsRoomPick ? 'Please choose your room: ' : 'Details: ').$link;
+    }
+
+    /** Whether this attendee still needs to pick a room while self-selection is open. */
+    private function needsRoomPick(): bool
+    {
+        $registration = $this->registration;
+
+        return $registration->status === EventRegistration::STATUS_CONFIRMED
+            && $registration->accommodation_required
+            && ! $registration->roomAssignment
+            && $registration->event->accommodationSelfSelectOpen();
     }
 
     public function smsSenderId(): ?string

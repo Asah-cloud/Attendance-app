@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccommodationController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AttendanceConfirmationController;
@@ -51,6 +52,12 @@ Route::get('/registrations/{code}/confirmation', [PublicEventRegistrationControl
 Route::post('/registrations/{code}/cancel', [PublicEventRegistrationController::class, 'cancel'])
     ->middleware('throttle:10,1')
     ->name('registrations.cancel');
+Route::get('/registrations/{code}/room', [PublicEventRegistrationController::class, 'roomSelect'])
+    ->middleware('throttle:60,1')
+    ->name('registrations.room.select');
+Route::post('/registrations/{code}/room', [PublicEventRegistrationController::class, 'roomClaim'])
+    ->middleware('throttle:20,1')
+    ->name('registrations.room.claim');
 Route::get('/check-in/{code}', [AttendanceController::class, 'personalCheckIn'])
     ->middleware('throttle:30,1')
     ->name('attendance.personal');
@@ -155,6 +162,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/registration-form', [EventRegistrationFormController::class, 'edit'])->name('events.registration-form.edit');
         Route::get('/events/{event}/registrations', [EventRegistrationFormController::class, 'registrations'])->name('events.registrations.index');
         Route::post('/events/{event}/registrations', [EventRegistrationFormController::class, 'storeRegistration'])->name('events.registrations.store');
+        Route::delete('/events/{event}/registrations', [EventRegistrationFormController::class, 'destroyAll'])->name('events.registrations.destroy-all');
         Route::get('/events/{event}/registrations/export', [EventRegistrationFormController::class, 'export'])->name('events.registrations.export');
         Route::patch('/events/{event}/registrations/{registration}/approve', [EventRegistrationFormController::class, 'approve'])->name('events.registrations.approve');
         Route::patch('/events/{event}/registrations/{registration}/reject', [EventRegistrationFormController::class, 'reject'])->name('events.registrations.reject');
@@ -172,6 +180,9 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'updateSystemField'])->name('events.registration-fields.update');
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
 
+        Route::patch('/events/{event}/meals/settings', [MealDistributionController::class, 'updateSettings'])->name('events.meals.settings');
+        Route::patch('/events/{event}/meals/registrations/{registration}', [MealDistributionController::class, 'updateRequirement'])->name('events.meals.requirements.update');
+        Route::post('/events/{event}/meals/mark-all-required', [MealDistributionController::class, 'markAllRequired'])->name('events.meals.mark-all-required');
         Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
         Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
         Route::put('/events/{event}/meals/{meal}/stations', [MealDistributionController::class, 'updateStationAllocations'])->name('events.meals.stations.allocations.update');
@@ -183,6 +194,32 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
         Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
         Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->name('events.meals.collections.reverse');
+
+        Route::get('/events/{event}/accommodation', [AccommodationController::class, 'index'])->name('events.accommodation.index');
+        Route::patch('/events/{event}/accommodation/settings', [AccommodationController::class, 'updateSettings'])->name('events.accommodation.settings');
+        Route::post('/events/{event}/accommodation/sites', [AccommodationController::class, 'storeSite'])->name('events.accommodation.sites.store');
+        Route::post('/events/{event}/accommodation/sites/{site}/blocks', [AccommodationController::class, 'storeBlock'])->name('events.accommodation.blocks.store');
+        Route::post('/events/{event}/accommodation/blocks/{block}/floors', [AccommodationController::class, 'storeFloor'])->name('events.accommodation.floors.store');
+        Route::post('/events/{event}/accommodation/floors/{floor}/rooms', [AccommodationController::class, 'storeRoom'])->name('events.accommodation.rooms.store');
+        Route::post('/events/{event}/accommodation/floors/{floor}/rooms/bulk', [AccommodationController::class, 'bulkStoreRooms'])->name('events.accommodation.rooms.bulk');
+        Route::post('/events/{event}/accommodation/import', [AccommodationController::class, 'importRooms'])->name('events.accommodation.import');
+        Route::patch('/events/{event}/accommodation/sites/{site}', [AccommodationController::class, 'updateSite'])->name('events.accommodation.sites.update');
+        Route::patch('/events/{event}/accommodation/blocks/{block}', [AccommodationController::class, 'updateBlock'])->name('events.accommodation.blocks.update');
+        Route::patch('/events/{event}/accommodation/floors/{floor}', [AccommodationController::class, 'updateFloor'])->name('events.accommodation.floors.update');
+        Route::patch('/events/{event}/accommodation/rooms/{room}', [AccommodationController::class, 'updateRoom'])->name('events.accommodation.rooms.update');
+        Route::patch('/events/{event}/accommodation/registrations/{registration}', [AccommodationController::class, 'updateRequirement'])->name('events.accommodation.requirements.update');
+        Route::post('/events/{event}/accommodation/allocate', [AccommodationController::class, 'allocate'])->name('events.accommodation.allocate');
+        Route::put('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'assign'])->name('events.accommodation.assignments.update');
+        Route::delete('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'destroyAssignment'])->name('events.accommodation.assignments.destroy');
+        Route::post('/events/{event}/accommodation/registrations/{registration}/check-in', [AccommodationController::class, 'checkIn'])->name('events.accommodation.check-in');
+        Route::post('/events/{event}/accommodation/registrations/{registration}/check-out', [AccommodationController::class, 'checkOut'])->name('events.accommodation.check-out');
+        Route::post('/events/{event}/accommodation/notify', [AccommodationController::class, 'notify'])->name('events.accommodation.notify');
+        Route::post('/events/{event}/accommodation/invite-self-select', [AccommodationController::class, 'inviteSelfSelect'])->name('events.accommodation.invite-self-select');
+        Route::post('/events/{event}/accommodation/mark-all-required', [AccommodationController::class, 'markAllRequired'])->name('events.accommodation.mark-all-required');
+        Route::get('/events/{event}/accommodation/registrations/{registration}/room-preview', [AccommodationController::class, 'previewRoomPicker'])->name('events.accommodation.room-preview');
+        Route::get('/events/{event}/accommodation/report.csv', [AccommodationController::class, 'exportCsv'])->name('events.accommodation.report.csv');
+        Route::get('/events/{event}/accommodation/report.pdf', [AccommodationController::class, 'exportPdf'])->name('events.accommodation.report.pdf');
+        Route::delete('/events/{event}/accommodation/inventory/{type}/{id}', [AccommodationController::class, 'destroyInventory'])->name('events.accommodation.inventory.destroy');
 
         // Event feedback/survey forms: build any question set, share via slug URL + QR,
         // review responses in a table, and export them as Excel/PDF.

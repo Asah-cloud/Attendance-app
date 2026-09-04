@@ -110,7 +110,7 @@ class AttendanceController extends Controller
     public function personalCheckIn(string $code)
     {
         $registration = EventRegistration::query()
-            ->with(['event', 'participant'])
+            ->with(['event', 'participant', 'roomAssignment.room.floor.block.site'])
             ->where('registration_code', $code)
             ->firstOrFail();
 
@@ -170,7 +170,7 @@ class AttendanceController extends Controller
         }
 
         $registration = $event->registrations()
-            ->with('participant')
+            ->with(['participant', 'roomAssignment.room.floor.block.site'])
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->whereHas('participant', fn ($query) => $query->whereIn('phone', [
                 $phone, '0'.$phone, '233'.$phone, '+233'.$phone,
@@ -205,6 +205,10 @@ class AttendanceController extends Controller
         $message = $attendance->wasRecentlyCreated
             ? "Welcome, {$registration->participant->name}! Your {$session} check-in is complete."
             : "{$registration->participant->name} is already checked in for {$session}.";
+
+        if ($day === 0 && $event->accommodation_published && $registration->roomAssignment) {
+            $message .= ' Your room is '.$registration->roomAssignment->room->label().'.';
+        }
 
         return back()->with('success', $message);
     }
@@ -257,7 +261,7 @@ class AttendanceController extends Controller
         $code = $this->registrationCodeFromScan($validated['registration_code']);
 
         $registration = $event->registrations()
-            ->with('participant')
+            ->with(['participant', 'roomAssignment.room.floor.block.site'])
             ->where('registration_code', $code)
             ->first();
 
@@ -286,14 +290,21 @@ class AttendanceController extends Controller
             'marked_by' => Auth::id(),
         ]);
 
+        $message = $attendance->wasRecentlyCreated
+            ? "Welcome, {$registration->participant->name}! Your {$event->attendanceSessionLabel($day)} check-in is complete. We are happy to have you here."
+            : "Welcome back, {$registration->participant->name}! You are already checked in for {$event->attendanceSessionLabel($day)}. Enjoy the event.";
+        $room = $day === 0 && $event->accommodation_published ? $registration->roomAssignment?->room : null;
+        if ($room) {
+            $message .= ' Your room is '.$room->label().'.';
+        }
+
         return response()->json([
             'successful' => true,
             'already_present' => ! $attendance->wasRecentlyCreated,
             'name' => $registration->participant->name,
             'day' => $day,
-            'message' => $attendance->wasRecentlyCreated
-                ? "Welcome, {$registration->participant->name}! Your {$event->attendanceSessionLabel($day)} check-in is complete. We are happy to have you here."
-                : "Welcome back, {$registration->participant->name}! You are already checked in for {$event->attendanceSessionLabel($day)}. Enjoy the event.",
+            'room' => $room?->label(),
+            'message' => $message,
         ]);
     }
 

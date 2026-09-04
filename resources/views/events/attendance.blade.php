@@ -160,6 +160,17 @@
                         </span>
                     </label>
 
+                    @if($event->accommodation_enabled)
+                        <label class="mb-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                            <input type="checkbox" name="needs_room" value="1" @checked(old('needs_room'))
+                                   class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                            <span>
+                                <span class="block text-sm font-black text-gray-900">These attendees need a room</span>
+                                <span class="mt-1 block text-xs leading-5 text-gray-500">Marks only newly registered participants as needing a room. If attendees are notified above, their message includes a link to pick one.</span>
+                            </span>
+                        </label>
+                    @endif
+
                     <div class="flex flex-col gap-3">
                         <button type="submit" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all uppercase text-xs tracking-widest">
                             Start Import

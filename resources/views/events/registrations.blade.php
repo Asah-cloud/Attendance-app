@@ -6,6 +6,25 @@
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('events.registrations.export', $event) }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export CSV</a>
                 <a href="{{ route('events.badges', $event) }}" target="_blank" class="rounded-xl bg-teal-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-teal-950">Print badges</a>
+                @can('update', $event)
+                    <div x-data="{ open: false, title: '' }" class="inline-flex">
+                        <button type="button" @click="open = true" class="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-wider text-red-700">Clear all attendees</button>
+                        <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="open = false">
+                            <div class="w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-xl" @click.outside="open = false">
+                                <h3 class="text-lg font-black text-slate-900">Delete all attendees?</h3>
+                                <p class="mt-2 text-sm text-slate-600">This permanently removes every registration for <strong>{{ $event->title }}</strong>, plus their room assignments and meal records. Attendees who have already checked in are kept. Participant accounts and their registrations for other events are not affected. This cannot be undone.</p>
+                                <form method="POST" action="{{ route('events.registrations.destroy-all', $event) }}" class="mt-4">@csrf @method('DELETE')
+                                    <label class="text-xs font-bold text-slate-500">Type the event title to confirm</label>
+                                    <input name="confirm_title" x-model="title" autocomplete="off" placeholder="{{ $event->title }}" class="mt-1 w-full rounded-xl border-slate-300 text-sm">
+                                    <div class="mt-4 flex justify-end gap-2">
+                                        <button type="button" @click="open = false" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600">Cancel</button>
+                                        <button type="submit" x-bind:disabled="title.trim() !== @js($event->title)" class="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white disabled:opacity-40">Delete all</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endcan
             </div>
         </div>
         <x-event-closed-banner :event="$event" />

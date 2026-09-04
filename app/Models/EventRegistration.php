@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class EventRegistration extends Model
@@ -35,6 +36,10 @@ class EventRegistration extends Model
         'reminder_sent_at',
         'confirmation_sent_at',
         'confirmation_reminder_sent_at',
+        'accommodation_required',
+        'accessibility_required',
+        'accommodation_notes',
+        'food_required',
     ];
 
     protected function casts(): array
@@ -48,6 +53,9 @@ class EventRegistration extends Model
             'reminder_sent_at' => 'datetime',
             'confirmation_sent_at' => 'datetime',
             'confirmation_reminder_sent_at' => 'datetime',
+            'accommodation_required' => 'boolean',
+            'accessibility_required' => 'boolean',
+            'food_required' => 'boolean',
         ];
     }
 
@@ -72,5 +80,10 @@ class EventRegistration extends Model
     public function mealCollections(): HasMany
     {
         return $this->hasMany(MealCollection::class);
+    }
+
+    public function roomAssignment(): HasOne
+    {
+        return $this->hasOne(RoomAssignment::class);
     }
 }

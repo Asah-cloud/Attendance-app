@@ -383,6 +383,44 @@ it('uses an event pass fallback and compacts long badge names', function () {
         ->assertSee('margin:3mm', false);
 });
 
+it('shows the assigned room on badges once accommodation is published', function () {
+    $event = publicRegistrationEvent(['accommodation_enabled' => true, 'accommodation_published' => true]);
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Room Badge Person', 'category' => 'Guest']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed', 'accommodation_required' => true]);
+    $site = $event->accommodationSites()->create(['name' => 'Main Campus']);
+    $block = $site->blocks()->create(['name' => 'Block A']);
+    $floor = $block->floors()->create(['name' => 'Ground']);
+    $room = $floor->rooms()->create(['name' => 'A01', 'capacity' => 2]);
+    $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertSee('Room A01')
+        ->assertSee('Block A, Ground');
+
+    $this->actingAs($manager)->get(route('events.badges.pdf', $event))
+        ->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
+it('hides room info on badges when accommodation is not published', function () {
+    $event = publicRegistrationEvent(['accommodation_enabled' => true, 'accommodation_published' => false]);
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Hidden Room Person', 'category' => 'Guest']);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed', 'accommodation_required' => true]);
+    $site = $event->accommodationSites()->create(['name' => 'Main Campus']);
+    $block = $site->blocks()->create(['name' => 'Block B']);
+    $floor = $block->floors()->create(['name' => 'First']);
+    $room = $floor->rooms()->create(['name' => 'B02', 'capacity' => 2]);
+    $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertDontSee('Room B02');
+});
+
 it('prevents an usher from printing badges', function () {
     $event = publicRegistrationEvent();
     $usher = User::factory()->create(['company_id' => $event->company_id, 'role' => 'usher']);
