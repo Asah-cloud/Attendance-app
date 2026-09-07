@@ -72,6 +72,20 @@ class RegistrationLifecycleService
         }
     }
 
+    /** Whether a new or newly-approved registration should be confirmed or waitlisted, given current capacity. */
+    public function determineConfirmedOrWaitlistedStatus(Event $event, ?int $excludeRegistrationId = null): string
+    {
+        $confirmedCount = EventRegistration::query()
+            ->where('event_id', $event->id)
+            ->when($excludeRegistrationId, fn ($query) => $query->where('id', '!=', $excludeRegistrationId))
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->count();
+
+        return $event->registration_capacity !== null && $confirmedCount >= $event->registration_capacity
+            ? EventRegistration::STATUS_WAITLISTED
+            : EventRegistration::STATUS_CONFIRMED;
+    }
+
     public function capacityChanged(Event $event): void
     {
         $this->fillAvailablePlaces($event->id);

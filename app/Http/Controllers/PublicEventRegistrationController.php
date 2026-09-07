@@ -38,7 +38,7 @@ class PublicEventRegistrationController extends Controller
         $fields = $event->registrationFields()->where('is_active', true)->get();
         $validated = $request->validate($this->rules($fields));
 
-        $registration = DB::transaction(function () use ($event, $validated, $participants): EventRegistration {
+        $registration = DB::transaction(function () use ($event, $validated, $participants, $lifecycle): EventRegistration {
             $event = Event::query()->lockForUpdate()->findOrFail($event->id);
 
             if (! $event->registrationIsOpen()) {
@@ -57,16 +57,9 @@ class PublicEventRegistrationController extends Controller
                 throw ValidationException::withMessages(['email' => 'You are already registered for this event.']);
             }
 
-            $confirmedCount = EventRegistration::query()
-                ->where('event_id', $event->id)
-                ->where('status', EventRegistration::STATUS_CONFIRMED)
-                ->count();
-
-            $status = match (true) {
-                $event->registration_requires_approval => EventRegistration::STATUS_PENDING,
-                $event->registration_capacity !== null && $confirmedCount >= $event->registration_capacity => EventRegistration::STATUS_WAITLISTED,
-                default => EventRegistration::STATUS_CONFIRMED,
-            };
+            $status = $event->registration_requires_approval
+                ? EventRegistration::STATUS_PENDING
+                : $lifecycle->determineConfirmedOrWaitlistedStatus($event);
 
             return EventRegistration::create([
                 'event_id' => $event->id,
@@ -174,7 +167,7 @@ class PublicEventRegistrationController extends Controller
 
     public function storeConfirm(Request $request, string $code, RegistrationLifecycleService $lifecycle): RedirectResponse
     {
-        $registration = DB::transaction(function () use ($request, $code): EventRegistration {
+        $registration = DB::transaction(function () use ($request, $code, $lifecycle): EventRegistration {
             $registration = EventRegistration::with('event')
                 ->where('management_token', $code)
                 ->lockForUpdate()
@@ -192,15 +185,7 @@ class PublicEventRegistrationController extends Controller
                 $this->customFieldRules($fields)
             ));
 
-            $confirmedCount = EventRegistration::query()
-                ->where('event_id', $event->id)
-                ->where('id', '!=', $registration->id)
-                ->where('status', EventRegistration::STATUS_CONFIRMED)
-                ->count();
-
-            $status = $event->registration_capacity !== null && $confirmedCount >= $event->registration_capacity
-                ? EventRegistration::STATUS_WAITLISTED
-                : EventRegistration::STATUS_CONFIRMED;
+            $status = $lifecycle->determineConfirmedOrWaitlistedStatus($event, $registration->id);
 
             $registration->update([
                 'status' => $status,
