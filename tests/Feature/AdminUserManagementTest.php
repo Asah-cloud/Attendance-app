@@ -3,6 +3,8 @@
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\User;
+use App\Notifications\NewAccountCredentials;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -115,6 +117,7 @@ it('allows a manager to delete an usher in their own company', function () {
 });
 
 it('lets a manager create an usher pre-staffed on every current event in their company', function () {
+    Notification::fake();
     $company = Company::create(['name' => 'Acme Co']);
     $otherCompany = Company::create(['name' => 'Other Co']);
     $manager = adminManager($company);
@@ -125,8 +128,6 @@ it('lets a manager create an usher pre-staffed on every current event in their c
         ->post(route('admin.register.store'), [
             'name' => 'New Usher',
             'email' => 'newusher@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
             // A manager can't choose company/role from the form, but even if
             // someone tampers with the request it must not be honored.
             'company_id' => $otherCompany->id,
@@ -139,10 +140,14 @@ it('lets a manager create an usher pre-staffed on every current event in their c
     expect($usher->company_id)->toBe($company->id)
         ->and($usher->hasRole('usher'))->toBeTrue()
         ->and($usher->hasRole('manager'))->toBeFalse()
+        ->and($usher->must_change_password)->toBeTrue()
         ->and($usher->events()->pluck('events.id')->all())->toBe([$ownEvent->id]);
+
+    Notification::assertSentTo($usher, NewAccountCredentials::class);
 });
 
 it('lets a super admin pick the company and role when creating a user', function () {
+    Notification::fake();
     $company = Company::create(['name' => 'Acme Co']);
     $admin = User::factory()->create(['role' => 'admin']);
     $admin->assignRole('admin');
@@ -153,8 +158,6 @@ it('lets a super admin pick the company and role when creating a user', function
         ->post(route('admin.register.store'), [
             'name' => 'Admin Picked Usher',
             'email' => 'adminpicked@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
             'company_id' => $company->id,
             'role' => 'usher',
         ])

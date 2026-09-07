@@ -15,8 +15,6 @@
             <div class="grid gap-5 sm:grid-cols-2">
                 <div><x-input-label for="name" :value="__('Full name')" /><x-text-input id="name" class="mt-1 block w-full" type="text" name="name" :value="old('name')" required autofocus /><x-input-error :messages="$errors->get('name')" class="mt-1" /></div>
                 <div><x-input-label for="email" :value="__('Work email')" /><x-text-input id="email" class="mt-1 block w-full" type="email" name="email" :value="old('email')" required /><x-input-error :messages="$errors->get('email')" class="mt-1" /></div>
-                <div><x-input-label for="password" :value="__('Temporary password')" /><x-text-input id="password" class="mt-1 block w-full" type="password" name="password" required /><x-input-error :messages="$errors->get('password')" class="mt-1" /></div>
-                <div><x-input-label for="password_confirmation" :value="__('Confirm password')" /><x-text-input id="password_confirmation" class="mt-1 block w-full" type="password" name="password_confirmation" required /><x-input-error :messages="$errors->get('password_confirmation')" class="mt-1" /></div>
 
                 <div>
                     <x-input-label for="company_id" :value="__('Company')" />
@@ -50,6 +48,7 @@
                 </div>
             </div>
             <p class="text-xs leading-5 text-slate-500">An usher is automatically staffed on every event currently in the selected company. You can fine-tune which events they can access afterwards from Edit Member.</p>
+            <p class="text-xs leading-5 text-slate-500">A temporary password will be emailed to them. They'll be required to set their own password the first time they sign in.</p>
             <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
                 <a href="{{ route('admin.users.index') }}" class="rounded-xl border border-slate-200 px-5 py-3 text-center text-sm font-extrabold text-slate-600 hover:bg-slate-50">Cancel</a>
                 <button class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Create account</button>

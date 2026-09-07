@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\User;
+use App\Notifications\NewAccountCredentials;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
@@ -50,7 +51,6 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'company_id' => ['nullable', 'exists:companies,id'],
             'role' => ['required', 'exists:roles,name'],
         ]);
@@ -63,13 +63,16 @@ class RegisteredUserController extends Controller
         $role = $isAdmin ? $request->string('role')->toString() : 'usher';
         $companyId = $isAdmin ? $request->input('company_id') : $currentUser->company_id;
 
+        $temporaryPassword = Str::password(16);
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => Hash::make($temporaryPassword),
             'category' => 'staff',
             'role' => $role,
             'company_id' => $companyId,
+            'must_change_password' => true,
         ]);
 
         $user->assignRole(Role::findOrCreate($role));
@@ -84,7 +87,9 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
+        $user->notify(new NewAccountCredentials($temporaryPassword));
+
         return redirect()->route('admin.users.index')
-            ->with('success', 'New user registered successfully!');
+            ->with('success', "New user registered successfully! We've emailed {$user->email} their temporary password.");
     }
 }
