@@ -125,6 +125,8 @@ class EventController extends Controller
             'company_id' => ['nullable', Rule::exists('companies', 'id')],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'accommodation_enabled' => ['nullable', 'boolean'],
+            'food_registration_required' => ['nullable', 'boolean'],
         ]);
 
         // Determine which company this event belongs to
@@ -153,6 +155,8 @@ class EventController extends Controller
         unset($validated['logo'], $validated['flyer']);
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
+        $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
+        $validated['food_registration_required'] = $request->boolean('food_registration_required');
         $validated['day'] = 1;
 
         // Enforce active subscription limits
@@ -222,9 +226,13 @@ class EventController extends Controller
             'remove_logo' => ['nullable', 'boolean'],
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_flyer' => ['nullable', 'boolean'],
+            'accommodation_enabled' => ['nullable', 'boolean'],
+            'food_registration_required' => ['nullable', 'boolean'],
         ]);
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
+        $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
+        $validated['food_registration_required'] = $request->boolean('food_registration_required');
         if (! $validated['has_arrival_session'] && (int) $event->day === 0) {
             $validated['day'] = 1;
         }

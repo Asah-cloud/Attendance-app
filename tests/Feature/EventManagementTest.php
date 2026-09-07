@@ -48,6 +48,59 @@ it('ignores a manager supplied company_id and always scopes the new event to the
     $this->assertDatabaseHas('events', ['title' => 'Sneaky Event', 'company_id' => $company->id]);
 });
 
+it('lets a manager enable rooms and food sign-up while creating an event', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventManagementManager($company);
+
+    $this->actingAs($manager)
+        ->post(route('events.store'), [
+            'title' => 'Retreat',
+            'event_date' => now()->addWeek()->toDateString(),
+            'accommodation_enabled' => '1',
+            'food_registration_required' => '1',
+        ])
+        ->assertRedirect('/events');
+
+    $this->assertDatabaseHas('events', [
+        'title' => 'Retreat',
+        'accommodation_enabled' => true,
+        'food_registration_required' => true,
+    ]);
+});
+
+it('leaves rooms and food sign-up off by default when creating an event', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventManagementManager($company);
+
+    $this->actingAs($manager)->post(route('events.store'), [
+        'title' => 'Plain Service',
+        'event_date' => now()->addWeek()->toDateString(),
+    ]);
+
+    $this->assertDatabaseHas('events', [
+        'title' => 'Plain Service',
+        'accommodation_enabled' => false,
+        'food_registration_required' => false,
+    ]);
+});
+
+it('lets a manager toggle rooms and food sign-up when editing an event', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventManagementManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now(), 'accommodation_enabled' => true, 'food_registration_required' => true]);
+
+    $this->actingAs($manager)
+        ->put(route('events.update', $event), [
+            'title' => 'Conference',
+            'event_date' => now()->toDateString(),
+            // omitted accommodation_enabled/food_registration_required = unchecked
+        ])
+        ->assertRedirect('/events');
+
+    expect($event->fresh()->accommodation_enabled)->toBeFalse()
+        ->and($event->fresh()->food_registration_required)->toBeFalse();
+});
+
 it('blocks event creation once a company reaches its event limit', function () {
     $company = Company::create(['name' => 'Acme Co', 'event_limit' => 1]);
     $manager = eventManagementManager($company);

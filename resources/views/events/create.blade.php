@@ -69,6 +69,18 @@
                         @error('day') <p class="text-red-500 text-xs mt-2 font-bold">{{ $message }}</p> @enderror
                     </div>
 
+                    {{-- Optional feature toggles --}}
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-6">
+                            <input type="checkbox" name="accommodation_enabled" value="1" {{ old('accommodation_enabled') ? 'checked' : '' }} class="mt-1 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                            <span><span class="block text-sm font-black text-indigo-950">Use rooms &amp; accommodation</span><span class="mt-1 block text-xs leading-5 text-indigo-800/70">Let attendees request a room. You can set up sites, blocks, and rooms afterwards from the Accommodation tab.</span></span>
+                        </label>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-6">
+                            <input type="checkbox" name="food_registration_required" value="1" {{ old('food_registration_required') ? 'checked' : '' }} class="mt-1 rounded border-amber-300 text-amber-600 focus:ring-amber-500">
+                            <span><span class="block text-sm font-black text-amber-950">Use food sign-up</span><span class="mt-1 block text-xs leading-5 text-amber-800/70">Attendees opt in to food during registration. You can add meals and stations afterwards from the Meals tab.</span></span>
+                        </label>
+                    </div>
+
                     {{-- Description --}}
                     <div>
                         <label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Description (Optional)</label>
