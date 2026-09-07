@@ -48,6 +48,44 @@ it('prevents a manager from editing another company user', function () {
         ->assertForbidden();
 });
 
+it('never assigns an usher to another company\'s event, even when a super admin edits them', function () {
+    $company = Company::create(['name' => 'One']);
+    $otherCompany = Company::create(['name' => 'Two']);
+    $admin = User::factory()->create(['role' => 'admin']);
+    $admin->assignRole('admin');
+    $usher = User::factory()->create(['company_id' => $company->id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+    $ownEvent = Event::create(['company_id' => $company->id, 'title' => 'Own Event', 'event_date' => now()]);
+    $otherEvent = Event::create(['company_id' => $otherCompany->id, 'title' => 'Other Company Event', 'event_date' => now()]);
+
+    $this->actingAs($admin)
+        ->put(route('admin.users.update', $usher), [
+            'name' => $usher->name,
+            'email' => $usher->email,
+            'role' => 'usher',
+            'company_id' => $company->id,
+            'event_ids' => [$ownEvent->id, $otherEvent->id],
+        ])
+        ->assertRedirect(route('admin.users.index'));
+
+    expect($usher->events()->pluck('events.id')->all())->toBe([$ownEvent->id]);
+});
+
+it('does not let an usher access an event staffed by mistake outside their own company', function () {
+    $company = Company::create(['name' => 'One']);
+    $otherCompany = Company::create(['name' => 'Two']);
+    $usher = User::factory()->create(['company_id' => $company->id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+    $otherEvent = Event::create(['company_id' => $otherCompany->id, 'title' => 'Other Company Event', 'event_date' => now()]);
+    $usher->events()->attach($otherEvent);
+
+    $this->actingAs($usher)
+        ->get(route('events.attendance', $otherEvent))
+        ->assertForbidden();
+
+    expect($usher->can('scanAttendance', $otherEvent))->toBeFalse();
+});
+
 it('rejects personal QR check in outside the event dates', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create([

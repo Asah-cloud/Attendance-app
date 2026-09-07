@@ -37,8 +37,9 @@ class EventController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->get();
         } else {
-            // Ushers only see events they have been assigned to work.
+            // Ushers only see events they have been assigned to work, within their own company.
             $events = $user->events()
+                ->where('company_id', $user->company_id)
                 ->orderBy('created_at', 'desc')
                 ->get();
         }

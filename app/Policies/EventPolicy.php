@@ -19,6 +19,7 @@ class EventPolicy
         }
 
         return $user->hasRole('usher')
+            && $user->company_id !== null && $user->company_id === $event->company_id
             && $user->events()->whereKey($event->id)->exists();
     }
 
@@ -41,6 +42,7 @@ class EventPolicy
         }
 
         return $user->hasRole('usher')
+            && $user->company_id !== null && $user->company_id === $event->company_id
             && $user->events()->whereKey($event->id)->exists();
     }
 

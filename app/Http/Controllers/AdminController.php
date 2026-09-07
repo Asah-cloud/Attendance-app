@@ -87,9 +87,11 @@ class AdminController extends Controller
 
         $user->syncRoles($request->role);
 
+        // An usher can only ever be staffed on events belonging to their own company,
+        // regardless of which company the acting admin happens to be scoped to.
         $eventIds = Event::query()
             ->whereIn('id', $request->input('event_ids', []))
-            ->when(! $currentUser->hasRole('admin'), fn ($query) => $query->where('company_id', $currentUser->company_id))
+            ->where('company_id', $user->company_id)
             ->pluck('id');
         $user->events()->sync($request->role === 'usher' ? $eventIds : []);
 
