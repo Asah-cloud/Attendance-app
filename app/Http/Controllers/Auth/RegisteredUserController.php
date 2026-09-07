@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
+use App\Models\Event;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -18,10 +20,24 @@ class RegisteredUserController extends Controller
 {
     /**
      * Display the registration view.
+     *
+     * This route only ever runs behind the 'role:admin|manager' middleware group
+     * (see routes/web.php), so the actor is always an authenticated admin or manager.
      */
     public function create(): View
     {
-        return view('admin.users.create');
+        $currentUser = Auth::user();
+        $isAdmin = $currentUser->hasRole('admin');
+
+        $companies = $isAdmin
+            ? Company::orderBy('name')->get()
+            : Company::query()->whereKey($currentUser->company_id)->get();
+
+        // A manager may only ever create ushers in their own company; an admin
+        // may create any staff role for any company.
+        $assignableRoles = $isAdmin ? ['usher', 'manager', 'admin'] : ['usher'];
+
+        return view('admin.users.create', compact('companies', 'assignableRoles', 'isAdmin'));
     }
 
     /**
@@ -35,33 +51,40 @@ class RegisteredUserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'company_id' => ['nullable', 'exists:companies,id'],
+            'role' => ['required', 'exists:roles,name'],
         ]);
 
         $currentUser = Auth::user();
+        $isAdmin = $currentUser->hasRole('admin');
+
+        // A manager can only ever create an usher within their own company,
+        // regardless of what the submitted form fields say.
+        $role = $isAdmin ? $request->string('role')->toString() : 'usher';
+        $companyId = $isAdmin ? $request->input('company_id') : $currentUser->company_id;
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'category' => 'staff',
-            'role' => 'usher',
-            // If logged-in user is not a super admin, automatically assign their company id
-            'company_id' => ($currentUser && ! $currentUser->hasRole('admin')) ? $currentUser->company_id : null,
+            'role' => $role,
+            'company_id' => $companyId,
         ]);
 
-        $user->assignRole(Role::findOrCreate('usher'));
+        $user->assignRole(Role::findOrCreate($role));
+
+        // An usher assigned to a company starts staffed on every event currently
+        // in that company, so they aren't left with zero access until a manager
+        // remembers to go pick events one by one. Future new events still need
+        // an explicit assignment via Edit Member.
+        if ($role === 'usher' && $companyId) {
+            $user->events()->sync(Event::where('company_id', $companyId)->pluck('id'));
+        }
 
         event(new Registered($user));
 
-        // If an authorized manager or admin is creating this person, keep them logged in and redirect
-        if (Auth::check() && ($currentUser->hasRole('admin') || $currentUser->hasRole('manager'))) {
-            return redirect()->route('admin.users.index')
-                ->with('success', 'New user registered successfully to your company!');
-        }
-
-        // Otherwise, log in the new user (normal guest registration workflow)
-        Auth::login($user);
-
-        return redirect(route('dashboard', absolute: false));
+        return redirect()->route('admin.users.index')
+            ->with('success', 'New user registered successfully!');
     }
 }

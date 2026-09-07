@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Event;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 
@@ -111,6 +112,59 @@ it('allows a manager to delete an usher in their own company', function () {
         ->assertRedirect(route('admin.users.index'));
 
     $this->assertDatabaseMissing('users', ['id' => $usher->id]);
+});
+
+it('lets a manager create an usher pre-staffed on every current event in their company', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $otherCompany = Company::create(['name' => 'Other Co']);
+    $manager = adminManager($company);
+    $ownEvent = Event::create(['company_id' => $company->id, 'title' => 'Own Event', 'event_date' => now()]);
+    Event::create(['company_id' => $otherCompany->id, 'title' => 'Other Company Event', 'event_date' => now()]);
+
+    $this->actingAs($manager)
+        ->post(route('admin.register.store'), [
+            'name' => 'New Usher',
+            'email' => 'newusher@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            // A manager can't choose company/role from the form, but even if
+            // someone tampers with the request it must not be honored.
+            'company_id' => $otherCompany->id,
+            'role' => 'manager',
+        ])
+        ->assertRedirect(route('admin.users.index'));
+
+    $usher = User::where('email', 'newusher@example.com')->firstOrFail();
+
+    expect($usher->company_id)->toBe($company->id)
+        ->and($usher->hasRole('usher'))->toBeTrue()
+        ->and($usher->hasRole('manager'))->toBeFalse()
+        ->and($usher->events()->pluck('events.id')->all())->toBe([$ownEvent->id]);
+});
+
+it('lets a super admin pick the company and role when creating a user', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $admin = User::factory()->create(['role' => 'admin']);
+    $admin->assignRole('admin');
+    $eventOne = Event::create(['company_id' => $company->id, 'title' => 'Event One', 'event_date' => now()]);
+    $eventTwo = Event::create(['company_id' => $company->id, 'title' => 'Event Two', 'event_date' => now()]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.register.store'), [
+            'name' => 'Admin Picked Usher',
+            'email' => 'adminpicked@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'company_id' => $company->id,
+            'role' => 'usher',
+        ])
+        ->assertRedirect(route('admin.users.index'));
+
+    $usher = User::where('email', 'adminpicked@example.com')->firstOrFail();
+
+    expect($usher->company_id)->toBe($company->id)
+        ->and($usher->hasRole('usher'))->toBeTrue()
+        ->and($usher->events()->pluck('events.id')->all())->toEqualCanonicalizing([$eventOne->id, $eventTwo->id]);
 });
 
 it('prevents the super admin from deleting their own account', function () {
