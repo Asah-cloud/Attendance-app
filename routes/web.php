@@ -65,13 +65,13 @@ Route::get('/events/{event:slug}/public-check-in', [AttendanceController::class,
     ->middleware(['signed', 'throttle:60,1'])
     ->name('scan.events');
 Route::post('/events/{event:slug}/public-check-in', [AttendanceController::class, 'checkInByPhone'])
-    ->middleware(['signed', 'throttle:20,1'])
+    ->middleware(['auth', 'verified', 'company.active', 'throttle:20,1'])
     ->name('attendance.check');
 Route::get('/events/{event:slug}/arrival/check-in', [AttendanceController::class, 'publicArrivalCheckIn'])
     ->middleware(['signed', 'throttle:60,1'])
     ->name('arrival.public');
 Route::post('/events/{event:slug}/arrival/check-in', [AttendanceController::class, 'checkInArrivalByPhone'])
-    ->middleware(['signed', 'throttle:20,1'])
+    ->middleware(['auth', 'verified', 'company.active', 'throttle:20,1'])
     ->name('arrival.check');
 Route::get('/confirm/{code}', [PublicEventRegistrationController::class, 'showConfirm'])->name('attendance.confirm.show');
 Route::post('/confirm/{code}', [PublicEventRegistrationController::class, 'storeConfirm'])

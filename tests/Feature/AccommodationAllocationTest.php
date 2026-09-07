@@ -268,10 +268,10 @@ it('lets a confirmed attendee choose their own room before the cutoff', function
     $upstairs = accommodationRoom($event, 'Room 210', 2, ['floor' => 'Second']);
     accommodationRoom($event, 'Room 011', 2);
 
-    $this->get(route('registrations.room.select', $registration->registration_code))->assertOk()->assertSee('Room 210');
+    $this->get(route('registrations.room.select', $registration->management_token))->assertOk()->assertSee('Room 210');
 
-    $this->post(route('registrations.room.claim', $registration->registration_code), ['room_id' => $upstairs->id])
-        ->assertRedirect(route('registrations.room.select', $registration->registration_code));
+    $this->post(route('registrations.room.claim', $registration->management_token), ['room_id' => $upstairs->id])
+        ->assertRedirect(route('registrations.room.select', $registration->management_token));
 
     expect($registration->fresh()->roomAssignment->accommodation_room_id)->toBe($upstairs->id)
         ->and($registration->fresh()->roomAssignment->method)->toBe('self');
@@ -281,15 +281,15 @@ it('closes self-selection after the cutoff and blocks the last-bed race', functi
     $company = Company::create(['name' => 'Acme']);
     $past = Event::create(['company_id' => $company->id, 'title' => 'Past', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->subDay()]);
     $late = accommodationRegistration($past, 'Late');
-    $this->get(route('registrations.room.select', $late->registration_code))->assertNotFound();
+    $this->get(route('registrations.room.select', $late->management_token))->assertNotFound();
 
     $open = Event::create(['company_id' => $company->id, 'title' => 'Open', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDay()]);
     $first = accommodationRegistration($open, 'First');
     $second = accommodationRegistration($open, 'Second');
     $solo = accommodationRoom($open, 'Solo', 1);
 
-    $this->post(route('registrations.room.claim', $first->registration_code), ['room_id' => $solo->id])->assertRedirect();
-    $this->post(route('registrations.room.claim', $second->registration_code), ['room_id' => $solo->id])->assertRedirect();
+    $this->post(route('registrations.room.claim', $first->management_token), ['room_id' => $solo->id])->assertRedirect();
+    $this->post(route('registrations.room.claim', $second->management_token), ['room_id' => $solo->id])->assertRedirect();
 
     expect($first->fresh()->roomAssignment->accommodation_room_id)->toBe($solo->id);
     expect($second->fresh()->roomAssignment)->toBeNull();
@@ -352,7 +352,7 @@ it('sends a fresh registrant to the room picker while self-selection is open', f
     ]);
 
     $registration = EventRegistration::whereHas('participant', fn ($q) => $q->where('email', 'picker@example.com'))->firstOrFail();
-    $response->assertRedirect(route('registrations.room.select', ['code' => $registration->registration_code, 'new' => 1]));
+    $response->assertRedirect(route('registrations.room.select', ['code' => $registration->management_token, 'new' => 1]));
     expect($registration->roomAssignment)->toBeNull();
 });
 
@@ -398,9 +398,9 @@ it('links to the room picker in the registration email when self-selection is op
 
     Notification::assertSentTo($registration->participant, EventRegistrationSubmitted::class, function ($notification) use ($registration) {
         $mail = $notification->toMail($registration->participant);
-        expect($mail->viewData['actionUrl'])->toBe(route('registrations.room.select', $registration->registration_code))
+        expect($mail->viewData['actionUrl'])->toBe(route('registrations.room.select', $registration->management_token))
             ->and($mail->viewData['actionLabel'])->toBe('Select your room')
-            ->and($notification->toArkesel($registration->participant))->toContain(route('registrations.room.select', $registration->registration_code));
+            ->and($notification->toArkesel($registration->participant))->toContain(route('registrations.room.select', $registration->management_token));
 
         return true;
     });
@@ -422,7 +422,7 @@ it('keeps the normal confirmation link in the registration email when self-selec
 
     Notification::assertSentTo($registration->participant, EventRegistrationSubmitted::class, function ($notification) use ($registration) {
         $mail = $notification->toMail($registration->participant);
-        expect($mail->viewData['actionUrl'])->toBe(route('registrations.confirmation', $registration->registration_code));
+        expect($mail->viewData['actionUrl'])->toBe(route('registrations.confirmation', $registration->management_token));
 
         return true;
     });
@@ -439,7 +439,7 @@ it('links to the room picker in the confirmed lifecycle email while self-selecti
 
     Notification::assertSentTo($registration->participant, RegistrationLifecycleNotification::class, function ($notification) use ($registration) {
         $mail = $notification->toMail($registration->participant);
-        expect($mail->viewData['actionUrl'])->toBe(route('registrations.room.select', $registration->registration_code));
+        expect($mail->viewData['actionUrl'])->toBe(route('registrations.room.select', $registration->management_token));
 
         return true;
     });
@@ -477,7 +477,7 @@ it('sends imported attendees a room-picker link when notified while self-selecti
 
     Notification::assertSentTo($registration->participant, EventRegistrationSubmitted::class, function ($notification) use ($registration) {
         $mail = $notification->toMail($registration->participant);
-        expect($mail->viewData['actionUrl'])->toBe(route('registrations.room.select', $registration->registration_code));
+        expect($mail->viewData['actionUrl'])->toBe(route('registrations.room.select', $registration->management_token));
 
         return true;
     });

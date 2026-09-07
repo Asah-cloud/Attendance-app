@@ -26,7 +26,7 @@ class RoomAssigned extends Notification implements ShouldQueue
             ->line('Room: '.$this->assignment->room->label())
             ->when($site->address, fn ($message) => $message->line('Address: '.$site->address))
             ->when($site->check_in_instructions, fn ($message) => $message->line('Check-in: '.$site->check_in_instructions))
-            ->action('View room and registration', route('registrations.confirmation', $this->assignment->registration->registration_code));
+            ->action('View room and registration', route('registrations.confirmation', $this->assignment->registration->management_token));
 
         $company = $event->company;
 
@@ -37,7 +37,7 @@ class RoomAssigned extends Notification implements ShouldQueue
     {
         $this->assignment->loadMissing(['registration.event', 'room.floor.block.site']);
 
-        return 'Hello '.$notifiable->name.'! Your room for '.$this->assignment->registration->event->title.' is '.$this->assignment->room->label().'. Details: '.route('registrations.confirmation', $this->assignment->registration->registration_code);
+        return 'Hello '.$notifiable->name.'! Your room for '.$this->assignment->registration->event->title.' is '.$this->assignment->room->label().'. Details: '.route('registrations.confirmation', $this->assignment->registration->management_token);
     }
 
     public function smsSenderId(): ?string

@@ -14,7 +14,7 @@
                     <p class="mt-1 text-xs font-bold text-amber-700">No "attendees can pick until" deadline is set yet — attendees can't reach this page until you set one.</p>
                 @endif
                 @if(request()->boolean('new'))
-                    <p class="mt-3 text-sm text-slate-600">Pick a room now, or <a href="{{ route('registrations.confirmation', $registration->registration_code) }}" class="font-bold text-indigo-700 underline">do it later</a> — we'll assign one automatically if you don't choose before the deadline.</p>
+                    <p class="mt-3 text-sm text-slate-600">Pick a room now, or <a href="{{ route('registrations.confirmation', $registration->management_token) }}" class="font-bold text-indigo-700 underline">do it later</a> — we'll assign one automatically if you don't choose before the deadline.</p>
                 @endif
 
                 @if(session('success'))<div class="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>@endif
@@ -32,7 +32,7 @@
                     <p class="mt-4 text-xs font-bold text-indigo-700">Showing step-free rooms only (no stairs), as you asked.</p>
                 @endif
 
-                <form @if(!($preview ?? false)) method="POST" action="{{ route('registrations.room.claim', $registration->registration_code) }}" @else onsubmit="return false" @endif class="mt-5 space-y-4">@csrf
+                <form @if(!($preview ?? false)) method="POST" action="{{ route('registrations.room.claim', $registration->management_token) }}" @else onsubmit="return false" @endif class="mt-5 space-y-4">@csrf
                     @forelse($rooms as $blockName => $floors)
                         <div class="overflow-hidden rounded-2xl border border-slate-200">
                             <p class="border-b border-slate-100 bg-slate-50 px-4 py-2 text-sm font-black text-slate-800">{{ $blockName }}</p>
@@ -69,7 +69,7 @@
                 @if($preview ?? false)
                     <a href="{{ route('events.accommodation.index', $registration->event) }}" class="mt-4 block text-center text-xs font-bold text-slate-500">Back to Rooms</a>
                 @else
-                    <a href="{{ route('registrations.confirmation', $registration->registration_code) }}" class="mt-4 block text-center text-xs font-bold text-slate-500">Back to your registration</a>
+                    <a href="{{ route('registrations.confirmation', $registration->management_token) }}" class="mt-4 block text-center text-xs font-bold text-slate-500">Back to your registration</a>
                 @endif
             </div>
         </div>

@@ -10,10 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class ParticipantRegistrationService
 {
-    public function register(Event $event, array $data, string $source): array
+    public function register(Event $event, array $data, string $source, bool $trusted = true): array
     {
-        return DB::transaction(function () use ($event, $data, $source): array {
-            $participant = $this->resolveParticipant($event, $data);
+        return DB::transaction(function () use ($event, $data, $source, $trusted): array {
+            $participant = $this->resolveParticipant($event, $data, $trusted);
 
             $registration = EventRegistration::query()->updateOrCreate(
                 ['event_id' => $event->id, 'participant_id' => $participant->id],
@@ -29,7 +29,14 @@ class ParticipantRegistrationService
         });
     }
 
-    public function resolveParticipant(Event $event, array $data): Participant
+    /**
+     * Find or create the participant these registration details belong to.
+     *
+     * When $trusted is false (unauthenticated public registration), an existing
+     * match's profile fields are only filled in when blank, never overwritten —
+     * matching by phone/email alone isn't proof the submitter owns that profile.
+     */
+    public function resolveParticipant(Event $event, array $data, bool $trusted = true): Participant
     {
         $phone = $this->normalizePhone($data['phone'] ?? null);
         $email = $this->usableEmail($data['email'] ?? null);
@@ -65,12 +72,16 @@ class ParticipantRegistrationService
         }
 
         $user->fill([
-            'name' => $data['name'] ?? $user->name,
-            'email' => $email ?? $user->email,
+            'name' => $trusted ? ($data['name'] ?? $user->name) : ($user->name ?? $data['name'] ?? null),
+            'email' => $trusted ? ($email ?? $user->email) : ($user->email ?? $email),
             'phone' => $user->phone ?? $phone,
             'member_id' => $user->member_id ?? $memberId,
-            'category' => $this->usableString($data['category'] ?? null) ?? $user->category,
-            'gender' => $this->usableString($data['gender'] ?? null) ?? $user->gender,
+            'category' => $trusted
+                ? ($this->usableString($data['category'] ?? null) ?? $user->category)
+                : ($user->category ?? $this->usableString($data['category'] ?? null)),
+            'gender' => $trusted
+                ? ($this->usableString($data['gender'] ?? null) ?? $user->gender)
+                : ($user->gender ?? $this->usableString($data['gender'] ?? null)),
             'company_id' => $user->company_id ?? $event->company_id,
         ])->save();
 

@@ -43,8 +43,8 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
                 ])),
                 'actionLabel' => $needsRoomPick ? 'Select your room' : 'View my registration and QR code',
                 'actionUrl' => $needsRoomPick
-                    ? route('registrations.room.select', $this->registration->registration_code)
-                    : route('registrations.confirmation', $this->registration->registration_code),
+                    ? route('registrations.room.select', $this->registration->management_token)
+                    : route('registrations.confirmation', $this->registration->management_token),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
@@ -59,8 +59,8 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
         $organization = $event->company?->name ?? config('app.name');
         $needsRoomPick = $this->needsRoomPick();
         $link = $needsRoomPick
-            ? route('registrations.room.select', $this->registration->registration_code)
-            : route('registrations.confirmation', $this->registration->registration_code);
+            ? route('registrations.room.select', $this->registration->management_token)
+            : route('registrations.confirmation', $this->registration->management_token);
 
         return 'Hello '.$notifiable->name.'! Thank you for registering for '.$event->title.'. We received your details. Status: '
             .ucfirst($this->registration->status).'. From '.$organization.'. '

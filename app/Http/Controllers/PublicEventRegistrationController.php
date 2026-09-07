@@ -51,7 +51,7 @@ class PublicEventRegistrationController extends Controller
                 'phone' => $validated['phone'],
                 'gender' => $validated['gender'],
                 'category' => $validated['category'],
-            ]);
+            ], trusted: false);
 
             if (EventRegistration::query()->where('event_id', $event->id)->where('participant_id', $participant->id)->exists()) {
                 throw ValidationException::withMessages(['email' => 'You are already registered for this event.']);
@@ -94,7 +94,7 @@ class PublicEventRegistrationController extends Controller
     public function confirmation(string $code): View
     {
         $registration = EventRegistration::with(['event.company', 'participant', 'roomAssignment.room.floor.block.site'])
-            ->where('registration_code', $code)
+            ->where('management_token', $code)
             ->firstOrFail();
 
         return view('registrations.confirmation', compact('registration'));
@@ -103,7 +103,7 @@ class PublicEventRegistrationController extends Controller
     public function roomSelect(string $code, RoomAllocationService $allocator): View
     {
         $registration = EventRegistration::with(['event.company', 'participant', 'roomAssignment.room.floor.block.site'])
-            ->where('registration_code', $code)
+            ->where('management_token', $code)
             ->firstOrFail();
 
         abort_unless($this->selfSelectAllowed($registration), 404);
@@ -118,7 +118,7 @@ class PublicEventRegistrationController extends Controller
     public function roomClaim(Request $request, string $code, RoomAllocationService $allocator): RedirectResponse
     {
         $registration = EventRegistration::with(['event.company', 'participant', 'roomAssignment'])
-            ->where('registration_code', $code)
+            ->where('management_token', $code)
             ->firstOrFail();
 
         abort_unless($this->selfSelectAllowed($registration), 404);
@@ -136,7 +136,7 @@ class PublicEventRegistrationController extends Controller
             }
         }
 
-        return redirect()->route('registrations.room.select', $registration->registration_code)
+        return redirect()->route('registrations.room.select', $registration->management_token)
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
@@ -149,7 +149,7 @@ class PublicEventRegistrationController extends Controller
 
     public function cancel(string $code, RegistrationLifecycleService $lifecycle): RedirectResponse
     {
-        $registration = EventRegistration::where('registration_code', $code)->firstOrFail();
+        $registration = EventRegistration::where('management_token', $code)->firstOrFail();
 
         $lifecycle->cancel($registration);
 
@@ -159,11 +159,11 @@ class PublicEventRegistrationController extends Controller
     public function showConfirm(string $code): View|RedirectResponse
     {
         $registration = EventRegistration::with(['event.company', 'participant'])
-            ->where('registration_code', $code)
+            ->where('management_token', $code)
             ->firstOrFail();
 
         if ($registration->status !== EventRegistration::STATUS_AWAITING_CONFIRMATION) {
-            return redirect()->route('registrations.confirmation', $registration->registration_code);
+            return redirect()->route('registrations.confirmation', $registration->management_token);
         }
 
         $event = $registration->event;
@@ -174,31 +174,51 @@ class PublicEventRegistrationController extends Controller
 
     public function storeConfirm(Request $request, string $code, RegistrationLifecycleService $lifecycle): RedirectResponse
     {
-        $registration = EventRegistration::with('event')
-            ->where('registration_code', $code)
-            ->firstOrFail();
+        $registration = DB::transaction(function () use ($request, $code): EventRegistration {
+            $registration = EventRegistration::with('event')
+                ->where('management_token', $code)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if ($registration->status !== EventRegistration::STATUS_AWAITING_CONFIRMATION) {
-            return redirect()->route('registrations.confirmation', $registration->registration_code);
+            if ($registration->status !== EventRegistration::STATUS_AWAITING_CONFIRMATION) {
+                return $registration;
+            }
+
+            $event = $registration->event;
+            $fields = $event->registrationFields()->where('is_system', false)->where('is_active', true)->get();
+
+            $validated = $request->validate(array_merge(
+                ['consent' => ['required', 'accepted']],
+                $this->customFieldRules($fields)
+            ));
+
+            $confirmedCount = EventRegistration::query()
+                ->where('event_id', $event->id)
+                ->where('id', '!=', $registration->id)
+                ->where('status', EventRegistration::STATUS_CONFIRMED)
+                ->count();
+
+            $status = $event->registration_capacity !== null && $confirmedCount >= $event->registration_capacity
+                ? EventRegistration::STATUS_WAITLISTED
+                : EventRegistration::STATUS_CONFIRMED;
+
+            $registration->update([
+                'status' => $status,
+                'approved_at' => $status === EventRegistration::STATUS_CONFIRMED ? now() : null,
+                'custom_answers' => $validated['custom'] ?? [],
+                'consented_at' => now(),
+                'terms_version' => $event->registration_terms_version,
+            ]);
+
+            return $registration;
+        });
+
+        if ($registration->status !== EventRegistration::STATUS_CONFIRMED && $registration->status !== EventRegistration::STATUS_WAITLISTED) {
+            return redirect()->route('registrations.confirmation', $registration->management_token);
         }
 
-        $event = $registration->event;
-        $fields = $event->registrationFields()->where('is_system', false)->where('is_active', true)->get();
-
-        $validated = $request->validate(array_merge(
-            ['consent' => ['required', 'accepted']],
-            $this->customFieldRules($fields)
-        ));
-
-        $registration->update([
-            'status' => EventRegistration::STATUS_CONFIRMED,
-            'approved_at' => now(),
-            'custom_answers' => $validated['custom'] ?? [],
-            'consented_at' => now(),
-            'terms_version' => $event->registration_terms_version,
-        ]);
-
-        $lifecycle->notify($registration, 'confirmed');
+        $registration->load('event');
+        $lifecycle->notify($registration, $registration->status === EventRegistration::STATUS_CONFIRMED ? 'confirmed' : 'waitlisted');
         $lifecycle->allocateAccommodation($registration);
 
         return $this->afterRegistration($registration->fresh());
@@ -213,10 +233,10 @@ class PublicEventRegistrationController extends Controller
             && $registration->accommodation_required
             && ! $registration->roomAssignment()->exists()
             && $registration->event->accommodationSelfSelectOpen()) {
-            return redirect()->route('registrations.room.select', ['code' => $registration->registration_code, 'new' => 1]);
+            return redirect()->route('registrations.room.select', ['code' => $registration->management_token, 'new' => 1]);
         }
 
-        return redirect()->route('registrations.confirmation', $registration->registration_code);
+        return redirect()->route('registrations.confirmation', $registration->management_token);
     }
 
     private function rules($fields): array

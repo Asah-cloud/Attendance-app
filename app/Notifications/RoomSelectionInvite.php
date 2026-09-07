@@ -24,7 +24,7 @@ class RoomSelectionInvite extends Notification implements ShouldQueue
             ->greeting('Hello '.$notifiable->name.'!')
             ->line('You can now choose your own room for '.$event->title.'.')
             ->line('Selection closes '.$event->accommodation_self_select_closes_at->format('D j M Y, g:ia').'. You can change your choice until then.')
-            ->action('Choose your room', route('registrations.room.select', $this->registration->registration_code));
+            ->action('Choose your room', route('registrations.room.select', $this->registration->management_token));
 
         $company = $event->company;
 
@@ -40,7 +40,7 @@ class RoomSelectionInvite extends Notification implements ShouldQueue
 
         return 'Hello '.$notifiable->name.'! Choose your room for '.$event->title.' before '
             .$event->accommodation_self_select_closes_at->format('D j M g:ia').': '
-            .route('registrations.room.select', $this->registration->registration_code);
+            .route('registrations.room.select', $this->registration->management_token);
     }
 
     public function smsSenderId(): ?string

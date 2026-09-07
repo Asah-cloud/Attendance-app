@@ -102,7 +102,7 @@ it('lets a manager add a confirmation question inline and preview the live form'
         ->get(route('events.confirmations.index', $event))
         ->assertOk()
         ->assertSee('Dietary restrictions')
-        ->assertSee(route('attendance.confirm.show', $registration->registration_code), false);
+        ->assertSee(route('attendance.confirm.show', $registration->management_token), false);
 });
 
 it('lets an attendee confirm their attendance through the personal link', function () {
@@ -112,19 +112,19 @@ it('lets an attendee confirm their attendance through the personal link', functi
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy', 'email' => 'john@example.com']);
     $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'source' => 'hardcopy_import']);
 
-    $this->get(route('attendance.confirm.show', $registration->registration_code))
+    $this->get(route('attendance.confirm.show', $registration->management_token))
         ->assertOk()
         ->assertSee('John Hardcopy')
         ->assertSee('Homecoming')
         ->assertSee('Acme Co')
         ->assertSee("You're invited", false);
 
-    $this->post(route('attendance.confirm.store', $registration->registration_code))
+    $this->post(route('attendance.confirm.store', $registration->management_token))
         ->assertSessionHasErrors('consent');
     expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_AWAITING_CONFIRMATION);
 
-    $this->post(route('attendance.confirm.store', $registration->registration_code), ['consent' => '1'])
-        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+    $this->post(route('attendance.confirm.store', $registration->management_token), ['consent' => '1'])
+        ->assertRedirect(route('registrations.confirmation', $registration->management_token));
 
     expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED)
         ->and($event->confirmedParticipants()->whereKey($participant->id)->exists())->toBeTrue();
@@ -136,17 +136,17 @@ it('lets an attendee confirm their attendance through the personal link', functi
     );
 
     // Following the confirmation through shows the "thanks" copy and the scannable QR.
-    $this->get(route('registrations.confirmation', $registration->registration_code))
+    $this->get(route('registrations.confirmation', $registration->management_token))
         ->assertOk()
         ->assertSee('Thanks for confirming!')
         ->assertSee('Your personal check-in QR');
 
     // Revisiting the original confirm link after they've already confirmed should
     // land them back on their QR page, not a dead 404.
-    $this->get(route('attendance.confirm.show', $registration->registration_code))
-        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
-    $this->post(route('attendance.confirm.store', $registration->registration_code), ['consent' => '1'])
-        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+    $this->get(route('attendance.confirm.show', $registration->management_token))
+        ->assertRedirect(route('registrations.confirmation', $registration->management_token));
+    $this->post(route('attendance.confirm.store', $registration->management_token), ['consent' => '1'])
+        ->assertRedirect(route('registrations.confirmation', $registration->management_token));
 });
 
 it('uses the event flyer as the confirmation page background when one is set', function () {
@@ -157,7 +157,7 @@ it('uses the event flyer as the confirmation page background when one is set', f
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy']);
     $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION]);
 
-    $this->get(route('attendance.confirm.show', $registration->registration_code))
+    $this->get(route('attendance.confirm.show', $registration->management_token))
         ->assertOk()
         ->assertSee("background-image: url('".Storage::url($flyerPath)."')", false)
         ->assertSee("You're invited", false);
@@ -169,7 +169,7 @@ it('falls back to the generated design when the event has no flyer', function ()
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy']);
     $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION]);
 
-    $response = $this->get(route('attendance.confirm.show', $registration->registration_code))->assertOk();
+    $response = $this->get(route('attendance.confirm.show', $registration->management_token))->assertOk();
 
     $response->assertDontSee('background-image: url', false)
         ->assertSee((string) strtoupper(substr($event->title, 0, 1)));
@@ -181,8 +181,8 @@ it('redirects a registration that is not awaiting confirmation to its QR page in
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'Already Confirmed']);
     $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
 
-    $this->get(route('attendance.confirm.show', $registration->registration_code))
-        ->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+    $this->get(route('attendance.confirm.show', $registration->management_token))
+        ->assertRedirect(route('registrations.confirmation', $registration->management_token));
 });
 
 it('404s for a confirmation code that does not exist at all', function () {

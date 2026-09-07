@@ -33,7 +33,7 @@ class AttendanceConfirmationController extends Controller
             'defaultMessage' => AttendanceConfirmationRequest::DEFAULT_MESSAGE,
             'customFields' => $event->registrationFields()->where('is_system', false)->get(),
             'fieldTypes' => EventRegistrationField::CUSTOM_TYPES,
-            'previewCode' => $registrations->first()?->registration_code,
+            'previewCode' => $registrations->first()?->management_token,
         ]);
     }
 

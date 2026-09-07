@@ -133,7 +133,7 @@ it('reuses an existing participant when a manager adds a walk in', function () {
     );
 });
 
-it('updates an existing participant\'s email when a matching phone is resolved with a new email', function () {
+it('does not overwrite an existing participant\'s email when a matching phone is resolved with a different email', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Today', 'event_date' => now()]);
     $participant = Participant::create([
@@ -147,11 +147,31 @@ it('updates an existing participant\'s email when a matching phone is resolved w
         'name' => 'Pastor Gideon',
         'phone' => '0509651270',
         'email' => 'gigobod21@gmail.com',
+    ], trusted: false);
+
+    expect($resolved->id)->toBe($participant->id)
+        ->and($resolved->email)->toBe('placeholder@church.com')
+        ->and($participant->fresh()->email)->toBe('placeholder@church.com');
+});
+
+it('fills in an existing participant\'s missing email when a matching phone supplies one', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Today', 'event_date' => now()]);
+    $participant = Participant::create([
+        'company_id' => $company->id,
+        'name' => 'Pastor Gideon',
+        'email' => null,
+        'phone' => '509651270',
+    ]);
+
+    $resolved = app(ParticipantRegistrationService::class)->resolveParticipant($event, [
+        'name' => 'Pastor Gideon',
+        'phone' => '0509651270',
+        'email' => 'gigobod21@gmail.com',
     ]);
 
     expect($resolved->id)->toBe($participant->id)
-        ->and($resolved->email)->toBe('gigobod21@gmail.com')
-        ->and($participant->fresh()->email)->toBe('gigobod21@gmail.com');
+        ->and($resolved->email)->toBe('gigobod21@gmail.com');
 });
 
 it('keeps an existing participant\'s email when no new email is supplied', function () {

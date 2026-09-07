@@ -37,7 +37,7 @@ class AttendanceConfirmationRequest extends Notification implements ShouldQueue
                 'greeting' => 'Hello '.$notifiable->name.'!',
                 'lines' => [$this->renderMessage($event, $notifiable->name)],
                 'actionLabel' => 'Confirm my attendance',
-                'actionUrl' => route('attendance.confirm.show', $this->registration->registration_code),
+                'actionUrl' => route('attendance.confirm.show', $this->registration->management_token),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
@@ -57,7 +57,7 @@ class AttendanceConfirmationRequest extends Notification implements ShouldQueue
         $organization = $event->company?->name ?? config('app.name');
 
         return $this->renderMessage($event, $notifiable->name).' From '.$organization.'. Confirm here: '
-            .route('attendance.confirm.show', $this->registration->registration_code);
+            .route('attendance.confirm.show', $this->registration->management_token);
     }
 
     private function renderMessage(Event $event, string $name): string

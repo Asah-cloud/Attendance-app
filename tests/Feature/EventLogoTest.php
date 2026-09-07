@@ -143,7 +143,7 @@ it('shows the company and event logos on the public registration form and confir
 
     $registration = $event->registrations()->firstOrFail();
 
-    $this->get(route('registrations.confirmation', $registration->registration_code))
+    $this->get(route('registrations.confirmation', $registration->management_token))
         ->assertOk()
         ->assertSee($companyLogoUrl, false)
         ->assertSee($eventLogoUrl, false);

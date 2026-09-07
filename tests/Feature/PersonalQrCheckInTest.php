@@ -51,7 +51,7 @@ it('opens the phone check-in page without recording attendance', function () {
     $this->get(route('attendance.personal', $registration->registration_code))
         ->assertOk()
         ->assertSee('Event check-in')
-        ->assertSee('Enter your registered phone number');
+        ->assertSee('Please show this screen to an usher to complete your check-in.');
 
     $this->assertDatabaseCount('attendances', 0);
 });

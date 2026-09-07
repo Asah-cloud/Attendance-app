@@ -134,7 +134,7 @@ it('registers publicly with normalized details custom answers consent and notifi
     ]));
 
     $registration = EventRegistration::with('participant')->firstOrFail();
-    $response->assertRedirect(route('registrations.confirmation', $registration->registration_code));
+    $response->assertRedirect(route('registrations.confirmation', $registration->management_token));
 
     expect($registration->status)->toBe('confirmed')
         ->and($registration->registration_code)->toHaveLength(40)
@@ -180,20 +180,34 @@ it('marks registrations pending when manager approval is required', function () 
     expect(EventRegistration::firstOrFail()->status)->toBe('pending');
 });
 
-it('allows cancellation through the private registration code', function () {
+it('allows cancellation through the private management link', function () {
     Notification::fake();
     $event = publicRegistrationEvent();
     $this->post(route('events.register.store', $event), registrationPayload());
     $registration = EventRegistration::firstOrFail();
 
-    $this->get(route('registrations.confirmation', $registration->registration_code))
+    $this->get(route('registrations.confirmation', $registration->management_token))
         ->assertOk()
         ->assertSee('Public Registration Event');
-    $this->post(route('registrations.cancel', $registration->registration_code))
+    $this->post(route('registrations.cancel', $registration->management_token))
         ->assertSessionHas('success');
 
     expect($registration->fresh()->status)->toBe('cancelled')
         ->and($registration->fresh()->cancelled_at)->not->toBeNull();
+});
+
+it('does not allow the badge scan code to be used for self-service management actions', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent();
+    $this->post(route('events.register.store', $event), registrationPayload());
+    $registration = EventRegistration::firstOrFail();
+
+    expect($registration->registration_code)->not->toBe($registration->management_token);
+
+    $this->get(route('registrations.confirmation', $registration->registration_code))->assertNotFound();
+    $this->post(route('registrations.cancel', $registration->registration_code))->assertNotFound();
+
+    expect($registration->fresh()->status)->not->toBe('cancelled');
 });
 
 it('lets organizers manage registrations, export them, and resend confirmations', function () {

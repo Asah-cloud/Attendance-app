@@ -63,6 +63,7 @@ class EventRegistration extends Model
     {
         static::creating(function (EventRegistration $registration): void {
             $registration->registration_code ??= Str::random(40);
+            $registration->management_token ??= Str::random(40);
             $registration->registered_at ??= now();
         });
     }

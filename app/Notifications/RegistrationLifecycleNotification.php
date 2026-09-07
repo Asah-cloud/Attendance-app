@@ -43,8 +43,8 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
                 ])),
                 'actionLabel' => $needsRoomPick ? 'Select your room' : $this->actionLabel(),
                 'actionUrl' => $needsRoomPick
-                    ? route('registrations.room.select', $this->registration->registration_code)
-                    : route('registrations.confirmation', $this->registration->registration_code),
+                    ? route('registrations.room.select', $this->registration->management_token)
+                    : route('registrations.confirmation', $this->registration->management_token),
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
@@ -64,8 +64,8 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
         $organization = $event->company?->name ?? config('app.name');
         $needsRoomPick = $this->needsRoomPick();
         $link = $needsRoomPick
-            ? route('registrations.room.select', $this->registration->registration_code)
-            : route('registrations.confirmation', $this->registration->registration_code);
+            ? route('registrations.room.select', $this->registration->management_token)
+            : route('registrations.confirmation', $this->registration->management_token);
 
         return 'Hello '.$notifiable->name.'! '.$this->smsMessage().' Event: '.$event->title.', '
             .$event->event_date->format('M j, Y').'. From '.$organization.'. '

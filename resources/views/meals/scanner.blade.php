@@ -57,7 +57,15 @@
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token()) },
                     body: JSON.stringify(payload),
                 });
-                return { ok: response.ok, data: await response.json() };
+                let data = {};
+                try { data = await response.json(); } catch (e) { /* no body */ }
+                return { ok: response.ok, status: response.status, data };
+            };
+
+            const failedSync = [];
+            const showFailedSync = () => {
+                if (failedSync.length === 0) return;
+                showResult(`${failedSync.length} queued scan(s) could not be synced and need manual review: ${failedSync.map(f => f.registration_code).join(', ')}`, false);
             };
 
             const flushQueue = async () => {
@@ -66,13 +74,16 @@
                 const remaining = [];
                 for (const item of queue) {
                     try {
-                        const { ok } = await submitScan(item);
-                        if (!ok) { /* server rejected (conflict/entitlement/closed) - drop it, audited server-side */ continue; }
+                        const { ok, status } = await submitScan(item);
+                        if (ok) continue;
+                        if (status >= 500) { remaining.push(item); continue; } // server/transient error — retry later
+                        failedSync.push(item); // 4xx: conflict/entitlement/closed — needs manual review, not silently dropped
                     } catch (e) {
-                        remaining.push(item);
+                        remaining.push(item); // network error — retry later
                     }
                 }
                 setQueue(remaining);
+                showFailedSync();
             };
 
             const issue = async value => {

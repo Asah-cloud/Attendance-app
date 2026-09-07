@@ -104,6 +104,8 @@ class AttendanceController extends Controller
             ->where('day', '=', $currentDay)
             ->delete();
 
+        $this->cache->invalidateEvent($event->id, $event->company_id);
+
         return back()->with('success', 'Attendance removed for '.$event->attendanceSessionLabel($currentDay).'.');
     }
 
@@ -162,6 +164,8 @@ class AttendanceController extends Controller
 
     private function checkInByPhoneForSession(Request $request, Event $event, int $day)
     {
+        $this->authorize('scanAttendance', $event);
+
         $validated = $request->validate(['phone' => ['required', 'string', 'max:30']]);
         $phone = $this->registrations->normalizePhone($validated['phone']);
 

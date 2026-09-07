@@ -5,7 +5,6 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
-use Illuminate\Support\Facades\URL;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -62,13 +61,15 @@ it('lets a manager configure arrival on the same date as day one', function () {
 
 it('records arrival separately and then allows day one attendance', function () {
     [$company, $event, $participant] = arrivalEvent();
-    $arrivalUrl = URL::signedRoute('arrival.check', ['event' => $event->slug]);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
 
-    $this->post($arrivalUrl, ['phone' => '0241234567'])
+    $this->actingAs($manager)
+        ->post(route('arrival.check', ['event' => $event->slug]), ['phone' => '0241234567'])
         ->assertSessionHas('success', 'Welcome, Arrival Guest! Your Arrival check-in is complete.');
 
-    $attendanceUrl = URL::signedRoute('attendance.check', ['event' => $event->slug]);
-    $this->post($attendanceUrl, ['phone' => '0241234567'])
+    $this->actingAs($manager)
+        ->post(route('attendance.check', ['event' => $event->slug]), ['phone' => '0241234567'])
         ->assertSessionHas('success', 'Welcome, Arrival Guest! Your Day 1 check-in is complete.');
 
     $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $participant->id, 'day' => 0]);
@@ -79,7 +80,7 @@ it('provides a separate arrival report', function () {
     [$company, $event] = arrivalEvent();
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
     $manager->assignRole('manager');
-    $this->post(URL::signedRoute('arrival.check', ['event' => $event->slug]), ['phone' => '0241234567']);
+    $this->actingAs($manager)->post(route('arrival.check', ['event' => $event->slug]), ['phone' => '0241234567']);
 
     $this->actingAs($manager)
         ->get(route('reports.event', ['event' => $event, 'day' => 0]))

@@ -37,7 +37,7 @@
                         @if($registration->roomAssignment->room->floor->block->site->check_in_instructions)<p class="mt-2 text-sm text-indigo-800">{{ $registration->roomAssignment->room->floor->block->site->check_in_instructions }}</p>@endif
                     @else<p class="mt-2 text-sm font-bold text-indigo-800">Your room request is recorded. Your room will show here once the organiser shares it.</p>@endif
                     @if($registration->status === \App\Models\EventRegistration::STATUS_CONFIRMED && $registration->event->accommodationSelfSelectOpen())
-                        <a href="{{ route('registrations.room.select', $registration->registration_code) }}" class="mt-3 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">{{ $registration->roomAssignment ? 'Change your room' : 'Choose your room' }}</a>
+                        <a href="{{ route('registrations.room.select', $registration->management_token) }}" class="mt-3 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">{{ $registration->roomAssignment ? 'Change your room' : 'Choose your room' }}</a>
                     @endif
                 </div>
             @endif
@@ -62,7 +62,7 @@
             @endif
 
             @if($registration->status !== 'cancelled')
-                <form method="POST" action="{{ route('registrations.cancel', $registration->registration_code) }}" class="mt-7">
+                <form method="POST" action="{{ route('registrations.cancel', $registration->management_token) }}" class="mt-7">
                     @csrf
                     <button class="text-sm font-bold text-red-600">Cancel registration</button>
                 </form>

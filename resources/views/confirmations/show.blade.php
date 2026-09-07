@@ -68,7 +68,7 @@
             @endif
 
             {{-- Confirmation form --}}
-            <form method="POST" action="{{ route('attendance.confirm.store', $registration->registration_code) }}" class="relative space-y-6 overflow-hidden rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-200/70 sm:p-10">
+            <form method="POST" action="{{ route('attendance.confirm.store', $registration->management_token) }}" class="relative space-y-6 overflow-hidden rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-200/70 sm:p-10">
                 <div class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-600"></div>
                 @csrf
 
