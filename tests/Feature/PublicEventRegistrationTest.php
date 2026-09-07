@@ -374,10 +374,10 @@ it('generates printable badges with a scannable QR for each confirmed attendee',
         ->assertSee(Storage::url('event-logos/conference.png'))
         ->assertSee('Attendance &amp; meal collection', false)
         ->assertDontSee('Pending Person')
-        ->assertSee('<svg', false);
+        ->assertSee('data:image/png;base64,', false);
 });
 
-it('uses an event pass fallback and compacts long badge names', function () {
+it('uses an event pass fallback and preserves full badge names', function () {
     $event = publicRegistrationEvent();
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
     $manager->assignRole('manager');
@@ -391,10 +391,10 @@ it('uses an event pass fallback and compacts long badge names', function () {
 
     $this->actingAs($manager)->get(route('events.badges', $event))
         ->assertOk()
-        ->assertSee('Asah A. K. Isaac')
+        ->assertSee('Asah Ayensu Kofi Isaac')
         ->assertSee('Event Pass')
         ->assertDontSee('Guest attendee')
-        ->assertSee('margin:3mm', false);
+        ->assertSee('Use middle initials');
 });
 
 it('shows the assigned room on badges once accommodation is published', function () {

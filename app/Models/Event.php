@@ -69,6 +69,9 @@ class Event extends Model
         'badge_accent_color',
         'badge_image_position_x',
         'badge_image_position_y',
+        'badge_fields',
+        'badge_font',
+        'badge_name_format',
     ];
 
     protected $casts = [
@@ -87,6 +90,7 @@ class Event extends Model
         'registration_requires_approval' => 'boolean',
         'cancelled_at' => 'datetime',
         'badge_category_colors' => 'array',
+        'badge_fields' => 'array',
     ];
 
     public function attendances(): HasMany

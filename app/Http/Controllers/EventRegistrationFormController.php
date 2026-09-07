@@ -9,6 +9,8 @@ use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
+use App\Support\BadgeDesign;
+use App\Support\Pdf\PdfQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -182,48 +184,99 @@ class EventRegistrationFormController extends Controller
             $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
         ]);
 
-        return view('events.badges', compact('event', 'registrations', 'categories', 'categoryColors'));
+        $templates = Event::where('company_id', $event->company_id)->whereKeyNot($event->id)
+            ->whereNotNull('badge_fields')->orderBy('title')->get(['id', 'title']);
+        $fields = BadgeDesign::fields($event);
+
+        return view('events.badges', compact('event', 'registrations', 'categories', 'categoryColors', 'templates', 'fields'));
     }
 
-    public function badgesPdf(Event $event): Response
+    public function badgesPdf(Request $request, Event $event): Response
     {
         $this->authorize('manageWhenOpen', $event);
+        $options = $request->validate([
+            'attendees' => ['sometimes', 'array', 'min:1'],
+            'attendees.*' => ['integer', 'distinct'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'paper' => ['sometimes', 'in:badge,a4'],
+            'cut_guides' => ['sometimes', 'boolean'],
+            'sample' => ['sometimes', 'boolean'],
+        ]);
         set_time_limit(300);
         $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->when(isset($options['attendees']), fn ($query) => $query->whereIn('id', $options['attendees']))
+            ->when(filled($options['category'] ?? null), fn ($query) => $query->whereHas('participant', fn ($participant) => $participant->where('category', $options['category'])))
             ->with(['participant', 'roomAssignment.room.floor.block'])
+            ->orderBy('id')
+            ->when($request->boolean('sample'), fn ($query) => $query->limit(1))
             ->get();
 
-        $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();
+        abort_if($registrations->isEmpty(), 422, 'No confirmed attendees match your print selection.');
+
+        // Keep palette assignments stable when printing only a subset of attendees.
+        $categories = $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with('participant:id,category')->get()->pluck('participant.category')->filter()->unique()->sort()->values();
         $palette = ['#7C3AED', '#0F766E', '#B45309', '#BE123C', '#1D4ED8', '#4338CA'];
         $categoryColors = $categories->mapWithKeys(fn ($category, $index) => [
             $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
         ]);
 
-        $localFilePath = function (?string $absolutePath): ?string {
-            return $absolutePath && is_file($absolutePath) ? str_replace('\\', '/', $absolutePath) : null;
-        };
-
-        $backgroundImage = $localFilePath(public_path('images/badges/professional-teal-background-v1.png'));
-        $badgeImage = $event->badge_image_path ? $localFilePath(Storage::disk('public')->path($event->badge_image_path)) : null;
-        $companyLogo = $event->company?->logo_path ? $localFilePath(Storage::disk('public')->path($event->company->logo_path)) : null;
-        $eventLogo = $event->logo_path ? $localFilePath(Storage::disk('public')->path($event->logo_path)) : null;
-
-        $pdf = Pdf::loadView('events.badges-pdf', compact(
-            'event', 'registrations', 'categoryColors', 'backgroundImage', 'badgeImage', 'companyLogo', 'eventLogo'
-        ))->setPaper($event->badge_size === 'A5' ? 'a5' : 'a6', 'portrait');
+        $fields = BadgeDesign::fields($event);
+        $paper = $options['paper'] ?? 'badge';
+        $cutGuides = $request->boolean('cut_guides');
+        $pdf = Pdf::loadView('events.badges-pdf', compact('event', 'registrations', 'categoryColors', 'fields', 'paper', 'cutGuides'))
+            ->setPaper($paper === 'a4' ? 'a4' : ($event->badge_size === 'A5' ? 'a5' : 'a6'), $paper === 'a4' && $event->badge_size !== 'A5' ? 'landscape' : 'portrait');
 
         return $pdf->download('badges-'.$event->slug.'.pdf');
+    }
+
+    public function badgeQr(Event $event, EventRegistration $registration): Response
+    {
+        $this->authorize('manageWhenOpen', $event);
+        abort_unless($registration->event_id === $event->id && $registration->status === EventRegistration::STATUS_CONFIRMED, 404);
+        $uri = PdfQrCode::dataUri('ASAH-ATTENDANCE:'.$registration->registration_code, 400, 4);
+
+        return response(base64_decode(explode(',', $uri, 2)[1]), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
     }
 
     public function updateBadgeSettings(Request $request, Event $event): RedirectResponse
     {
         $this->authorize('manageWhenOpen', $event);
+        if ($request->filled('template_id')) {
+            $request->validate(['template_id' => ['required', 'integer']]);
+            $template = Event::where('company_id', $event->company_id)->whereNotNull('badge_fields')->findOrFail($request->integer('template_id'));
+            $settings = $template->only(['badge_size', 'badge_design', 'badge_layout', 'badge_primary_color', 'badge_accent_color', 'badge_image_position_x', 'badge_image_position_y', 'badge_fields', 'badge_font', 'badge_name_format', 'badge_category_colors']);
+            $settings['badge_image_path'] = null;
+            if ($template->badge_image_path && Storage::disk('public')->exists($template->badge_image_path)) {
+                $path = 'badge-images/'.Str::uuid().'.'.pathinfo($template->badge_image_path, PATHINFO_EXTENSION);
+                Storage::disk('public')->copy($template->badge_image_path, $path);
+                $settings['badge_image_path'] = $path;
+            }
+            $oldImage = $event->badge_image_path;
+            $event->fill($settings)->save();
+            if ($oldImage && $oldImage !== $template->badge_image_path) {
+                Storage::disk('public')->delete($oldImage);
+            }
+
+            return back()->with('success', 'Company template applied. You can now adjust it for this event.');
+        }
         $validated = $request->validate([
             'badge_size' => ['required', 'in:A5,A6'],
             'badge_design' => ['required', 'in:default,category'],
-            'badge_layout' => ['sometimes', 'in:standard,image_header,split'],
+            'badge_layout' => ['sometimes', 'in:standard,minimal,background,image_header,split'],
+            'badge_font' => ['sometimes', 'in:DejaVu Sans,DejaVu Serif,DejaVu Sans Mono'],
+            'badge_name_format' => ['sometimes', 'in:full,initials'],
+            'badge_fields' => ['sometimes', 'array:'.implode(',', array_keys(BadgeDesign::LABELS))],
+            'badge_fields.*' => ['array:x,y,w,h,size,align,visible'],
+            'badge_fields.*.x' => ['required_with:badge_fields', 'numeric', 'between:0,95'],
+            'badge_fields.*.y' => ['required_with:badge_fields', 'numeric', 'between:0,95'],
+            'badge_fields.*.w' => ['required_with:badge_fields', 'numeric', 'between:5,100'],
+            'badge_fields.*.h' => ['required_with:badge_fields', 'numeric', 'between:3,100'],
+            'badge_fields.*.size' => ['required_with:badge_fields', 'numeric', 'between:6,48'],
+            'badge_fields.*.align' => ['required_with:badge_fields', 'in:left,center,right'],
+            'badge_fields.*.visible' => ['required_with:badge_fields', 'boolean'],
             'badge_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'remove_badge_image' => ['nullable', 'boolean'],
             'badge_primary_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],
@@ -247,7 +300,17 @@ class EventRegistrationFormController extends Controller
 
         $layout = $validated['badge_layout'] ?? $event->badge_layout ?? 'standard';
         $removingImage = $request->boolean('remove_badge_image');
-        if ($layout !== 'standard'
+        $fields = array_replace_recursive(BadgeDesign::defaults($layout), $validated['badge_fields'] ?? $event->badge_fields ?? []);
+        foreach ($fields as $key => $field) {
+            if ($field['x'] + $field['w'] > 100.01 || $field['y'] + $field['h'] > 100.01) {
+                throw ValidationException::withMessages(['badge_fields' => BadgeDesign::LABELS[$key].' must fit inside the badge.']);
+            }
+        }
+        [$width, $height] = BadgeDesign::dimensions($event->replicate()->fill(['badge_size' => $validated['badge_size']]));
+        if (! $fields['qr']['visible'] || min($fields['qr']['w'] * $width / 100, $fields['qr']['h'] * $height / 100) < 25) {
+            throw ValidationException::withMessages(['badge_fields' => 'Keep the QR code visible and at least 25 mm wide and high.']);
+        }
+        if (in_array($layout, ['background', 'image_header', 'split'])
             && ! $request->hasFile('badge_image')
             && ($removingImage || ! $event->badge_image_path)) {
             throw ValidationException::withMessages([
@@ -272,6 +335,9 @@ class EventRegistrationFormController extends Controller
             'badge_design' => $validated['badge_design'],
             'badge_category_colors' => $colors,
             'badge_layout' => $layout,
+            'badge_fields' => $fields,
+            'badge_font' => $validated['badge_font'] ?? $event->badge_font ?? 'DejaVu Sans',
+            'badge_name_format' => $validated['badge_name_format'] ?? $event->badge_name_format ?? 'full',
             'badge_primary_color' => strtoupper($validated['badge_primary_color'] ?? $event->badge_primary_color ?? '#0F766E'),
             'badge_accent_color' => strtoupper($validated['badge_accent_color'] ?? $event->badge_accent_color ?? '#0F172A'),
             'badge_image_position_x' => $validated['badge_image_position_x'] ?? $event->badge_image_position_x ?? 50,
