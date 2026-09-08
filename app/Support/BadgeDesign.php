@@ -65,7 +65,7 @@ final class BadgeDesign
             'meta' => $event->event_date->format('j M Y').($event->end_date && ! $event->end_date->equalTo($event->event_date) ? ' - '.$event->end_date->format('j M Y') : '').($event->location ? ' · '.$event->location : ''),
             'name' => $name, 'category' => $registration?->participant->category ?: 'Attendee',
             'member' => $registration?->participant->member_id ?: 'Event Pass',
-            'room' => $event->accommodation_published && $assignment ? 'Room '.$assignment->room->name.' · '.$assignment->room->floor->block->name.', '.$assignment->room->floor->name : '',
+            'room' => $event->accommodation_published && $assignment ? $assignment->room->floor->block->name.' · '.$assignment->room->floor->name.' · Room '.$assignment->room->name : '',
         ];
     }
 }

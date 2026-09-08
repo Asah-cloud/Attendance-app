@@ -411,8 +411,9 @@ it('shows the assigned room on badges once accommodation is published', function
 
     $this->actingAs($manager)->get(route('events.badges', $event))
         ->assertOk()
-        ->assertSee('Room A01')
-        ->assertSee('Block A, Ground');
+        ->assertSee('Block A')
+        ->assertSee('Ground')
+        ->assertSee('Room A01');
 
     $this->actingAs($manager)->get(route('events.badges.pdf', $event))
         ->assertOk()->assertHeader('content-type', 'application/pdf');
