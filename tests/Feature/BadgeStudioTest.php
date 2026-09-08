@@ -6,6 +6,7 @@ use App\Models\Participant;
 use App\Models\User;
 use App\Support\BadgeDesign;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Dompdf\FontMetrics;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
@@ -45,6 +46,30 @@ it('saves a full background design and movable fields with optional name initial
     Storage::disk('public')->assertExists($event->badge_image_path);
     $registration = badgeRegistration($event, 'Asah Ayensu Kofi Isaac');
     expect(BadgeDesign::values($event, $registration)['name'])->toBe('Asah A. K. Isaac');
+});
+
+it('lets a manager select Poppins and prints a working PDF with it', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event);
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_font' => 'Poppins',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($event->fresh()->badge_font)->toBe('Poppins');
+
+    $this->get(route('events.badges', $event))->assertOk()->assertSee('Poppins');
+    $this->get(route('events.badges.pdf', $event))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+});
+
+it('serves the Poppins font files for the badge studio preview but rejects anything else', function () {
+    [$event, $manager] = badgeStudioFixture();
+
+    $this->actingAs($manager)->get(route('events.badges.font', [$event, 'poppins']))
+        ->assertOk()->assertHeader('content-type', 'font/ttf');
+    $this->get(route('events.badges.font', [$event, 'poppins-Bold']))->assertOk();
+    $this->get(route('events.badges.font', [$event, '../../../.env']))->assertNotFound();
 });
 
 it('lets a manager give a field a custom colour and bold weight, or leave it to inherit the default', function () {
@@ -124,6 +149,11 @@ it('prints only selected confirmed attendees with stable category colours', func
     $foreign = badgeRegistration($other);
     $pdf = Mockery::mock(Barryvdh\DomPDF\PDF::class);
     $pdf->shouldReceive('setOption')->with('fontHeightRatio', 1000 / 1164)->andReturnSelf();
+    $fontMetrics = Mockery::mock(FontMetrics::class);
+    $fontMetrics->shouldReceive('registerFont')->twice();
+    $dompdf = Mockery::mock(Dompdf\Dompdf::class);
+    $dompdf->shouldReceive('getFontMetrics')->andReturn($fontMetrics);
+    $pdf->shouldReceive('getDomPDF')->andReturn($dompdf);
     Pdf::shouldReceive('loadView')->once()->withArgs(function ($view, $data) use ($second) {
         expect($view)->toBe('events.badges-pdf');
         expect($data['registrations']->pluck('id')->all())->toBe([$second->id]);
@@ -143,6 +173,11 @@ it('returns one sample and rejects empty or invalid print selections', function 
     badgeRegistration($event, 'Second Person');
     $pdf = Mockery::mock(Barryvdh\DomPDF\PDF::class);
     $pdf->shouldReceive('setOption')->with('fontHeightRatio', 1000 / 1164)->andReturnSelf();
+    $fontMetrics = Mockery::mock(FontMetrics::class);
+    $fontMetrics->shouldReceive('registerFont')->twice();
+    $dompdf = Mockery::mock(Dompdf\Dompdf::class);
+    $dompdf->shouldReceive('getFontMetrics')->andReturn($fontMetrics);
+    $pdf->shouldReceive('getDomPDF')->andReturn($dompdf);
     Pdf::shouldReceive('loadView')->once()->withArgs(fn ($view, $data) => $data['registrations']->count() === 1)->andReturn($pdf);
     $pdf->shouldReceive('setPaper')->andReturnSelf();
     $pdf->shouldReceive('download')->andReturn(response('%PDF-1.4'));

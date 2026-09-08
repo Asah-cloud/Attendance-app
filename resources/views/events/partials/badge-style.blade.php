@@ -1,5 +1,5 @@
 @if(!($pdfMode ?? false))
-@foreach(['DejaVu Sans' => 'sans', 'DejaVu Serif' => 'serif', 'DejaVu Sans Mono' => 'mono'] as $family => $file)
+@foreach(['DejaVu Sans' => 'sans', 'DejaVu Serif' => 'serif', 'DejaVu Sans Mono' => 'mono', 'Poppins' => 'poppins'] as $family => $file)
 @foreach(['normal' => '', 'bold' => '-Bold'] as $weight => $suffix)
 @font-face{font-family:'{{ $family }}';font-weight:{{ $weight }};src:url('{{ route('events.badges.font', [$event, $file.$suffix]) }}') format('truetype')}
 @endforeach

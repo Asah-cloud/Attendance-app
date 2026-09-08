@@ -230,8 +230,16 @@ class EventRegistrationFormController extends Controller
         $pdf = Pdf::loadView('events.badges-pdf', compact('event', 'registrations', 'categoryColors', 'fields', 'paper', 'cutGuides'))
             // DejaVu ascender minus descender is 1.164 em. Normalize dompdf's
             // line boxes to CSS em units so wrapping and spacing match the editor.
-            ->setOption('fontHeightRatio', 1000 / 1164)
-            ->setPaper($paper === 'a4' ? 'a4' : ($event->badge_size === 'A5' ? 'a5' : 'a6'), $paper === 'a4' && $event->badge_size !== 'A5' ? 'landscape' : 'portrait');
+            ->setOption('fontHeightRatio', 1000 / 1164);
+        // DejaVu fonts are dompdf's own built-ins and need no registration.
+        // Poppins is ours, so dompdf must be told about it before rendering.
+        if (! is_dir(storage_path('fonts'))) {
+            mkdir(storage_path('fonts'), 0775, true);
+        }
+        $metrics = $pdf->getDomPDF()->getFontMetrics();
+        $metrics->registerFont(['family' => 'Poppins', 'style' => 'normal', 'weight' => 'normal'], base_path('resources/fonts/Poppins.ttf'));
+        $metrics->registerFont(['family' => 'Poppins', 'style' => 'normal', 'weight' => 'bold'], base_path('resources/fonts/Poppins-Bold.ttf'));
+        $pdf->setPaper($paper === 'a4' ? 'a4' : ($event->badge_size === 'A5' ? 'a5' : 'a6'), $paper === 'a4' && $event->badge_size !== 'A5' ? 'landscape' : 'portrait');
 
         return $pdf->download('badges-'.$event->slug.'.pdf');
     }
@@ -245,15 +253,23 @@ class EventRegistrationFormController extends Controller
         return response(base64_decode(explode(',', $uri, 2)[1]), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
     }
 
+    /** Font family key => [base filename, directory holding "{base}.ttf" / "{base}-Bold.ttf"]. */
+    private const BADGE_FONT_FILES = [
+        'sans' => ['DejaVuSans', 'vendor/dompdf/dompdf/lib/fonts'],
+        'serif' => ['DejaVuSerif', 'vendor/dompdf/dompdf/lib/fonts'],
+        'mono' => ['DejaVuSansMono', 'vendor/dompdf/dompdf/lib/fonts'],
+        'poppins' => ['Poppins', 'resources/fonts'],
+    ];
+
     public function badgeFont(Event $event, string $font): BinaryFileResponse
     {
         $this->authorize('manageWhenOpen', $event);
-        $fonts = ['sans' => 'DejaVuSans', 'serif' => 'DejaVuSerif', 'mono' => 'DejaVuSansMono'];
         $key = str_replace('-Bold', '', $font);
-        abort_unless(isset($fonts[$key]) && in_array($font, [$key, $key.'-Bold'], true), 404);
-        $file = $fonts[$key].(str_ends_with($font, '-Bold') ? '-Bold' : '').'.ttf';
+        abort_unless(isset(self::BADGE_FONT_FILES[$key]) && in_array($font, [$key, $key.'-Bold'], true), 404);
+        [$base, $dir] = self::BADGE_FONT_FILES[$key];
+        $file = $base.(str_ends_with($font, '-Bold') ? '-Bold' : '').'.ttf';
 
-        return response()->file(base_path('vendor/dompdf/dompdf/lib/fonts/'.$file), ['Content-Type' => 'font/ttf', 'Cache-Control' => 'private, max-age=86400']);
+        return response()->file(base_path($dir.'/'.$file), ['Content-Type' => 'font/ttf', 'Cache-Control' => 'private, max-age=86400']);
     }
 
     public function updateBadgeSettings(Request $request, Event $event): RedirectResponse
@@ -281,7 +297,7 @@ class EventRegistrationFormController extends Controller
             'badge_size' => ['required', 'in:A5,A6'],
             'badge_design' => ['required', 'in:default,category'],
             'badge_layout' => ['sometimes', 'in:standard,minimal,background,image_header,split'],
-            'badge_font' => ['sometimes', 'in:DejaVu Sans,DejaVu Serif,DejaVu Sans Mono'],
+            'badge_font' => ['sometimes', 'in:DejaVu Sans,DejaVu Serif,DejaVu Sans Mono,Poppins'],
             'badge_name_format' => ['sometimes', 'in:full,initials'],
             'badge_fields' => ['sometimes', 'array:'.implode(',', array_keys(BadgeDesign::LABELS))],
             'badge_fields.*' => ['array:x,y,w,h,size,align,visible,color,bold'],
