@@ -43,6 +43,32 @@ it('reuses a participant across events and creates separate registrations', func
         ->and($firstUser->registrations()->where('status', 'confirmed')->count())->toBe(2);
 });
 
+it('gives the same person an independent participant record in each company instead of blocking or merging them', function () {
+    $companyOne = Company::create(['name' => 'One']);
+    $companyTwo = Company::create(['name' => 'Two']);
+    $eventOne = Event::create(['company_id' => $companyOne->id, 'title' => 'Event One', 'event_date' => now()]);
+    $eventTwo = Event::create(['company_id' => $companyTwo->id, 'title' => 'Event Two', 'event_date' => now()]);
+    $service = app(ParticipantRegistrationService::class);
+
+    [$firstUser] = $service->register($eventOne, [
+        'name' => 'Same Person',
+        'email' => 'same.person@example.com',
+        'phone' => '+233 20 123 4567',
+    ], 'walk_in');
+    [$secondUser] = $service->register($eventTwo, [
+        'name' => 'Same Person',
+        'email' => 'same.person@example.com',
+        'phone' => '0201234567',
+    ], 'walk_in');
+
+    expect($secondUser->id)->not->toBe($firstUser->id)
+        ->and($firstUser->company_id)->toBe($companyOne->id)
+        ->and($secondUser->company_id)->toBe($companyTwo->id)
+        ->and(Participant::where('email', 'same.person@example.com')->count())->toBe(2)
+        ->and($firstUser->registrations()->where('status', 'confirmed')->count())->toBe(1)
+        ->and($secondUser->registrations()->where('status', 'confirmed')->count())->toBe(1);
+});
+
 it('does not allow public personal QR links to mark attendance', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Today', 'event_date' => now()]);

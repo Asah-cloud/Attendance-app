@@ -49,13 +49,10 @@ class ParticipantRegistrationService
             ->values()
             ->all();
 
-        $user = $this->findExistingUser($lookupEmails, $phone, $memberId);
-
-        if ($user && $user->company_id !== null && $event->company_id !== null && $user->company_id !== $event->company_id) {
-            throw ValidationException::withMessages([
-                'email' => 'These details belong to a participant in another company.',
-            ]);
-        }
+        // Scoped to this event's company: the same person attending events run by two
+        // different companies gets an independent participant record in each, rather
+        // than being treated as one shared identity (or blocked outright).
+        $user = $this->findExistingUser($lookupEmails, $phone, $memberId, $event->company_id);
 
         if (! $user) {
             return Participant::create([
@@ -101,12 +98,12 @@ class ParticipantRegistrationService
         return $phone !== '' ? $phone : null;
     }
 
-    private function findExistingUser(array $emails, ?string $phone, ?string $memberId): ?Participant
+    private function findExistingUser(array $emails, ?string $phone, ?string $memberId, ?int $companyId): ?Participant
     {
         $matches = collect([
-            $emails !== [] ? Participant::query()->whereIn('email', $emails)->first() : null,
-            $phone ? Participant::query()->where('phone', $phone)->first() : null,
-            $memberId ? Participant::query()->where('member_id', $memberId)->first() : null,
+            $emails !== [] ? Participant::query()->where('company_id', $companyId)->whereIn('email', $emails)->first() : null,
+            $phone ? Participant::query()->where('company_id', $companyId)->where('phone', $phone)->first() : null,
+            $memberId ? Participant::query()->where('company_id', $companyId)->where('member_id', $memberId)->first() : null,
         ])->filter()->unique('id')->values();
 
         if ($matches->count() > 1) {
