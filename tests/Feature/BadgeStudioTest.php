@@ -96,6 +96,7 @@ it('prints only selected confirmed attendees with stable category colours', func
     [$other] = badgeStudioFixture();
     $foreign = badgeRegistration($other);
     $pdf = Mockery::mock(Barryvdh\DomPDF\PDF::class);
+    $pdf->shouldReceive('setOption')->with('fontHeightRatio', 1000 / 1164)->andReturnSelf();
     Pdf::shouldReceive('loadView')->once()->withArgs(function ($view, $data) use ($second) {
         expect($view)->toBe('events.badges-pdf');
         expect($data['registrations']->pluck('id')->all())->toBe([$second->id]);
@@ -114,6 +115,7 @@ it('returns one sample and rejects empty or invalid print selections', function 
     badgeRegistration($event);
     badgeRegistration($event, 'Second Person');
     $pdf = Mockery::mock(Barryvdh\DomPDF\PDF::class);
+    $pdf->shouldReceive('setOption')->with('fontHeightRatio', 1000 / 1164)->andReturnSelf();
     Pdf::shouldReceive('loadView')->once()->withArgs(fn ($view, $data) => $data['registrations']->count() === 1)->andReturn($pdf);
     $pdf->shouldReceive('setPaper')->andReturnSelf();
     $pdf->shouldReceive('download')->andReturn(response('%PDF-1.4'));

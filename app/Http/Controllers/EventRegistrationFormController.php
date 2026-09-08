@@ -22,6 +22,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EventRegistrationFormController extends Controller
@@ -227,6 +228,9 @@ class EventRegistrationFormController extends Controller
         $paper = $options['paper'] ?? 'badge';
         $cutGuides = $request->boolean('cut_guides');
         $pdf = Pdf::loadView('events.badges-pdf', compact('event', 'registrations', 'categoryColors', 'fields', 'paper', 'cutGuides'))
+            // DejaVu ascender minus descender is 1.164 em. Normalize dompdf's
+            // line boxes to CSS em units so wrapping and spacing match the editor.
+            ->setOption('fontHeightRatio', 1000 / 1164)
             ->setPaper($paper === 'a4' ? 'a4' : ($event->badge_size === 'A5' ? 'a5' : 'a6'), $paper === 'a4' && $event->badge_size !== 'A5' ? 'landscape' : 'portrait');
 
         return $pdf->download('badges-'.$event->slug.'.pdf');
@@ -239,6 +243,17 @@ class EventRegistrationFormController extends Controller
         $uri = PdfQrCode::dataUri('ASAH-ATTENDANCE:'.$registration->registration_code, 400, 4);
 
         return response(base64_decode(explode(',', $uri, 2)[1]), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
+    }
+
+    public function badgeFont(Event $event, string $font): BinaryFileResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+        $fonts = ['sans' => 'DejaVuSans', 'serif' => 'DejaVuSerif', 'mono' => 'DejaVuSansMono'];
+        $key = str_replace('-Bold', '', $font);
+        abort_unless(isset($fonts[$key]) && in_array($font, [$key, $key.'-Bold'], true), 404);
+        $file = $fonts[$key].(str_ends_with($font, '-Bold') ? '-Bold' : '').'.ttf';
+
+        return response()->file(base_path('vendor/dompdf/dompdf/lib/fonts/'.$file), ['Content-Type' => 'font/ttf', 'Cache-Control' => 'private, max-age=86400']);
     }
 
     public function updateBadgeSettings(Request $request, Event $event): RedirectResponse

@@ -1,40 +1,537 @@
 (() => {
-'use strict';
-const c=window.badgeStudio, $=id=>document.getElementById(id), form=$('design-form'), canvas=document.querySelector('.badge');
-const fields=structuredClone(c.fields);
-for(const f of Object.values(fields)){for(const k of ['x','y','w','h','size'])f[k]=Number(f[k]);f.visible=Boolean(Number(f.visible));}
-let selected='name',dirty=c.hasErrors,artwork=c.artwork,objectUrl=null,imageSize=null;
-const dimensions=()=>$('badge-size').value==='A5'?[148,210]:[105,148];
-const attendee=()=>c.attendees[$('preview-attendee').value];
-const fieldElement=key=>canvas.querySelector(`[data-field="${key}"]`);
-function formatName(name){const p=name.trim().split(/\s+/u);return $('name-format').value==='initials'&&p.length>2?[p[0],...p.slice(1,-1).map(x=>[...x][0].toLocaleUpperCase()+'.'),p.at(-1)].join(' '):name;}
-function ids(){return [...document.querySelectorAll('#attendee-list input:checked')].filter(x=>!$('print-category').value||x.parentElement.dataset.category===$('print-category').value).map(x=>x.value);}
-function updatePrint(){const count=ids().length;$('print-count').textContent=`${count} attendees selected`;for(const id of ['sample-pdf','download-pdf'])$(id).disabled=dirty||!count;$('paper-help').textContent=$('badge-size').value==='A5'?'A4: one A5 badge centred on each sheet.':'A4: two A6 badges per landscape sheet, with space for cutting.';}
-function markDirty(){dirty=true;$('review-result').textContent='';$('save-status').textContent='Unsaved changes — save before downloading.';updatePrint();}
-function sync(){const root=$('field-inputs');root.replaceChildren();for(const [key,f]of Object.entries(fields))for(const [prop,val]of Object.entries(f)){const el=document.createElement('input');el.type='hidden';el.name=`badge_fields[${key}][${prop}]`;el.value=prop==='visible'?(val?'1':'0'):String(val);root.append(el);}}
-function inspect(){const f=fields[selected];$('field-picker').value=selected;for(const key of ['x','y','w','h','size'])$('field-'+key).value=f[key];$('field-align').value=f.align;$('field-visible').checked=f.visible;$('field-visible').disabled=selected==='qr';for(const id of ['field-size','field-align'])$(id).disabled=['qr','company_logo','event_logo'].includes(selected);canvas.querySelectorAll('.badge-field').forEach(el=>el.classList.toggle('selected',el.dataset.field===selected));}
-function syncVisibilityList(){for(const el of document.querySelectorAll('.field-visibility-toggle'))el.checked=fields[el.dataset.field].visible;}
-function clamp(f,key){const[w,h]=dimensions();f.w=Math.max(key==='qr'?Math.ceil(250000/w)/100:5,Math.min(100,f.w));f.h=Math.max(key==='qr'?Math.ceil(250000/h)/100:3,Math.min(100,f.h));f.x=Math.max(0,Math.min(95,100-f.w,f.x));f.y=Math.max(0,Math.min(95,100-f.h,f.y));f.size=Math.max(6,Math.min(48,f.size));for(const prop of ['x','y','w','h'])f[prop]=Math.round(f[prop]*100)/100;if(key==='qr')f.visible=true;}
-function renderValues(data){if(!data)return;for(const[key,val]of Object.entries(data.values)){const el=fieldElement(key)?.querySelector('.field-content');if(el)el.textContent=key==='name'?formatName(data.fullName):val;}const color=[...document.querySelectorAll('input[data-category]')].find(x=>x.dataset.category===data.values.category);fieldElement('category').style.background=$('category-treatment').value==='category'&&color?color.value:$('primary').value;}
-function warnings(){const results=[],active=[];for(const[key,f]of Object.entries(fields)){if(!f.visible)continue;const el=fieldElement(key),content=el.querySelector('.field-content');if(content?.textContent.trim()&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1))results.push(`${c.labels[key]} does not fit. Enlarge its box or reduce the font size.`);if(key==='qr'||content?.textContent.trim()||el.querySelector('img'))active.push([key,f]);}for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){const[a,x]=active[i],[b,y]=active[j];if(x.x<y.x+y.w&&x.x+x.w>y.x&&x.y<y.y+y.h&&x.y+x.h>y.y)results.push(`${c.labels[a]} overlaps ${c.labels[b].toLowerCase()}.`);}return results;}
-function render(){const[w,h]=dimensions(),layout=$('layout').value;Object.assign(canvas.style,{width:w+'mm',height:h+'mm',fontFamily:$('font').value,color:$('accent').value});canvas.className='badge layout-'+layout;canvas.querySelector('.badge-stripe').style.background=$('primary').value;const art=canvas.querySelector('.badge-art'),show=['background','image_header','split'].includes(layout),removed=$('remove-artwork')?.checked&&!objectUrl;art.style.backgroundImage=show&&artwork&&!removed?`url("${artwork}")`:'none';art.style.backgroundPosition=`${form.elements.badge_image_position_x.value}% ${form.elements.badge_image_position_y.value}%`;$('crop-controls').classList.toggle('hidden',!['image_header','split'].includes(layout));$('artwork-panel').classList.toggle('hidden',!show);$('category-colors').classList.toggle('hidden',$('category-treatment').value!=='category');$('resolution-help').textContent=w===105?'Suggested artwork: 1240 × 1748 px or larger (300 dpi).':'Suggested artwork: 1748 × 2480 px or larger (300 dpi).';const issues=[];if(show&&(!artwork||removed))issues.push('Upload artwork before saving this design.');if(imageSize&&layout==='background'){if(Math.abs(imageSize[0]/imageSize[1]-w/h)>.025)issues.push('Artwork proportions differ from the badge. It will stretch to fill; export at the dimensions above.');if(imageSize[0]<w/25.4*200||imageSize[1]<h/25.4*200)issues.push('Artwork may look soft in print. Use a higher-resolution export.');}$('art-warning').textContent=issues.join(' ');$('dimensions').textContent=`${w} × ${h} mm`;for(const[key,f]of Object.entries(fields)){clamp(f,key);const el=fieldElement(key);Object.assign(el.style,{left:f.x*w/100+'mm',top:f.y*h/100+'mm',width:f.w*w/100+'mm',height:f.h*h/100+'mm',fontSize:f.size+'pt',textAlign:f.align,display:f.visible?'':'none'});if(key==='qr'){const img=el.querySelector('img');if(img)img.style.width=img.style.height=Math.min(f.w*w/100,f.h*h/100)+'mm';}}renderValues(attendee());sync();inspect();updatePrint();$('canvas-wrap').classList.toggle('guides',$('guides').checked);syncVisibilityList();requestAnimationFrame(()=>$('layout-warnings').textContent=warnings().join(' '));}
-for(const el of form.querySelectorAll('[name]')){if(el.type==='hidden'||el.type==='file')continue;el.addEventListener('input',()=>{markDirty();render();});}
-for(const el of document.querySelectorAll('[data-property]'))el.addEventListener('change',()=>{if(el.value===''||!Number.isFinite(Number(el.value)))return;fields[selected][el.dataset.property]=Number(el.value);markDirty();render();});
-$('field-visible').addEventListener('change',()=>{fields[selected].visible=$('field-visible').checked;markDirty();render();});
-for(const el of document.querySelectorAll('.field-visibility-toggle'))el.addEventListener('change',()=>{fields[el.dataset.field].visible=el.checked;markDirty();render();});
-$('field-align').addEventListener('change',()=>{fields[selected].align=$('field-align').value;markDirty();render();});
-$('field-picker').addEventListener('change',()=>{selected=$('field-picker').value;inspect();});
-$('reset-fields').addEventListener('click',()=>{Object.assign(fields,structuredClone(['image_header','split'].includes($('layout').value)?c.headerDefaults:c.defaults));markDirty();render();});
-$('guides').addEventListener('change',render);
-$('preview-attendee').addEventListener('change',()=>{const data=attendee(),img=fieldElement('qr').querySelector('img');if(data&&img){img.onload=()=>img.style.visibility='';img.onerror=()=>{$('layout-warnings').textContent='Could not load the QR code. Reload the page before printing.';};img.style.visibility='hidden';img.src=data.qr;}render();});
-$('artwork').addEventListener('change',()=>{const file=$('artwork').files[0];if(!file){artwork=c.artwork;imageSize=null;objectUrl=null;markDirty();render();return;}if(file.size>4194304||!['image/png','image/jpeg','image/webp'].includes(file.type)){$('art-warning').textContent='Choose a PNG, JPG or WebP no larger than 4 MB.';$('artwork').value='';return;}if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(file);artwork=objectUrl;const img=new Image();img.onload=()=>{imageSize=[img.naturalWidth,img.naturalHeight];render();};img.src=artwork;markDirty();render();});
-canvas.addEventListener('pointerdown',event=>{const el=event.target.closest('[data-field]');if(!el)return;event.preventDefault();selected=el.dataset.field;inspect();el.focus();const rect=canvas.getBoundingClientRect(),start={x:event.clientX,y:event.clientY,fx:fields[selected].x,fy:fields[selected].y};el.setPointerCapture(event.pointerId);const move=e=>{fields[selected].x=start.fx+(e.clientX-start.x)/rect.width*100;fields[selected].y=start.fy+(e.clientY-start.y)/rect.height*100;markDirty();render();};const end=()=>{el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);};el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);});
-canvas.addEventListener('keydown',event=>{const el=event.target.closest('[data-field]'),moves={ArrowLeft:['x',-1],ArrowRight:['x',1],ArrowUp:['y',-1],ArrowDown:['y',1]};if(!el||!moves[event.key])return;selected=el.dataset.field;event.preventDefault();const[key,delta]=moves[event.key];fields[selected][key]+=delta*(event.shiftKey?2:.25);markDirty();render();});
-$('review-all').addEventListener('click',()=>{const failures=[];for(const data of Object.values(c.attendees)){renderValues(data);const issues=warnings();if(issues.length)failures.push(`${data.fullName}: ${issues.join(' ')}`);}renderValues(attendee());$('review-result').textContent=!Object.keys(c.attendees).length?'Add confirmed attendees to check real names.':failures.length?`${failures.length} attendee(s) need review. ${failures.slice(0,5).join(' ')}${failures.length>5?' Use the preview selector to review remaining attendees.':''}`:'All attendee fields fit without overlapping. Download a sample to check the print result.';});
-function filter(){const search=$('attendee-search').value.toLocaleLowerCase(),category=$('print-category').value;document.querySelectorAll('#attendee-list label').forEach(row=>row.classList.toggle('hidden',!row.dataset.name.toLocaleLowerCase().includes(search)||(category&&row.dataset.category!==category)));const visible=[...document.querySelectorAll('#attendee-list label:not(.hidden) input')];$('select-all').checked=visible.length>0&&visible.every(x=>x.checked);$('select-all').indeterminate=visible.some(x=>x.checked)&&!$('select-all').checked;updatePrint();}
-$('attendee-search').addEventListener('input',filter);$('print-category').addEventListener('change',filter);$('attendee-list').addEventListener('change',filter);$('print-paper').addEventListener('change',updatePrint);$('select-all').addEventListener('change',()=>{document.querySelectorAll('#attendee-list label:not(.hidden) input').forEach(x=>x.checked=$('select-all').checked);filter();});
-async function download(sample){if(dirty)return;const chosen=ids();if(!chosen.length)return;const query={paper:$('print-paper').value,cut_guides:$('cut-guides').checked,sample};if(chosen.length!==Object.keys(c.attendees).length)query.attendees=chosen;$(sample?'sample-pdf':'download-pdf').disabled=true;$('print-error').textContent='Preparing PDF…';try{const response=await fetch(c.pdfUrl,{method:'POST',headers:{'X-CSRF-TOKEN':form.querySelector('[name=_token]').value,Accept:'application/pdf','Content-Type':'application/json'},body:JSON.stringify(query)});if(!response.ok||!response.headers.get('content-type')?.includes('application/pdf'))throw new Error('Could not generate the PDF. Check your selection and reload if your session has expired.');const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=sample?'badge-sample.pdf':'attendee-badges.pdf';link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);$('print-error').textContent='';}catch(error){$('print-error').textContent=error.message;}finally{updatePrint();}}
-$('sample-pdf').addEventListener('click',()=>download(true));$('download-pdf').addEventListener('click',()=>download(false));
-form.addEventListener('submit',()=>{sync();dirty=false;});window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-render();if(dirty)markDirty();document.fonts.ready.then(render);
+    "use strict";
+    const c = window.badgeStudio,
+        $ = (id) => document.getElementById(id),
+        form = $("design-form"),
+        canvas = document.querySelector(".badge");
+    const fields = structuredClone(c.fields);
+    for (const f of Object.values(fields)) {
+        for (const k of ["x", "y", "w", "h", "size"]) f[k] = Number(f[k]);
+        f.visible = Boolean(Number(f.visible));
+    }
+    let selected = "name",
+        dirty = c.hasErrors,
+        artwork = c.artwork,
+        objectUrl = null,
+        imageSize = null;
+    const dimensions = () =>
+        $("badge-size").value === "A5" ? [148, 210] : [105, 148];
+    const attendee = () => c.attendees[$("preview-attendee").value];
+    const fieldElement = (key) => canvas.querySelector(`[data-field="${key}"]`);
+    function formatName(name) {
+        const p = name.trim().split(/\s+/u);
+        return $("name-format").value === "initials" && p.length > 2
+            ? [
+                  p[0],
+                  ...p
+                      .slice(1, -1)
+                      .map((x) => [...x][0].toLocaleUpperCase() + "."),
+                  p.at(-1),
+              ].join(" ")
+            : name;
+    }
+    function ids() {
+        return [...document.querySelectorAll("#attendee-list input:checked")]
+            .filter(
+                (x) =>
+                    !$("print-category").value ||
+                    x.parentElement.dataset.category ===
+                        $("print-category").value,
+            )
+            .map((x) => x.value);
+    }
+    function updatePrint() {
+        const count = ids().length;
+        $("print-count").textContent = `${count} attendees selected`;
+        for (const id of ["sample-pdf", "download-pdf"])
+            $(id).disabled = dirty || !count;
+        $("paper-help").textContent =
+            $("badge-size").value === "A5"
+                ? "A4: one A5 badge centred on each sheet."
+                : "A4: two A6 badges per landscape sheet, with space for cutting.";
+    }
+    function markDirty() {
+        dirty = true;
+        $("review-result").textContent = "";
+        $("save-status").textContent =
+            "Unsaved changes — save before downloading.";
+        updatePrint();
+    }
+    function sync() {
+        const root = $("field-inputs");
+        root.replaceChildren();
+        for (const [key, f] of Object.entries(fields))
+            for (const [prop, val] of Object.entries(f)) {
+                const el = document.createElement("input");
+                el.type = "hidden";
+                el.name = `badge_fields[${key}][${prop}]`;
+                el.value = prop === "visible" ? (val ? "1" : "0") : String(val);
+                root.append(el);
+            }
+    }
+    function inspect() {
+        const f = fields[selected];
+        $("field-picker").value = selected;
+        for (const key of ["x", "y", "w", "h", "size"])
+            $("field-" + key).value = f[key];
+        $("field-align").value = f.align;
+        $("field-visible").checked = f.visible;
+        $("field-visible").disabled = selected === "qr";
+        for (const id of ["field-size", "field-align"])
+            $(id).disabled = ["qr", "company_logo", "event_logo"].includes(
+                selected,
+            );
+        canvas
+            .querySelectorAll(".badge-field")
+            .forEach((el) =>
+                el.classList.toggle("selected", el.dataset.field === selected),
+            );
+    }
+    function syncVisibilityList() {
+        for (const el of document.querySelectorAll(".field-visibility-toggle"))
+            el.checked = fields[el.dataset.field].visible;
+    }
+    function clamp(f, key) {
+        const [w, h] = dimensions();
+        f.w = Math.max(
+            key === "qr" ? Math.ceil(250000 / w) / 100 : 5,
+            Math.min(100, f.w),
+        );
+        f.h = Math.max(
+            key === "qr" ? Math.ceil(250000 / h) / 100 : 3,
+            Math.min(100, f.h),
+        );
+        f.x = Math.max(0, Math.min(95, 100 - f.w, f.x));
+        f.y = Math.max(0, Math.min(95, 100 - f.h, f.y));
+        f.size = Math.max(6, Math.min(48, f.size));
+        for (const prop of ["x", "y", "w", "h"])
+            f[prop] = Math.round(f[prop] * 100) / 100;
+        if (key === "qr") f.visible = true;
+    }
+    function renderValues(data) {
+        if (!data) return;
+        for (const [key, val] of Object.entries(data.values)) {
+            const el = fieldElement(key)?.querySelector(".field-content");
+            if (el)
+                el.textContent =
+                    key === "name" ? formatName(data.fullName) : val;
+        }
+        const color = [
+            ...document.querySelectorAll("input[data-category]"),
+        ].find((x) => x.dataset.category === data.values.category);
+        fieldElement("category").style.background =
+            $("category-treatment").value === "category" && color
+                ? color.value
+                : $("primary").value;
+    }
+    function warnings() {
+        const results = [],
+            active = [];
+        for (const [key, f] of Object.entries(fields)) {
+            if (!f.visible) continue;
+            const el = fieldElement(key),
+                content = el.querySelector(".field-content");
+            if (
+                content?.textContent.trim() &&
+                (el.scrollHeight > el.clientHeight + 1 ||
+                    el.scrollWidth > el.clientWidth + 1)
+            )
+                results.push(
+                    `${c.labels[key]} does not fit. Enlarge its box or reduce the font size.`,
+                );
+            if (
+                key === "qr" ||
+                content?.textContent.trim() ||
+                el.querySelector("img")
+            )
+                active.push([key, f]);
+        }
+        for (let i = 0; i < active.length; i++)
+            for (let j = i + 1; j < active.length; j++) {
+                const [a, x] = active[i],
+                    [b, y] = active[j];
+                if (
+                    x.x < y.x + y.w &&
+                    x.x + x.w > y.x &&
+                    x.y < y.y + y.h &&
+                    x.y + x.h > y.y
+                )
+                    results.push(
+                        `${c.labels[a]} overlaps ${c.labels[b].toLowerCase()}.`,
+                    );
+            }
+        return results;
+    }
+    function render() {
+        const [w, h] = dimensions(),
+            layout = $("layout").value;
+        Object.assign(canvas.style, {
+            width: w + "mm",
+            height: h + "mm",
+            fontFamily: $("font").value,
+            color: $("accent").value,
+        });
+        canvas.className = "badge layout-" + layout;
+        canvas.querySelector(".badge-stripe").style.background =
+            $("primary").value;
+        const art = canvas.querySelector(".badge-art"),
+            show = ["background", "image_header", "split"].includes(layout),
+            removed = $("remove-artwork")?.checked && !objectUrl;
+        art.style.display = show && !removed ? "" : "none";
+        const sectioned = ["image_header", "split"].includes(layout),
+            aw = w * (sectioned ? 0.86 : 1),
+            ah = h * (sectioned ? 0.17 : 1);
+        Object.assign(art.style, {
+            left: (sectioned ? w * 0.07 : 0) + "mm",
+            top: (sectioned ? h * 0.04 : 0) + "mm",
+            width: aw + "mm",
+            height: ah + "mm",
+        });
+        let artImg = art.querySelector("img");
+        if (artwork && !artImg) {
+            artImg = document.createElement("img");
+            artImg.alt = "Company badge artwork";
+            art.append(artImg);
+        }
+        if (artImg) {
+            if (artwork && artImg.getAttribute("src") !== artwork)
+                artImg.src = artwork;
+            artImg.style.display = artwork ? "" : "none";
+            let iw = aw,
+                ih = ah;
+            if (sectioned && imageSize) {
+                const scale = Math.max(aw / imageSize[0], ah / imageSize[1]);
+                iw = imageSize[0] * scale;
+                ih = imageSize[1] * scale;
+            }
+            Object.assign(artImg.style, {
+                width: iw + "mm",
+                height: ih + "mm",
+                left:
+                    ((aw - iw) * form.elements.badge_image_position_x.value) /
+                        100 +
+                    "mm",
+                top:
+                    ((ah - ih) * form.elements.badge_image_position_y.value) /
+                        100 +
+                    "mm",
+            });
+        }
+        $("crop-controls").classList.toggle(
+            "hidden",
+            !["image_header", "split"].includes(layout),
+        );
+        $("artwork-panel").classList.toggle("hidden", !show);
+        $("category-colors").classList.toggle(
+            "hidden",
+            $("category-treatment").value !== "category",
+        );
+        $("resolution-help").textContent =
+            w === 105
+                ? "Suggested artwork: 1240 × 1748 px or larger (300 dpi)."
+                : "Suggested artwork: 1748 × 2480 px or larger (300 dpi).";
+        const issues = [];
+        if (show && (!artwork || removed))
+            issues.push("Upload artwork before saving this design.");
+        if (imageSize && layout === "background") {
+            if (Math.abs(imageSize[0] / imageSize[1] - w / h) > 0.025)
+                issues.push(
+                    "Artwork proportions differ from the badge. It will stretch to fill; export at the dimensions above.",
+                );
+            if (
+                imageSize[0] < (w / 25.4) * 200 ||
+                imageSize[1] < (h / 25.4) * 200
+            )
+                issues.push(
+                    "Artwork may look soft in print. Use a higher-resolution export.",
+                );
+        }
+        $("art-warning").textContent = issues.join(" ");
+        $("dimensions").textContent = `${w} × ${h} mm`;
+        for (const [key, f] of Object.entries(fields)) {
+            clamp(f, key);
+            const el = fieldElement(key);
+            Object.assign(el.style, {
+                left: (f.x * w) / 100 + "mm",
+                top: (f.y * h) / 100 + "mm",
+                width: (f.w * w) / 100 + "mm",
+                height: (f.h * h) / 100 + "mm",
+                fontSize: f.size + "pt",
+                textAlign: f.align,
+                display: f.visible ? "" : "none",
+            });
+            if (key === "qr") {
+                const img = el.querySelector("img");
+                if (img)
+                    img.style.width = img.style.height =
+                        Math.min((f.w * w) / 100, (f.h * h) / 100) + "mm";
+            }
+        }
+        renderValues(attendee());
+        sync();
+        inspect();
+        updatePrint();
+        $("canvas-wrap").classList.toggle("guides", $("guides").checked);
+        syncVisibilityList();
+        requestAnimationFrame(
+            () => ($("layout-warnings").textContent = warnings().join(" ")),
+        );
+    }
+    for (const el of form.querySelectorAll("[name]")) {
+        if (el.type === "hidden" || el.type === "file") continue;
+        el.addEventListener("input", () => {
+            markDirty();
+            render();
+        });
+    }
+    for (const el of document.querySelectorAll("[data-property]"))
+        el.addEventListener("change", () => {
+            if (el.value === "" || !Number.isFinite(Number(el.value))) return;
+            fields[selected][el.dataset.property] = Number(el.value);
+            markDirty();
+            render();
+        });
+    $("field-visible").addEventListener("change", () => {
+        fields[selected].visible = $("field-visible").checked;
+        markDirty();
+        render();
+    });
+    for (const el of document.querySelectorAll(".field-visibility-toggle"))
+        el.addEventListener("change", () => {
+            fields[el.dataset.field].visible = el.checked;
+            markDirty();
+            render();
+        });
+    $("field-align").addEventListener("change", () => {
+        fields[selected].align = $("field-align").value;
+        markDirty();
+        render();
+    });
+    $("field-picker").addEventListener("change", () => {
+        selected = $("field-picker").value;
+        inspect();
+    });
+    $("reset-fields").addEventListener("click", () => {
+        Object.assign(
+            fields,
+            structuredClone(
+                ["image_header", "split"].includes($("layout").value)
+                    ? c.headerDefaults
+                    : c.defaults,
+            ),
+        );
+        markDirty();
+        render();
+    });
+    $("guides").addEventListener("change", render);
+    $("preview-attendee").addEventListener("change", () => {
+        const data = attendee(),
+            img = fieldElement("qr").querySelector("img");
+        if (data && img) {
+            img.onload = () => (img.style.visibility = "");
+            img.onerror = () => {
+                $("layout-warnings").textContent =
+                    "Could not load the QR code. Reload the page before printing.";
+            };
+            img.style.visibility = "hidden";
+            img.src = data.qr;
+        }
+        render();
+    });
+    $("artwork").addEventListener("change", () => {
+        const file = $("artwork").files[0];
+        if (!file) {
+            artwork = c.artwork;
+            imageSize = null;
+            objectUrl = null;
+            markDirty();
+            render();
+            return;
+        }
+        if (
+            file.size > 4194304 ||
+            !["image/png", "image/jpeg", "image/webp"].includes(file.type)
+        ) {
+            $("art-warning").textContent =
+                "Choose a PNG, JPG or WebP no larger than 4 MB.";
+            $("artwork").value = "";
+            return;
+        }
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(file);
+        artwork = objectUrl;
+        const img = new Image();
+        img.onload = () => {
+            imageSize = [img.naturalWidth, img.naturalHeight];
+            render();
+        };
+        img.src = artwork;
+        markDirty();
+        render();
+    });
+    canvas.addEventListener("pointerdown", (event) => {
+        const el = event.target.closest("[data-field]");
+        if (!el) return;
+        event.preventDefault();
+        selected = el.dataset.field;
+        inspect();
+        el.focus();
+        const rect = canvas.getBoundingClientRect(),
+            start = {
+                x: event.clientX,
+                y: event.clientY,
+                fx: fields[selected].x,
+                fy: fields[selected].y,
+            };
+        el.setPointerCapture(event.pointerId);
+        const move = (e) => {
+            fields[selected].x =
+                start.fx + ((e.clientX - start.x) / rect.width) * 100;
+            fields[selected].y =
+                start.fy + ((e.clientY - start.y) / rect.height) * 100;
+            markDirty();
+            render();
+        };
+        const end = () => {
+            el.removeEventListener("pointermove", move);
+            el.removeEventListener("pointerup", end);
+            el.removeEventListener("pointercancel", end);
+        };
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", end);
+        el.addEventListener("pointercancel", end);
+    });
+    canvas.addEventListener("keydown", (event) => {
+        const el = event.target.closest("[data-field]"),
+            moves = {
+                ArrowLeft: ["x", -1],
+                ArrowRight: ["x", 1],
+                ArrowUp: ["y", -1],
+                ArrowDown: ["y", 1],
+            };
+        if (!el || !moves[event.key]) return;
+        selected = el.dataset.field;
+        event.preventDefault();
+        const [key, delta] = moves[event.key];
+        fields[selected][key] += delta * (event.shiftKey ? 2 : 0.25);
+        markDirty();
+        render();
+    });
+    $("review-all").addEventListener("click", () => {
+        const failures = [];
+        for (const data of Object.values(c.attendees)) {
+            renderValues(data);
+            const issues = warnings();
+            if (issues.length)
+                failures.push(`${data.fullName}: ${issues.join(" ")}`);
+        }
+        renderValues(attendee());
+        $("review-result").textContent = !Object.keys(c.attendees).length
+            ? "Add confirmed attendees to check real names."
+            : failures.length
+              ? `${failures.length} attendee(s) need review. ${failures.slice(0, 5).join(" ")}${failures.length > 5 ? " Use the preview selector to review remaining attendees." : ""}`
+              : "All attendee fields fit without overlapping. Download a sample to check the print result.";
+    });
+    function filter() {
+        const search = $("attendee-search").value.toLocaleLowerCase(),
+            category = $("print-category").value;
+        document
+            .querySelectorAll("#attendee-list label")
+            .forEach((row) =>
+                row.classList.toggle(
+                    "hidden",
+                    !row.dataset.name.toLocaleLowerCase().includes(search) ||
+                        (category && row.dataset.category !== category),
+                ),
+            );
+        const visible = [
+            ...document.querySelectorAll(
+                "#attendee-list label:not(.hidden) input",
+            ),
+        ];
+        $("select-all").checked =
+            visible.length > 0 && visible.every((x) => x.checked);
+        $("select-all").indeterminate =
+            visible.some((x) => x.checked) && !$("select-all").checked;
+        updatePrint();
+    }
+    $("attendee-search").addEventListener("input", filter);
+    $("print-category").addEventListener("change", filter);
+    $("attendee-list").addEventListener("change", filter);
+    $("print-paper").addEventListener("change", updatePrint);
+    $("select-all").addEventListener("change", () => {
+        document
+            .querySelectorAll("#attendee-list label:not(.hidden) input")
+            .forEach((x) => (x.checked = $("select-all").checked));
+        filter();
+    });
+    async function download(sample) {
+        if (dirty) return;
+        const chosen = ids();
+        if (!chosen.length) return;
+        const query = {
+            paper: $("print-paper").value,
+            cut_guides: $("cut-guides").checked,
+            sample,
+        };
+        if (chosen.length !== Object.keys(c.attendees).length)
+            query.attendees = chosen;
+        $(sample ? "sample-pdf" : "download-pdf").disabled = true;
+        $("print-error").textContent = "Preparing PDF…";
+        try {
+            const response = await fetch(c.pdfUrl, {
+                method: "POST",
+                headers: {
+                    "X-CSRF-TOKEN": form.querySelector("[name=_token]").value,
+                    Accept: "application/pdf",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(query),
+            });
+            if (
+                !response.ok ||
+                !response.headers
+                    .get("content-type")
+                    ?.includes("application/pdf")
+            )
+                throw new Error(
+                    "Could not generate the PDF. Check your selection and reload if your session has expired.",
+                );
+            const blob = await response.blob(),
+                url = URL.createObjectURL(blob),
+                link = document.createElement("a");
+            link.href = url;
+            link.download = sample ? "badge-sample.pdf" : "attendee-badges.pdf";
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            $("print-error").textContent = "";
+        } catch (error) {
+            $("print-error").textContent = error.message;
+        } finally {
+            updatePrint();
+        }
+    }
+    $("sample-pdf").addEventListener("click", () => download(true));
+    $("download-pdf").addEventListener("click", () => download(false));
+    form.addEventListener("submit", () => {
+        sync();
+        dirty = false;
+    });
+    window.addEventListener("beforeunload", (event) => {
+        if (dirty) {
+            event.preventDefault();
+            event.returnValue = "";
+        }
+    });
+    if (artwork) {
+        const img = new Image();
+        img.onload = () => {
+            imageSize = [img.naturalWidth, img.naturalHeight];
+            render();
+        };
+        img.src = artwork;
+    }
+    render();
+    if (dirty) markDirty();
+    document.fonts.ready.then(render);
 })();

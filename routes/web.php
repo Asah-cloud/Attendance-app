@@ -173,6 +173,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/badges', [EventRegistrationFormController::class, 'badges'])->name('events.badges');
         Route::match(['get', 'post'], '/events/{event}/badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.badges.pdf');
         Route::get('/events/{event}/badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.badges.qr');
+        Route::get('/events/{event}/badges/fonts/{font}', [EventRegistrationFormController::class, 'badgeFont'])->name('events.badges.font');
         Route::patch('/events/{event}/badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.badges.settings');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');
         Route::get('/events/{event}/registration-form/print-qr', [EventRegistrationFormController::class, 'printQr'])->name('events.registration-form.print-qr');
