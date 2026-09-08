@@ -13,7 +13,6 @@
 .badge-art img{position:absolute;display:block;max-width:none}
 .layout-minimal .badge-wash,.layout-background .badge-wash,.layout-background .badge-stripe{display:none}
 .badge-field{position:absolute;margin:0;padding:0;overflow:hidden;line-height:1.2;word-wrap:break-word;font-weight:normal}
-.badge-field[data-field=name],.badge-field[data-field=event],.badge-field[data-field=company],.badge-field[data-field=category]{font-weight:bold}
 .badge-field[data-field=category]{padding:1mm 2mm;color:#fff}
 .badge-field[data-field=qr]{background:#fff;text-align:center}
 .badge-field img{display:block}

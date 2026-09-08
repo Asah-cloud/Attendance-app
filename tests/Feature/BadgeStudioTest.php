@@ -47,6 +47,33 @@ it('saves a full background design and movable fields with optional name initial
     expect(BadgeDesign::values($event, $registration)['name'])->toBe('Asah A. K. Isaac');
 });
 
+it('lets a manager give a field a custom colour and bold weight, or leave it to inherit the default', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $fields = BadgeDesign::defaults();
+    $fields['category'] = array_replace($fields['category'], ['color' => '#FF0000', 'bold' => false]);
+    $fields['room'] = array_replace($fields['room'], ['bold' => true]);
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $event->refresh();
+    expect($event->badge_fields['category']['color'])->toBe('#FF0000')
+        ->and($event->badge_fields['category']['bold'])->toBeFalse()
+        ->and($event->badge_fields['room']['bold'])->toBeTrue()
+        ->and($event->badge_fields['room']['color'])->toBeNull()
+        ->and($event->badge_fields['name']['bold'])->toBeTrue()
+        ->and($event->badge_fields['name']['color'])->toBeNull();
+});
+
+it('rejects an invalid field colour', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $fields = BadgeDesign::defaults();
+    $fields['name']['color'] = 'not-a-colour';
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertSessionHasErrors('badge_fields.name.color');
+});
+
 it('rejects out of bounds fields and an undersized or hidden QR code', function (string $key, array $changes) {
     [$event,$manager] = badgeStudioFixture();
     $fields = BadgeDesign::defaults();

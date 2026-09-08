@@ -8,6 +8,8 @@
     for (const f of Object.values(fields)) {
         for (const k of ["x", "y", "w", "h", "size"]) f[k] = Number(f[k]);
         f.visible = Boolean(Number(f.visible));
+        f.bold = Boolean(Number(f.bold));
+        f.color = f.color || null;
     }
     let selected = "name",
         dirty = c.hasErrors,
@@ -62,10 +64,16 @@
         root.replaceChildren();
         for (const [key, f] of Object.entries(fields))
             for (const [prop, val] of Object.entries(f)) {
+                if (prop === "color" && !val) continue; // no override: let the server fall back to the default
                 const el = document.createElement("input");
                 el.type = "hidden";
                 el.name = `badge_fields[${key}][${prop}]`;
-                el.value = prop === "visible" ? (val ? "1" : "0") : String(val);
+                el.value =
+                    prop === "visible" || prop === "bold"
+                        ? val
+                            ? "1"
+                            : "0"
+                        : String(val);
                 root.append(el);
             }
     }
@@ -77,10 +85,17 @@
         $("field-align").value = f.align;
         $("field-visible").checked = f.visible;
         $("field-visible").disabled = selected === "qr";
+        const isGraphic = ["qr", "company_logo", "event_logo"].includes(
+            selected,
+        );
+        $("field-bold").checked = f.bold;
+        $("field-bold").disabled = isGraphic;
+        $("field-custom-color").checked = f.color !== null;
+        $("field-custom-color").disabled = isGraphic;
+        $("field-color").value = f.color || $("accent").value;
+        $("field-color").disabled = isGraphic || f.color === null;
         for (const id of ["field-size", "field-align"])
-            $(id).disabled = ["qr", "company_logo", "event_logo"].includes(
-                selected,
-            );
+            $(id).disabled = isGraphic;
         canvas
             .querySelectorAll(".badge-field")
             .forEach((el) =>
@@ -258,6 +273,8 @@
                 height: (f.h * h) / 100 + "mm",
                 fontSize: f.size + "pt",
                 textAlign: f.align,
+                fontWeight: f.bold ? "bold" : "normal",
+                color: f.color || "",
                 display: f.visible ? "" : "none",
             });
             if (key === "qr") {
@@ -293,6 +310,24 @@
         });
     $("field-visible").addEventListener("change", () => {
         fields[selected].visible = $("field-visible").checked;
+        markDirty();
+        render();
+    });
+    $("field-bold").addEventListener("change", () => {
+        fields[selected].bold = $("field-bold").checked;
+        markDirty();
+        render();
+    });
+    $("field-custom-color").addEventListener("change", () => {
+        fields[selected].color = $("field-custom-color").checked
+            ? $("field-color").value
+            : null;
+        markDirty();
+        render();
+    });
+    $("field-color").addEventListener("input", () => {
+        if (!$("field-custom-color").checked) return;
+        fields[selected].color = $("field-color").value;
         markDirty();
         render();
     });

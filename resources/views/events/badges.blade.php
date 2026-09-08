@@ -40,6 +40,9 @@
 </section>
 <section class="panel"><p class="eyebrow">Field inspector</p><h2>Position &amp; typography</h2><label for="field-picker">Selected field</label><select id="field-picker">@foreach(\App\Support\BadgeDesign::LABELS as $key=>$label)<option value="{{ $key }}" @selected($key==='name')>{{ $label }}</option>@endforeach</select>
 <label class="check"><input id="field-visible" type="checkbox"> Show on badge</label>
+<label class="check"><input id="field-bold" type="checkbox"> Bold</label>
+<label class="check"><input id="field-custom-color" type="checkbox"> Custom text colour</label>
+<input type="color" id="field-color">
 <div class="row">@foreach(['x'=>'Left (%)','y'=>'Top (%)','w'=>'Width (%)','h'=>'Height (%)'] as $key=>$label)<div><label for="field-{{ $key }}">{{ $label }}</label><input type="number" id="field-{{ $key }}" data-property="{{ $key }}" min="{{ in_array($key,['x','y']) ? 0 : ($key==='w'?5:3) }}" max="{{ in_array($key,['x','y']) ? 95 : 100 }}" step="0.1"></div>@endforeach</div>
 <label for="field-size">Font size (pt)</label><input type="number" id="field-size" data-property="size" min="6" max="48" step="0.5"><label for="field-align">Text alignment</label><select id="field-align"><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></select>
 <p class="help field-note">Use the arrow keys on a selected field to move it; hold Shift for larger steps. The QR code stays visible on a white background, at least 25 mm square.</p>

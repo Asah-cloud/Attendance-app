@@ -25,7 +25,9 @@ final class BadgeDesign
             $positions['meta'] = [7, 42, 86, 6, 8];
         }
 
-        return collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => $key !== 'event_logo'])->all();
+        $bold = ['name', 'event', 'company', 'category'];
+
+        return collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => $key !== 'event_logo', 'color' => null, 'bold' => in_array($key, $bold, true)])->all();
     }
 
     public static function fields(Event $event): array
