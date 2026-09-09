@@ -246,6 +246,33 @@ it('holds reserved rooms back from auto-allocation but allows manual assignment'
     expect($general->fresh()->roomAssignment?->accommodation_room_id)->not->toBe($reserved->id);
 });
 
+it('lets a manager skip the immediate email on a manual assignment and send it later in bulk', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true, 'accommodation_published' => true]);
+    $held = accommodationRegistration($event, 'Held Guest');
+    $notified = accommodationRegistration($event, 'Notified Guest');
+    $room = accommodationRoom($event, 'Std 1', 2);
+
+    $this->actingAs($manager)
+        ->put(route('events.accommodation.assignments.update', [$event, $held]), ['room_id' => $room->id, 'send_notification' => 0])
+        ->assertRedirect()->assertSessionHasNoErrors();
+    $this->actingAs($manager)
+        ->put(route('events.accommodation.assignments.update', [$event, $notified]), ['room_id' => $room->id])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($held->fresh()->roomAssignment->notification_sent_at)->toBeNull()
+        ->and($notified->fresh()->roomAssignment->notification_sent_at)->not->toBeNull();
+    Notification::assertSentTo($notified->fresh()->participant, RoomAssigned::class);
+    Notification::assertNotSentTo($held->fresh()->participant, RoomAssigned::class);
+
+    $this->actingAs($manager)->post(route('events.accommodation.notify', $event))->assertRedirect();
+
+    expect($held->fresh()->roomAssignment->notification_sent_at)->not->toBeNull();
+    Notification::assertSentTo($held->fresh()->participant, RoomAssigned::class);
+});
+
 it('exports rooming lists and protects inventory with assignment history', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);

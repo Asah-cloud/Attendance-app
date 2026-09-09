@@ -245,7 +245,7 @@ class AccommodationController extends Controller
     {
         $this->authorize('update', $event);
         abort_unless($registration->event_id === $event->id, 404);
-        $data = $request->validate(['room_id' => ['required', 'integer'], 'is_locked' => ['nullable', 'boolean']]);
+        $data = $request->validate(['room_id' => ['required', 'integer'], 'is_locked' => ['nullable', 'boolean'], 'send_notification' => ['nullable', 'boolean']]);
         $room = AccommodationRoom::with('floor.block.site')->findOrFail($data['room_id']);
         $this->roomBelongs($room, $event);
         $assignment = $registration->roomAssignment;
@@ -255,7 +255,10 @@ class AccommodationController extends Controller
         abort_if($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->count() >= $room->capacity, 422, 'That room is already full.');
         RoomAssignment::updateOrCreate(['event_registration_id' => $registration->id], ['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual', 'is_locked' => $request->boolean('is_locked'), 'allocation_reason' => 'Manually assigned by a manager.', 'assigned_by' => $request->user()->id, 'assigned_at' => now()]);
         $registration->update(['accommodation_required' => true]);
-        if ($event->accommodation_published) {
+        // Defaults to sending immediately (unchanged behaviour); unticking "Email
+        // this attendee now" leaves notification_sent_at null so the assignment
+        // is still picked up later by the bulk "Email rooms to attendees" action.
+        if ($event->accommodation_published && $request->boolean('send_notification', true)) {
             $this->notifyAssignment($registration->roomAssignment()->firstOrFail());
         }
 
