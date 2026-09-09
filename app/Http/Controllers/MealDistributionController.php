@@ -425,7 +425,9 @@ class MealDistributionController extends Controller
         $confirmedByCategory = $eligibleRegistrations->countBy(fn ($registration) => $registration->participant->category ?: 'Unspecified');
         $forecast = $meals->map(fn ($meal) => [
             'meal' => $meal,
-            'suggested' => $confirmedByCategory->sum(fn ($count, $category) => $count * $meal->entitlementFor($category === 'Unspecified' ? null : $category)),
+            'suggested' => $suggested = $confirmedByCategory->sum(fn ($count, $category) => $count * $meal->entitlementFor($category === 'Unspecified' ? null : $category)),
+            'actual' => $actual = (int) $meal->collections_sum_quantity,
+            'accuracy' => $suggested > 0 ? round(($actual / $suggested) * 100) : ($actual > 0 ? null : 100),
         ]);
 
         $byStation = $collections->groupBy(fn ($collection) => $collection->station?->name ?? 'Unassigned')
@@ -439,6 +441,18 @@ class MealDistributionController extends Controller
             ->map(fn ($group) => $group->sum('quantity'))
             ->sortDesc();
 
+        $dietarySummary = $eligibleRegistrations
+            ->map(fn ($registration) => trim((string) $registration->participant->dietary_notes))
+            ->filter()
+            ->countBy(fn ($notes) => $notes)
+            ->sortDesc();
+
+        $collectionsByHour = $collections
+            ->filter(fn ($collection) => $collection->collected_at)
+            ->groupBy(fn ($collection) => $collection->collected_at->format('H:00'))
+            ->map(fn ($group) => $group->sum('quantity'))
+            ->sortKeys();
+
         return [
             'event' => $event,
             'meals' => $meals,
@@ -449,6 +463,8 @@ class MealDistributionController extends Controller
             'byStation' => $byStation,
             'noShows' => $noShows,
             'wasteByReason' => $wasteByReason,
+            'dietarySummary' => $dietarySummary,
+            'collectionsByHour' => $collectionsByHour,
             'totalStock' => $meals->sum('total_portions'),
             'totalIssued' => $collections->sum('quantity'),
             'totalWasted' => $wasteLogs->sum('quantity'),

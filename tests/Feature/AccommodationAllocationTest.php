@@ -297,7 +297,7 @@ it('shows occupancy, assignment methods, and follow-up lists on the accommodatio
     $checkedIn = accommodationRegistration($event, 'Checked In Guest');
     $notCheckedIn = accommodationRegistration($event, 'Pending Checkin Guest');
     $stillNeedsRoom = accommodationRegistration($event, 'Waiting Guest');
-    $checkedIn->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'checked_in', 'method' => 'manual']);
+    $checkedIn->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'checked_in', 'method' => 'manual', 'notification_sent_at' => now()]);
     $notCheckedIn->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
 
     $this->actingAs($manager)->get(route('events.accommodation.report', $event))
@@ -308,6 +308,7 @@ it('shows occupancy, assignment methods, and follow-up lists on the accommodatio
         ->assertSee('Waiting Guest')
         ->assertSeeInOrder(['Assignment method', 'manual', 'automatic'])
         ->assertSeeInOrder(['Not checked in', 'Pending Checkin Guest'])
+        ->assertSeeInOrder(['Notification status', 'Pending Checkin Guest'])
         ->assertSeeInOrder(['Still need a room', 'Waiting Guest']);
 });
 

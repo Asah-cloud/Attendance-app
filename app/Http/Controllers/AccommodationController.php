@@ -72,6 +72,8 @@ class AccommodationController extends Controller
         $noShows = $assigned->filter(fn ($r) => $r->roomAssignment->status === 'assigned')->values();
         $unassigned = $registrations->filter(fn ($r) => $r->accommodation_required && ! $r->roomAssignment)->values();
         $methodBreakdown = $assigned->countBy(fn ($r) => $r->roomAssignment->method);
+        $notifiedCount = $assigned->filter(fn ($r) => $r->roomAssignment->notification_sent_at)->count();
+        $pendingNotification = $assigned->filter(fn ($r) => ! $r->roomAssignment->notification_sent_at)->values();
 
         return [
             'event' => $event,
@@ -84,6 +86,8 @@ class AccommodationController extends Controller
             'noShows' => $noShows,
             'unassigned' => $unassigned,
             'methodBreakdown' => $methodBreakdown,
+            'notifiedCount' => $notifiedCount,
+            'pendingNotification' => $pendingNotification,
             'assignments' => $this->reportAssignments($event),
         ];
     }

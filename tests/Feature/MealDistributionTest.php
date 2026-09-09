@@ -152,6 +152,25 @@ it('lists attendees who have not collected food yet and totals waste by reason',
         ->assertSeeInOrder(['Waste by reason', 'Dropped', '5', 'Spoiled', '3']);
 });
 
+it('summarizes dietary requirements and forecast accuracy on the food report', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    $vegetarian = mealRegistration($event, 'Vegetarian Guest');
+    $vegetarian->participant->update(['dietary_notes' => 'Vegetarian']);
+    $other = mealRegistration($event, 'Regular Guest');
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $vegetarian->registration_code])->assertOk();
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $other->registration_code])->assertOk();
+
+    $this->actingAs($manager)->get(route('events.meals.report', $event))
+        ->assertOk()
+        ->assertSeeInOrder(['Dietary requirements', 'Vegetarian', '1'])
+        ->assertSeeInOrder(['Forecast vs. actual', 'Actual issued'])
+        ->assertSee('Collections by time of day');
+});
+
 it('prevents staff from accessing another event meal', function () {
     $company = Company::create(['name' => 'Acme']);
     $otherCompany = Company::create(['name' => 'Other']);
