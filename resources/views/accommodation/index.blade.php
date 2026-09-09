@@ -37,7 +37,7 @@
                 <select name="category" class="rounded-lg border-indigo-200 text-sm"><option value="">All categories</option>@foreach($allocationCategories as $option)<option value="{{ $option }}" @selected($allocationCategory === $option)>{{ $option }}</option>@endforeach</select>
                 <select name="gender" class="rounded-lg border-indigo-200 text-sm"><option value="">All genders</option>@foreach($allocationGenders as $option)<option value="{{ $option }}" @selected($allocationGender === $option)>{{ $option }}</option>@endforeach</select>
                 <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white" @disabled(!$event->accommodation_enabled)>Assign rooms now</button>
-                <a href="{{ route('events.accommodation.index', array_filter(['preview' => 1, 'category' => $allocationCategory, 'gender' => $allocationGender])) }}" class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-black text-indigo-700">Preview selection</a>
+                <a href="{{ route('events.accommodation.index', array_filter(['event' => $event, 'preview' => 1, 'category' => $allocationCategory, 'gender' => $allocationGender])) }}" class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-black text-indigo-700">Preview selection</a>
                 <span class="text-xs text-indigo-700">Choose a category, gender, or both. Run each group separately; people already assigned are left unchanged.</span>
             </form>
             <p class="mt-3 text-xs font-bold {{ $event->accommodationSelfSelectOpen() ? 'text-emerald-600' : 'text-slate-400' }}">
