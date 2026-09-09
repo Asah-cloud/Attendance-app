@@ -40,6 +40,54 @@ class AccommodationController extends Controller
         return view('accommodation.index', compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount', 'allocationCategories', 'allocationGenders', 'allocationCategory', 'allocationGender'));
     }
 
+    public function report(Event $event): View
+    {
+        $this->authorize('update', $event);
+
+        return view('accommodation.report', $this->reportData($event));
+    }
+
+    private function reportData(Event $event): array
+    {
+        $event->load(['accommodationSites.blocks.floors.rooms' => fn ($query) => $query->withCount('activeAssignments')]);
+        $roomRows = $event->accommodationSites->flatMap(fn ($site) => $site->blocks->flatMap(
+            fn ($block) => $block->floors->flatMap(fn ($floor) => $floor->rooms->map(fn ($room) => (object) [
+                'room' => $room,
+                'site' => $site->name,
+                'building' => $block->name,
+                'floor' => $floor->name,
+            ]))
+        ));
+        $occupancy = $roomRows->groupBy(fn ($row) => $row->site.' / '.$row->building.' / '.$row->floor)
+            ->map(fn ($group) => [
+                'rooms' => $group->count(),
+                'capacity' => $group->sum(fn ($row) => $row->room->capacity),
+                'occupied' => $group->sum(fn ($row) => $row->room->active_assignments_count),
+            ]);
+
+        $registrations = $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with(['participant', 'roomAssignment.room.floor.block.site'])
+            ->orderByDesc('accommodation_required')->get();
+        $assigned = $registrations->filter(fn ($r) => $r->roomAssignment);
+        $noShows = $assigned->filter(fn ($r) => $r->roomAssignment->status === 'assigned')->values();
+        $unassigned = $registrations->filter(fn ($r) => $r->accommodation_required && ! $r->roomAssignment)->values();
+        $methodBreakdown = $assigned->countBy(fn ($r) => $r->roomAssignment->method);
+
+        return [
+            'event' => $event,
+            'occupancy' => $occupancy,
+            'totalBeds' => $roomRows->sum(fn ($row) => $row->room->capacity),
+            'totalRooms' => $roomRows->count(),
+            'requiredCount' => $registrations->where('accommodation_required', true)->count(),
+            'assignedCount' => $assigned->filter(fn ($r) => in_array($r->roomAssignment->status, ['assigned', 'checked_in'], true))->count(),
+            'checkedInCount' => $assigned->filter(fn ($r) => $r->roomAssignment->status === 'checked_in')->count(),
+            'noShows' => $noShows,
+            'unassigned' => $unassigned,
+            'methodBreakdown' => $methodBreakdown,
+            'assignments' => $this->reportAssignments($event),
+        ];
+    }
+
     public function updateSettings(Request $request, Event $event): RedirectResponse
     {
         $this->authorize('update', $event);

@@ -133,6 +133,25 @@ it('provides managers with food reports and prevents stock below issued portions
     $this->actingAs($manager)->patch(route('events.meals.update', [$event, $meal]), ['name' => 'Lunch', 'total_portions' => 0, 'is_active' => 1])->assertSessionHasErrors('total_portions');
 });
 
+it('lists attendees who have not collected food yet and totals waste by reason', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    $served = mealRegistration($event, 'Served Guest');
+    $pending = mealRegistration($event, 'Pending Guest');
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $served->registration_code])->assertOk();
+    $meal->wasteLogs()->create(['quantity' => 2, 'reason' => 'Spoiled', 'logged_by' => $manager->id, 'occurred_at' => now()]);
+    $meal->wasteLogs()->create(['quantity' => 1, 'reason' => 'Spoiled', 'logged_by' => $manager->id, 'occurred_at' => now()]);
+    $meal->wasteLogs()->create(['quantity' => 5, 'reason' => 'Dropped', 'logged_by' => $manager->id, 'occurred_at' => now()]);
+
+    $this->actingAs($manager)->get(route('events.meals.report', $event))
+        ->assertOk()
+        ->assertSee('Pending Guest')
+        ->assertSeeInOrder(['Waste by reason', 'Dropped', '5', 'Spoiled', '3']);
+});
+
 it('prevents staff from accessing another event meal', function () {
     $company = Company::create(['name' => 'Acme']);
     $otherCompany = Company::create(['name' => 'Other']);

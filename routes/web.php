@@ -219,6 +219,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/accommodation/invite-self-select', [AccommodationController::class, 'inviteSelfSelect'])->name('events.accommodation.invite-self-select');
         Route::post('/events/{event}/accommodation/mark-all-required', [AccommodationController::class, 'markAllRequired'])->name('events.accommodation.mark-all-required');
         Route::get('/events/{event}/accommodation/registrations/{registration}/room-preview', [AccommodationController::class, 'previewRoomPicker'])->name('events.accommodation.room-preview');
+        Route::get('/events/{event}/accommodation/report', [AccommodationController::class, 'report'])->name('events.accommodation.report');
         Route::get('/events/{event}/accommodation/report.csv', [AccommodationController::class, 'exportCsv'])->name('events.accommodation.report.csv');
         Route::get('/events/{event}/accommodation/report.pdf', [AccommodationController::class, 'exportPdf'])->name('events.accommodation.report.pdf');
         Route::delete('/events/{event}/accommodation/inventory/{type}/{id}', [AccommodationController::class, 'destroyInventory'])->name('events.accommodation.inventory.destroy');

@@ -289,6 +289,28 @@ it('lets a manager skip the immediate email on a manual assignment and send it l
     Notification::assertSentTo($held->fresh()->participant, RoomAssigned::class);
 });
 
+it('shows occupancy, assignment methods, and follow-up lists on the accommodation report', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    $room = accommodationRoom($event, 'A01', 2);
+    $checkedIn = accommodationRegistration($event, 'Checked In Guest');
+    $notCheckedIn = accommodationRegistration($event, 'Pending Checkin Guest');
+    $stillNeedsRoom = accommodationRegistration($event, 'Waiting Guest');
+    $checkedIn->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'checked_in', 'method' => 'manual']);
+    $notCheckedIn->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
+
+    $this->actingAs($manager)->get(route('events.accommodation.report', $event))
+        ->assertOk()
+        ->assertSee('Accommodation report')
+        ->assertSee('Checked In Guest')
+        ->assertSee('Pending Checkin Guest')
+        ->assertSee('Waiting Guest')
+        ->assertSeeInOrder(['Assignment method', 'manual', 'automatic'])
+        ->assertSeeInOrder(['Not checked in', 'Pending Checkin Guest'])
+        ->assertSeeInOrder(['Still need a room', 'Waiting Guest']);
+});
+
 it('exports rooming lists and protects inventory with assignment history', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);

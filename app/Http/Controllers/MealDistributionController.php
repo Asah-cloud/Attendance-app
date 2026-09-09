@@ -417,18 +417,25 @@ class MealDistributionController extends Controller
         $wasteLogs = MealWasteLog::query()->whereHas('distribution', fn ($query) => $query->where('event_id', $event->id))
             ->with(['distribution', 'loggedBy'])->latest('occurred_at')->get();
 
-        $confirmedByCategory = $event->registrations()
+        $eligibleRegistrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->when($event->food_registration_required, fn ($query) => $query->where('food_required', true))
             ->with('participant')
-            ->get()
-            ->countBy(fn ($registration) => $registration->participant->category ?: 'Unspecified');
+            ->get();
+        $confirmedByCategory = $eligibleRegistrations->countBy(fn ($registration) => $registration->participant->category ?: 'Unspecified');
         $forecast = $meals->map(fn ($meal) => [
             'meal' => $meal,
             'suggested' => $confirmedByCategory->sum(fn ($count, $category) => $count * $meal->entitlementFor($category === 'Unspecified' ? null : $category)),
         ]);
 
         $byStation = $collections->groupBy(fn ($collection) => $collection->station?->name ?? 'Unassigned')
+            ->map(fn ($group) => $group->sum('quantity'))
+            ->sortDesc();
+
+        $servedParticipantIds = $collections->pluck('participant_id')->unique();
+        $noShows = $eligibleRegistrations->reject(fn ($registration) => $servedParticipantIds->contains($registration->participant_id))->values();
+
+        $wasteByReason = $wasteLogs->groupBy(fn ($log) => trim($log->reason) ?: 'Unspecified')
             ->map(fn ($group) => $group->sum('quantity'))
             ->sortDesc();
 
@@ -440,6 +447,8 @@ class MealDistributionController extends Controller
             'wasteLogs' => $wasteLogs,
             'forecast' => $forecast,
             'byStation' => $byStation,
+            'noShows' => $noShows,
+            'wasteByReason' => $wasteByReason,
             'totalStock' => $meals->sum('total_portions'),
             'totalIssued' => $collections->sum('quantity'),
             'totalWasted' => $wasteLogs->sum('quantity'),

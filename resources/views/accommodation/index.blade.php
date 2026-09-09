@@ -25,6 +25,7 @@
 
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="text-xl font-black text-slate-900">Assign rooms automatically</h2><p class="mt-1 text-sm text-slate-500">People who need a step-free room are placed first. Rooms then fill in the priority order you set.</p></div><div class="flex flex-wrap gap-2">
+                <a href="{{ route('events.accommodation.report', $event) }}" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-800">View report</a>
                 <a href="{{ route('events.accommodation.report.csv', $event) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">CSV report</a>
                 <a href="{{ route('events.accommodation.report.pdf', $event) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">PDF report</a>
                 <form method="POST" action="{{ route('events.accommodation.notify', $event) }}">@csrf<button class="rounded-xl border border-indigo-200 px-4 py-2 text-sm font-black text-indigo-700" @disabled(!$event->accommodation_published)>Email rooms to attendees</button></form>
