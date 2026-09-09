@@ -31,9 +31,15 @@
                 <a href="{{ route('events.accommodation.report.pdf', $event) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">PDF report</a>
                 <form method="POST" action="{{ route('events.accommodation.notify', $event) }}">@csrf<button class="rounded-xl border border-indigo-200 px-4 py-2 text-sm font-black text-indigo-700" @disabled(!$event->accommodation_published)>Email rooms to attendees</button></form>
                 <form method="POST" action="{{ route('events.accommodation.invite-self-select', $event) }}">@csrf<button class="rounded-xl border border-indigo-200 px-4 py-2 text-sm font-black text-indigo-700">Send selection link</button></form>
-                <a href="{{ route('events.accommodation.index', [$event, 'preview' => 1]) }}" class="rounded-xl border border-indigo-200 px-4 py-2 text-sm font-black text-indigo-700">Preview</a>
-                <form method="POST" action="{{ route('events.accommodation.allocate', $event) }}">@csrf<button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white" @disabled(!$event->accommodation_enabled)>Assign rooms now</button></form>
             </div></div>
+            <form method="POST" action="{{ route('events.accommodation.allocate', $event) }}" class="mt-4 flex flex-wrap items-center gap-2 rounded-2xl bg-indigo-50 p-3">@csrf
+                <span class="text-xs font-black text-indigo-900">Assign only</span>
+                <select name="category" class="rounded-lg border-indigo-200 text-sm"><option value="">All categories</option>@foreach($allocationCategories as $option)<option value="{{ $option }}" @selected($allocationCategory === $option)>{{ $option }}</option>@endforeach</select>
+                <select name="gender" class="rounded-lg border-indigo-200 text-sm"><option value="">All genders</option>@foreach($allocationGenders as $option)<option value="{{ $option }}" @selected($allocationGender === $option)>{{ $option }}</option>@endforeach</select>
+                <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white" @disabled(!$event->accommodation_enabled)>Assign rooms now</button>
+                <a href="{{ route('events.accommodation.index', array_filter(['preview' => 1, 'category' => $allocationCategory, 'gender' => $allocationGender])) }}" class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-black text-indigo-700">Preview selection</a>
+                <span class="text-xs text-indigo-700">Choose a category, gender, or both. Run each group separately; people already assigned are left unchanged.</span>
+            </form>
             <p class="mt-3 text-xs font-bold {{ $event->accommodationSelfSelectOpen() ? 'text-emerald-600' : 'text-slate-400' }}">
                 @if($event->accommodationSelfSelectOpen())
                     Attendees can pick their own room until {{ $event->accommodation_self_select_closes_at->format('D j M Y, g:ia') }} — "Send selection link" emails them the link.
@@ -201,7 +207,18 @@
 
                                                     <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                                         @forelse($floor->rooms as $room)
-                                                            <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                                            <details data-acc="room-{{ $room->id }}" class="group rounded-xl border border-slate-200 bg-white">
+                                                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-3 hover:bg-slate-50">
+                                                                    <span class="min-w-0">
+                                                                        <span class="block truncate text-sm font-black text-slate-900">Room {{ $room->name }}</span>
+                                                                        <span class="text-xs text-slate-500">{{ $room->active_assignments_count }} of {{ $room->capacity }} bed{{ $room->capacity === 1 ? '' : 's' }} occupied</span>
+                                                                    </span>
+                                                                    <span class="flex items-center gap-2">
+                                                                        @if($room->status !== 'active')<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800">{{ $room->status }}</span>@endif
+                                                                        <svg class="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                                                                    </span>
+                                                                </summary>
+                                                                <div class="border-t border-slate-100 p-3">
                                                                 <form method="POST" action="{{ route('events.accommodation.rooms.update', [$event, $room]) }}">@csrf @method('PATCH')
                                                                     <div class="flex items-center justify-between gap-2">
                                                                         <input name="name" value="{{ $room->name }}" required class="w-28 rounded border-slate-300 p-1 text-xs font-bold">
@@ -217,7 +234,8 @@
                                                                     <button class="mt-2 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save room</button>
                                                                 </form>
                                                                 <form method="POST" action="{{ route('events.accommodation.inventory.destroy', [$event, 'room', $room->id]) }}">@csrf @method('DELETE')<button class="mt-2 text-xs font-bold text-red-600">Delete empty room</button></form>
-                                                            </div>
+                                                                </div>
+                                                            </details>
                                                         @empty
                                                             <p class="text-xs text-slate-400">No rooms yet — use "+ Add room".</p>
                                                         @endforelse

@@ -28,12 +28,16 @@ class AccommodationController extends Controller
         $registrations = $event->registrations()->with(['participant', 'roomAssignment.room.floor.block.site'])
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->orderByDesc('accommodation_required')->get();
-        $preview = request()->boolean('preview') ? $allocator->preview($event) : null;
+        $allocationCategory = trim((string) request('category')) ?: null;
+        $allocationGender = trim((string) request('gender')) ?: null;
+        $preview = request()->boolean('preview') ? $allocator->preview($event, $allocationCategory, $allocationGender) : null;
         $rooms = $event->accommodationSites->flatMap->blocks->flatMap->floors->flatMap->rooms;
         $requiredCount = $registrations->where('accommodation_required', true)->count();
         $assignedCount = $registrations->filter(fn ($r) => $r->roomAssignment && in_array($r->roomAssignment->status, ['assigned', 'checked_in'], true))->count();
+        $allocationCategories = $registrations->pluck('participant.category')->filter(fn ($value) => filled($value))->unique()->sort()->values();
+        $allocationGenders = $registrations->pluck('participant.gender')->filter(fn ($value) => filled($value))->unique()->sort()->values();
 
-        return view('accommodation.index', compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount'));
+        return view('accommodation.index', compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount', 'allocationCategories', 'allocationGenders', 'allocationCategory', 'allocationGender'));
     }
 
     public function updateSettings(Request $request, Event $event): RedirectResponse
@@ -233,12 +237,20 @@ class AccommodationController extends Controller
     {
         $this->authorize('update', $event);
         abort_unless($event->accommodation_enabled, 422, 'Tick "Use accommodation" and Save before assigning rooms.');
-        $result = $allocator->commit($event, $request->user()->id);
+        $data = $request->validate([
+            'category' => ['nullable', 'string', 'max:255'],
+            'gender' => ['nullable', 'string', 'max:255'],
+        ]);
+        $category = trim((string) ($data['category'] ?? '')) ?: null;
+        $gender = trim((string) ($data['gender'] ?? '')) ?: null;
+        $result = $allocator->commit($event, $request->user()->id, $category, $gender);
         if ($event->accommodation_published) {
             $this->sendPendingNotifications($event);
         }
 
-        return back()->with('success', "{$result['assigned']} attendee(s) allocated. {$result['unallocated']} remain unallocated.");
+        $scope = collect([$category ? "category: {$category}" : null, $gender ? "gender: {$gender}" : null])->filter()->implode(', ');
+
+        return back()->with('success', "{$result['assigned']} attendee(s) allocated".($scope ? " ({$scope})" : '').". {$result['unallocated']} remain unallocated in this selection.");
     }
 
     public function assign(Request $request, Event $event, EventRegistration $registration): RedirectResponse

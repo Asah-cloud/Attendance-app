@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 class RoomAllocationService
 {
     /** @return array{proposals: Collection, unallocated: Collection} */
-    public function preview(Event $event): array
+    public function preview(Event $event, ?string $category = null, ?string $gender = null): array
     {
         $rooms = $this->eligibleRooms($event);
         $occupancy = $rooms->mapWithKeys(fn ($room) => [$room->id => $room->active_assignments_count]);
@@ -26,7 +26,9 @@ class RoomAllocationService
             ->whereDoesntHave('roomAssignment')
             ->orderByDesc('accessibility_required')
             ->orderBy('registered_at')
-            ->get();
+            ->get()
+            ->filter(fn (EventRegistration $registration) => $this->matchesParticipantFilter($registration, $category, $gender))
+            ->values();
 
         foreach ($registrations as $registration) {
             $room = $rooms->first(function ($room) use ($registration, $occupancy) {
@@ -47,12 +49,12 @@ class RoomAllocationService
     }
 
     /** @return array{assigned: int, unallocated: int} */
-    public function commit(Event $event, ?int $userId): array
+    public function commit(Event $event, ?int $userId, ?string $category = null, ?string $gender = null): array
     {
-        return DB::transaction(function () use ($event, $userId) {
+        return DB::transaction(function () use ($event, $userId, $category, $gender) {
             // Serialize allocation runs for this event and recalculate against locked rows.
             Event::query()->lockForUpdate()->findOrFail($event->id);
-            $result = $this->preview($event);
+            $result = $this->preview($event, $category, $gender);
             $assigned = 0;
 
             foreach ($result['proposals'] as $proposal) {
@@ -232,6 +234,15 @@ class RoomAllocationService
         $value = preg_replace('/\s+/', ' ', strtolower(trim((string) $value)));
 
         return $value !== '' ? $value : null;
+    }
+
+    /** Limit a bulk run to a participant category and/or gender, when selected. */
+    private function matchesParticipantFilter(EventRegistration $registration, ?string $category, ?string $gender): bool
+    {
+        $participant = $registration->participant;
+
+        return (! $this->normalizeText($category) || $this->normalizeText($category) === $this->normalizeText($participant->category))
+            && (! $this->normalizeGender($gender) || $this->normalizeGender($gender) === $this->normalizeGender($participant->gender));
     }
 
     private function reason(EventRegistration $registration, AccommodationRoom $room): string

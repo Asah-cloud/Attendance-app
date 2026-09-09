@@ -71,6 +71,22 @@ it('honours gender category and accessibility restrictions', function () {
     expect($female->fresh()->roomAssignment->accommodation_room_id)->toBe($accessibleRoom->id);
 });
 
+it('allocates only the selected participant category and gender', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    $room = accommodationRoom($event, 'A01', 3);
+    $vipWoman = accommodationRegistration($event, 'VIP Woman', 'Female', 'VIP');
+    $vipMan = accommodationRegistration($event, 'VIP Man', 'Male', 'VIP');
+    $generalWoman = accommodationRegistration($event, 'General Woman', 'Female', 'General');
+
+    $result = app(RoomAllocationService::class)->commit($event, null, 'VIP', 'Female');
+
+    expect($result)->toBe(['assigned' => 1, 'unallocated' => 0]);
+    expect($vipWoman->fresh()->roomAssignment->accommodation_room_id)->toBe($room->id);
+    expect($vipMan->fresh()->roomAssignment)->toBeNull();
+    expect($generalWoman->fresh()->roomAssignment)->toBeNull();
+});
+
 it('lets a manager build inventory and blocks another company manager', function () {
     $company = Company::create(['name' => 'Acme']);
     $other = Company::create(['name' => 'Other']);
