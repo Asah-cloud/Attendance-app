@@ -21,8 +21,6 @@
             <x-summary-card title="Allocated" :value="$assignedCount" color="purple" />
         </div>
 
-        @if(session('success'))<div class="rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{{ session('success') }}</div>@endif
-        @if(session('error'))<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ $errors->first() }}</div>@endif
 
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
