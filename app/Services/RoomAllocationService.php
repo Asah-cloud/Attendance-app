@@ -59,7 +59,8 @@ class RoomAllocationService
 
             foreach ($result['proposals'] as $proposal) {
                 $room = AccommodationRoom::query()->lockForUpdate()->findOrFail($proposal['room']->id);
-                $used = $room->activeAssignments()->lockForUpdate()->count();
+                // Postgres rejects "SELECT count(*) ... FOR UPDATE"; lock the rows, then count in PHP.
+                $used = $room->activeAssignments()->lockForUpdate()->get()->count();
                 if ($used >= $room->capacity) {
                     continue;
                 }
@@ -104,7 +105,7 @@ class RoomAllocationService
             }
 
             $room = AccommodationRoom::query()->lockForUpdate()->findOrFail($candidate->id);
-            if ($room->activeAssignments()->lockForUpdate()->count() >= $room->capacity) {
+            if ($room->activeAssignments()->lockForUpdate()->get()->count() >= $room->capacity) {
                 return null;
             }
 
@@ -179,7 +180,7 @@ class RoomAllocationService
             if (! $this->matches($registration, $room)) {
                 return ['ok' => false, 'message' => 'That room does not match your requirements.'];
             }
-            if ($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->lockForUpdate()->count() >= $room->capacity) {
+            if ($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->lockForUpdate()->get()->count() >= $room->capacity) {
                 return ['ok' => false, 'message' => 'Sorry, that room was just taken. Please choose another.'];
             }
 
