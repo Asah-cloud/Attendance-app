@@ -51,6 +51,22 @@
             @endif
         </section>
 
+        @if($cloneableEvents->isNotEmpty())
+        <section class="rounded-3xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm">
+            <h2 class="text-xl font-black text-indigo-900">Copy setup from a previous event</h2>
+            <p class="mt-1 text-sm text-indigo-800">Adds any locations, buildings, floors and rooms that aren't already here by name. Capacities and restrictions come along; assigned occupants never do.</p>
+            <form method="POST" action="{{ route('events.accommodation.clone', $event) }}" class="mt-4 flex flex-wrap items-center gap-2">@csrf
+                <select name="source_event_id" required class="rounded-lg border-indigo-200 text-sm">
+                    <option value="">Choose an event…</option>
+                    @foreach($cloneableEvents as $option)
+                        <option value="{{ $option->id }}">{{ $option->title }} @if($option->event_date)({{ $option->event_date->format('M Y') }})@endif</option>
+                    @endforeach
+                </select>
+                <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Copy inventory</button>
+            </form>
+        </section>
+        @endif
+
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xl font-black text-slate-900">Buildings &amp; rooms</h2>

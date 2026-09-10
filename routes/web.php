@@ -205,6 +205,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/accommodation/floors/{floor}/rooms', [AccommodationController::class, 'storeRoom'])->name('events.accommodation.rooms.store');
         Route::post('/events/{event}/accommodation/floors/{floor}/rooms/bulk', [AccommodationController::class, 'bulkStoreRooms'])->name('events.accommodation.rooms.bulk');
         Route::post('/events/{event}/accommodation/import', [AccommodationController::class, 'importRooms'])->name('events.accommodation.import');
+        Route::post('/events/{event}/accommodation/clone', [AccommodationController::class, 'cloneFrom'])->name('events.accommodation.clone');
         Route::patch('/events/{event}/accommodation/sites/{site}', [AccommodationController::class, 'updateSite'])->name('events.accommodation.sites.update');
         Route::patch('/events/{event}/accommodation/blocks/{block}', [AccommodationController::class, 'updateBlock'])->name('events.accommodation.blocks.update');
         Route::patch('/events/{event}/accommodation/floors/{floor}', [AccommodationController::class, 'updateFloor'])->name('events.accommodation.floors.update');

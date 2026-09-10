@@ -16,6 +16,7 @@ use App\Services\RoomAllocationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -36,8 +37,66 @@ class AccommodationController extends Controller
         $assignedCount = $registrations->filter(fn ($r) => $r->roomAssignment && in_array($r->roomAssignment->status, ['assigned', 'checked_in'], true))->count();
         $allocationCategories = $registrations->pluck('participant.category')->filter(fn ($value) => filled($value))->unique()->sort()->values();
         $allocationGenders = $registrations->pluck('participant.gender')->filter(fn ($value) => filled($value))->unique()->sort()->values();
+        $cloneableEvents = Event::where('company_id', $event->company_id)
+            ->where('id', '!=', $event->id)
+            ->whereHas('accommodationSites')
+            ->orderByDesc('event_date')
+            ->get(['id', 'title', 'event_date']);
 
-        return view('accommodation.index', compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount', 'allocationCategories', 'allocationGenders', 'allocationCategory', 'allocationGender'));
+        return view('accommodation.index', compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount', 'allocationCategories', 'allocationGenders', 'allocationCategory', 'allocationGender', 'cloneableEvents'));
+    }
+
+    public function cloneFrom(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $data = $request->validate(['source_event_id' => ['required', 'integer', Rule::exists('events', 'id')]]);
+        $source = Event::findOrFail($data['source_event_id']);
+        $this->authorize('update', $source);
+        abort_if($source->id === $event->id, 422, 'Choose a different event to copy from.');
+
+        $source->load('accommodationSites.blocks.floors.rooms');
+        $counts = ['site' => 0, 'block' => 0, 'floor' => 0, 'room' => 0];
+
+        DB::transaction(function () use ($event, $source, &$counts): void {
+            foreach ($source->accommodationSites as $site) {
+                $destSite = $event->accommodationSites()->firstOrCreate(
+                    ['name' => $site->name],
+                    ['address' => $site->address, 'check_in_instructions' => $site->check_in_instructions, 'is_active' => true]
+                );
+                $counts['site'] += $destSite->wasRecentlyCreated ? 1 : 0;
+
+                foreach ($site->blocks as $block) {
+                    $destBlock = $destSite->blocks()->firstOrCreate(
+                        ['name' => $block->name],
+                        ['gender_restriction' => $block->gender_restriction, 'category_restriction' => $block->category_restriction, 'priority' => $block->priority, 'is_active' => true]
+                    );
+                    $counts['block'] += $destBlock->wasRecentlyCreated ? 1 : 0;
+
+                    foreach ($block->floors as $floor) {
+                        $destFloor = $destBlock->floors()->firstOrCreate(
+                            ['name' => $floor->name],
+                            ['is_accessible' => $floor->is_accessible, 'priority' => $floor->priority, 'is_active' => true]
+                        );
+                        $counts['floor'] += $destFloor->wasRecentlyCreated ? 1 : 0;
+
+                        foreach ($floor->rooms as $room) {
+                            $destRoom = $destFloor->rooms()->firstOrCreate(
+                                ['name' => $room->name],
+                                ['capacity' => $room->capacity, 'gender_restriction' => $room->gender_restriction, 'category_restriction' => $room->category_restriction, 'is_accessible' => $room->is_accessible, 'priority' => $room->priority, 'notes' => $room->notes, 'status' => AccommodationRoom::STATUS_ACTIVE]
+                            );
+                            $counts['room'] += $destRoom->wasRecentlyCreated ? 1 : 0;
+                        }
+                    }
+                }
+            }
+        });
+
+        $total = array_sum($counts);
+        if ($total === 0) {
+            return back()->with('success', "Nothing new to copy — this event's inventory already matches {$source->title}.");
+        }
+
+        return back()->with('success', "Copied {$counts['site']} location(s), {$counts['block']} building(s), {$counts['floor']} floor(s) and {$counts['room']} room(s) from \"{$source->title}\". No occupants were copied.");
     }
 
     public function report(Event $event): View

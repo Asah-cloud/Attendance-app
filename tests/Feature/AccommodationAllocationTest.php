@@ -312,6 +312,45 @@ it('shows occupancy, assignment methods, and follow-up lists on the accommodatio
         ->assertSeeInOrder(['Still need a room', 'Waiting Guest']);
 });
 
+it('clones sites, blocks, floors and rooms from a past event without assignments', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $source = Event::create(['company_id' => $company->id, 'title' => 'Summit 2025', 'event_date' => now()->subYear()]);
+    $destination = Event::create(['company_id' => $company->id, 'title' => 'Summit 2026', 'event_date' => now()]);
+    $room = accommodationRoom($source, 'A01', 2, ['block' => 'Block A']);
+    $guest = accommodationRegistration($source, 'Past Guest');
+    $guest->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
+
+    $this->actingAs($manager)->get(route('events.accommodation.index', $destination))
+        ->assertOk()->assertSee('Copy setup from a previous event')->assertSee('Summit 2025');
+
+    $this->actingAs($manager)->post(route('events.accommodation.clone', $destination), ['source_event_id' => $source->id])
+        ->assertRedirect();
+
+    $destination->refresh();
+    $this->assertDatabaseHas('accommodation_sites', ['event_id' => $destination->id, 'name' => 'Main Campus']);
+    $this->assertDatabaseHas('accommodation_rooms', ['name' => 'A01', 'capacity' => 2]);
+    $destinationRoom = AccommodationRoom::whereHas('floor.block.site', fn ($q) => $q->where('event_id', $destination->id))
+        ->where('name', 'A01')->firstOrFail();
+    expect($destinationRoom->assignments()->count())->toBe(0);
+
+    // Re-running is idempotent — no duplicate rows.
+    $this->actingAs($manager)->post(route('events.accommodation.clone', $destination), ['source_event_id' => $source->id]);
+    expect(AccommodationRoom::whereHas('floor.block.site', fn ($q) => $q->where('event_id', $destination->id))->where('name', 'A01')->count())->toBe(1);
+});
+
+it('refuses to clone accommodation inventory from another company\'s event', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $otherCompany = Company::create(['name' => 'Other']);
+    $manager = accommodationManager($company);
+    $source = Event::create(['company_id' => $otherCompany->id, 'title' => 'Other Summit', 'event_date' => now()]);
+    accommodationRoom($source, 'A01');
+    $destination = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+
+    $this->actingAs($manager)->post(route('events.accommodation.clone', $destination), ['source_event_id' => $source->id])
+        ->assertForbidden();
+});
+
 it('exports rooming lists and protects inventory with assignment history', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
