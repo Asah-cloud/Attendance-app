@@ -105,14 +105,16 @@ it('explains why a filtered assign run placed nobody instead of a silent success
     accommodationRoom($event, 'F01', 2, ['gender' => 'Female']);
     accommodationRegistration($event, 'Male Guest', 'Male', 'STAFF');
 
-    // Filter that matches nobody unassigned.
-    $this->actingAs($manager)->post(route('events.accommodation.allocate', $event), ['category' => 'VIP', 'gender' => ''])
-        ->assertRedirect(route('events.accommodation.index', ['event' => $event, 'preview' => 1, 'category' => 'VIP']))
+    // Filter that matches nobody unassigned — plain redirect back, no sticky ?preview=1.
+    $this->actingAs($manager)->from(route('events.accommodation.index', $event))
+        ->post(route('events.accommodation.allocate', $event), ['category' => 'VIP', 'gender' => ''])
+        ->assertRedirect(route('events.accommodation.index', $event))
         ->assertSessionHas('error', fn ($m) => str_contains($m, 'No unassigned attendee matches'));
 
     // Filter matches the Male STAFF guest, but no compatible room has a free bed.
-    $this->actingAs($manager)->post(route('events.accommodation.allocate', $event), ['category' => 'STAFF', 'gender' => ''])
-        ->assertRedirect(route('events.accommodation.index', ['event' => $event, 'preview' => 1, 'category' => 'STAFF']))
+    $this->actingAs($manager)->from(route('events.accommodation.index', $event))
+        ->post(route('events.accommodation.allocate', $event), ['category' => 'STAFF', 'gender' => ''])
+        ->assertRedirect(route('events.accommodation.index', $event))
         ->assertSessionHas('error', fn ($m) => str_contains($m, 'no active room has a free bed'));
 });
 

@@ -364,26 +364,18 @@ class AccommodationController extends Controller
         $scope = collect([$category ? "category: {$category}" : null, $gender ? "gender: {$gender}" : null])->filter()->implode(', ');
         $scopeLabel = $scope ? " for {$scope}" : '';
 
-        // Nothing was placed: say why, as an error, and drop the manager onto the
-        // preview so they can see each blocked attendee's reason instead of a
-        // success toast that vanishes before they've scrolled back to it.
+        // Plain redirect back — never auto-attach ?preview=1. The preview is a
+        // heavy per-run scan; it stays an explicit "Preview selection" click so
+        // it doesn't silently recompute on every refresh of a large event.
         if ($assigned === 0) {
-            $message = $unallocated > 0
-                ? "No rooms assigned{$scopeLabel}. {$unallocated} attendee(s) still need a room, but no active room has a free bed that matches their gender/category. Check the room restrictions or add rooms."
-                : "No unassigned attendee matches this selection{$scopeLabel}. Confirm they are confirmed and ticked as \"Needs room\".";
-
-            return redirect()->route('events.accommodation.index', array_filter([
-                'event' => $event, 'preview' => 1, 'category' => $category, 'gender' => $gender,
-            ]))->with('error', $message);
+            return back()->with('error', $unallocated > 0
+                ? "No rooms assigned{$scopeLabel}. {$unallocated} attendee(s) still need a room, but no active room has a free bed that matches their gender/category. Use \"Preview selection\" to see each one, or adjust the room restrictions."
+                : "No unassigned attendee matches this selection{$scopeLabel}. Confirm they are confirmed and ticked as \"Needs room\".");
         }
 
         $message = "Assigned rooms to {$assigned} attendee(s){$scopeLabel}.";
         if ($unallocated > 0) {
-            $message .= " {$unallocated} still need a room — see who below.";
-
-            return redirect()->route('events.accommodation.index', array_filter([
-                'event' => $event, 'preview' => 1, 'category' => $category, 'gender' => $gender,
-            ]))->with('success', $message);
+            $message .= " {$unallocated} still need a room — use \"Preview selection\" to see who.";
         }
 
         return back()->with('success', $message);

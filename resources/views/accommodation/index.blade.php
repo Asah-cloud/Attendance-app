@@ -37,7 +37,8 @@
                 <select name="gender" class="rounded-lg border-indigo-200 text-sm"><option value="">All genders</option>@foreach($allocationGenders as $option)<option value="{{ $option }}" @selected($allocationGender === $option)>{{ $option }}</option>@endforeach</select>
                 <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white" @disabled(!$event->accommodation_enabled)>Assign rooms now</button>
                 <a href="{{ route('events.accommodation.index', array_filter(['event' => $event, 'preview' => 1, 'category' => $allocationCategory, 'gender' => $allocationGender])) }}" class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-black text-indigo-700">Preview selection</a>
-                <span class="text-xs text-indigo-700">Choose a category, gender, or both. Run each group separately; people already assigned are left unchanged.</span>
+                @if($preview)<a href="{{ route('events.accommodation.index', $event) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-500">Hide preview</a>@endif
+                <span class="text-xs text-indigo-700">Choose a category, gender, or both. Run each group separately; people already assigned are left unchanged. Preview is a fresh calculation each time — it doesn't assign anything.</span>
             </form>
             <p class="mt-3 text-xs font-bold {{ $event->accommodationSelfSelectOpen() ? 'text-emerald-600' : 'text-slate-400' }}">
                 @if($event->accommodationSelfSelectOpen())
@@ -47,7 +48,10 @@
                 @endif
             </p>
             @if($preview)
-                <div class="mt-5 grid gap-4 lg:grid-cols-2"><div class="rounded-2xl bg-emerald-50 p-4"><h3 class="font-black text-emerald-900">{{ $preview['proposals']->count() }} proposed</h3>@foreach($preview['proposals'] as $proposal)<p class="mt-2 text-sm text-emerald-800">{{ $proposal['registration']->participant->name }} → {{ $proposal['room']->label() }}</p>@endforeach</div><div class="rounded-2xl bg-amber-50 p-4"><h3 class="font-black text-amber-900">{{ $preview['unallocated']->count() }} unallocated</h3>@foreach($preview['unallocated'] as $item)<p class="mt-2 text-sm text-amber-800">{{ $item['registration']->participant->name }} — {{ $item['reason'] }}</p>@endforeach</div></div>
+                <div class="mt-5 grid gap-4 lg:grid-cols-2">
+                    <div class="rounded-2xl bg-emerald-50 p-4"><h3 class="font-black text-emerald-900">{{ $preview['proposals']->count() }} proposed</h3>@foreach($preview['proposals']->take(100) as $proposal)<p class="mt-2 text-sm text-emerald-800">{{ $proposal['registration']->participant->name }} → {{ $proposal['room']->label() }}</p>@endforeach @if($preview['proposals']->count() > 100)<p class="mt-2 text-xs font-bold text-emerald-700">…and {{ $preview['proposals']->count() - 100 }} more. Run "Assign rooms now" to place them.</p>@endif</div>
+                    <div class="rounded-2xl bg-amber-50 p-4"><h3 class="font-black text-amber-900">{{ $preview['unallocated']->count() }} unallocated</h3>@foreach($preview['unallocated']->take(100) as $item)<p class="mt-2 text-sm text-amber-800">{{ $item['registration']->participant->name }} — {{ $item['reason'] }}</p>@endforeach @if($preview['unallocated']->count() > 100)<p class="mt-2 text-xs font-bold text-amber-700">…and {{ $preview['unallocated']->count() - 100 }} more with the same blocker.</p>@endif</div>
+                </div>
             @endif
         </section>
 
