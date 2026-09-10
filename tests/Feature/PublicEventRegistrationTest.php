@@ -409,11 +409,11 @@ it('shows the assigned room on badges once accommodation is published', function
     $room = $floor->rooms()->create(['name' => 'A01', 'capacity' => 2]);
     $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
 
+    // Badge shows only the bare room name — no block, no floor.
     $this->actingAs($manager)->get(route('events.badges', $event))
         ->assertOk()
-        ->assertSee('Block A')
-        ->assertSee('Ground')
-        ->assertSee('Room A01');
+        ->assertSee('A01')
+        ->assertDontSee('Block A · Ground · Room A01');
 
     $this->actingAs($manager)->get(route('events.badges.pdf', $event))
         ->assertOk()->assertHeader('content-type', 'application/pdf');

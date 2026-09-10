@@ -48,6 +48,19 @@ it('saves a full background design and movable fields with optional name initial
     expect(BadgeDesign::values($event, $registration)['name'])->toBe('Asah A. K. Isaac');
 });
 
+it('prints only the bare room name on the badge, without block or floor', function () {
+    [$event] = badgeStudioFixture();
+    $event->update(['accommodation_published' => true]);
+    $site = $event->accommodationSites()->create(['name' => 'Main']);
+    $block = $site->blocks()->create(['name' => 'Old Block']);
+    $floor = $block->floors()->create(['name' => 'First']);
+    $room = $floor->rooms()->create(['name' => 'OB-105', 'capacity' => 2]);
+    $registration = badgeRegistration($event);
+    $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
+
+    expect(BadgeDesign::values($event, $registration->fresh())['room'])->toBe('OB-105');
+});
+
 it('lets a manager select Poppins and prints a working PDF with it', function () {
     [$event, $manager] = badgeStudioFixture();
     badgeRegistration($event);
