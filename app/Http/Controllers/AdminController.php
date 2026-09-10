@@ -74,7 +74,7 @@ class AdminController extends Controller
 
         if (! $currentUser->hasRole('admin')) {
             if ($request->input('company_id') != $currentUser->company_id
-                || $request->input('role') !== 'usher') {
+                || ! in_array($request->input('role'), ['usher', 'audit_head', 'audit_staff'], true)) {
                 abort(403);
             }
         }
@@ -93,7 +93,12 @@ class AdminController extends Controller
             ->whereIn('id', $request->input('event_ids', []))
             ->where('company_id', $user->company_id)
             ->pluck('id');
-        $user->events()->sync($request->role === 'usher' ? $eventIds : []);
+        $user->events()->sync(in_array($request->role, ['usher', 'audit_head', 'audit_staff'], true) ? $eventIds : []);
+        if ($request->role !== 'audit_staff') {
+            $user->mealStations()->detach();
+        } else {
+            $user->mealStations()->detach($user->mealStations()->whereNotIn('event_id', $eventIds)->pluck('meal_stations.id'));
+        }
 
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully!');
     }

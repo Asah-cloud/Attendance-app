@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AttendanceConfirmationController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AuditAccessController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
@@ -147,6 +148,23 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::get('/events/{event}/summary/export', [SummaryReportController::class, 'download'])->name('reports.summary.export');
     Route::get('/events/{event}/summary/pdf', [SummaryReportController::class, 'downloadPdf'])->name('reports.summary.pdf');
 
+    Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
+    Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
+    Route::put('/events/{event}/meals/{meal}/stations', [MealDistributionController::class, 'updateStationAllocations'])->name('events.meals.stations.allocations.update');
+    Route::get('/events/{event}/meals/vouchers', [MealDistributionController::class, 'vouchers'])->name('events.meals.vouchers');
+    Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
+    Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
+    Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');
+    Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
+    Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
+    Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
+    Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->middleware('throttle:5,1')->name('events.meals.collections.reverse');
+
+    Route::post('/events/{event}/meals/stations/{station}/staff', [MealDistributionController::class, 'assignStaff'])->name('events.meals.stations.staff');
+    Route::get('/events/{event}/audit-access', [AuditAccessController::class, 'index'])->name('audit.approvals.index');
+    Route::post('/events/{event}/audit-access', [AuditAccessController::class, 'store'])->middleware('throttle:10,1')->name('audit.approvals.store');
+    Route::post('/events/{event}/audit-attendance-summary', [AuditAccessController::class, 'summary'])->middleware('throttle:5,1')->name('audit.attendance-summary');
+
     // --- SHARED MANAGEMENT ROUTES (Admins & Managers) ---
     Route::middleware(['role:admin|manager'])->group(function () {
         Route::get('/admin/users', [AdminController::class, 'index'])->name('admin.users.index');
@@ -181,21 +199,6 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/registration-fields', [EventRegistrationFormController::class, 'storeField'])->name('events.registration-fields.store');
         Route::patch('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'updateSystemField'])->name('events.registration-fields.update');
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
-
-        Route::patch('/events/{event}/meals/settings', [MealDistributionController::class, 'updateSettings'])->name('events.meals.settings');
-        Route::patch('/events/{event}/meals/registrations/{registration}', [MealDistributionController::class, 'updateRequirement'])->name('events.meals.requirements.update');
-        Route::post('/events/{event}/meals/mark-all-required', [MealDistributionController::class, 'markAllRequired'])->name('events.meals.mark-all-required');
-        Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
-        Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
-        Route::put('/events/{event}/meals/{meal}/stations', [MealDistributionController::class, 'updateStationAllocations'])->name('events.meals.stations.allocations.update');
-        Route::get('/events/{event}/meals/vouchers', [MealDistributionController::class, 'vouchers'])->name('events.meals.vouchers');
-        Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
-        Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
-        Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');
-        Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
-        Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
-        Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
-        Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->name('events.meals.collections.reverse');
 
         Route::get('/events/{event}/accommodation', [AccommodationController::class, 'index'])->name('events.accommodation.index');
         Route::patch('/events/{event}/accommodation/settings', [AccommodationController::class, 'updateSettings'])->name('events.accommodation.settings');

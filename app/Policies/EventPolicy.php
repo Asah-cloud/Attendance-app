@@ -46,6 +46,19 @@ class EventPolicy
             && $user->events()->whereKey($event->id)->exists();
     }
 
+    public function viewMeals(User $user, Event $event): bool
+    {
+        return $this->view($user, $event) || ($user->isAudit()
+            && $user->company_id !== null && $user->company_id === $event->company_id
+            && $user->events()->whereKey($event->id)->exists());
+    }
+
+    public function manageMeals(User $user, Event $event): bool
+    {
+        return $this->update($user, $event)
+            || ($user->hasRole('audit_head') && $this->viewMeals($user, $event));
+    }
+
     public function delete(User $user, Event $event): bool
     {
         return $this->update($user, $event);

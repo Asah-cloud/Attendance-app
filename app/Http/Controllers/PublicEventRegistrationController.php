@@ -73,7 +73,7 @@ class PublicEventRegistrationController extends Controller
                 'accommodation_required' => $event->accommodation_enabled && ($validated['accommodation_required'] ?? false),
                 'accessibility_required' => $event->accommodation_enabled && ($validated['accommodation_required'] ?? false) && ($validated['accessibility_required'] ?? false),
                 'accommodation_notes' => $event->accommodation_enabled ? ($validated['accommodation_notes'] ?? null) : null,
-                'food_required' => $event->food_registration_required && ($validated['food_required'] ?? false),
+                'food_required' => false,
             ]);
         });
 

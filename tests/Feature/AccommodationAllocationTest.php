@@ -18,6 +18,16 @@ use Illuminate\Support\Facades\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
 
+beforeEach(function () {
+    // Keep tests offline: without this, public-registration tests make a real
+    // Arkesel API call whose 402 response trips ArkeselBalanceAlerter into a
+    // User::role('admin') lookup that throws when the role isn't seeded.
+    Notification::fake();
+    foreach (['admin', 'manager', 'usher'] as $role) {
+        Role::findOrCreate($role);
+    }
+});
+
 function accommodationManager(Company $company): User
 {
     Role::findOrCreate('manager');

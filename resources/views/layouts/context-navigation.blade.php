@@ -5,7 +5,7 @@
     $user = auth()->user();
 
     $section = match (true) {
-        request()->routeIs('events.*', 'reports.*') => ['Events', route('events.index')],
+        request()->routeIs('events.*', 'reports.*', 'audit.*') => ['Events', route('events.index')],
         request()->routeIs('admin.users.*', 'admin.register-*') => ['Team', route('admin.users.index')],
         request()->routeIs('companies.history.*') => ['Company history', route('companies.history.index')],
         request()->routeIs('companies.*') => ['Companies', route('companies.index')],
@@ -19,6 +19,7 @@
     };
 
     $pageLabel = match (true) {
+        request()->routeIs('audit.*') => 'Scoped approvals',
         request()->routeIs('events.create') => 'Create event',
         request()->routeIs('events.edit') => 'Edit event',
         request()->routeIs('events.attendance') => 'Attendance',
@@ -71,6 +72,13 @@
         $user->can('update', $contextEvent) ? ['label' => 'Billing', 'route' => route('events.billing.show', $contextEvent), 'active' => request()->routeIs('events.billing.*')] : null,
         $user->can('update', $contextEvent) ? ['label' => 'Settings', 'route' => route('events.edit', $contextEvent), 'active' => request()->routeIs('events.edit')] : null,
     ])) : [];
+    if ($contextEvent && $user->isAudit() && ! $user->can('update', $contextEvent)) {
+        $eventLinks = [
+            ['label' => 'Food operations', 'route' => route('events.meals.index', $contextEvent), 'active' => request()->routeIs('events.meals.index', 'events.meals.scanner')],
+            ['label' => 'Food reports', 'route' => route('events.meals.report', $contextEvent), 'active' => request()->routeIs('events.meals.report')],
+            ['label' => 'Attendance &mdash; approval required', 'route' => route('audit.approvals.index', $contextEvent), 'active' => request()->routeIs('audit.*')],
+        ];
+    }
 @endphp
 
 @if($section && ! request()->routeIs('dashboard'))
@@ -81,7 +89,7 @@
             @if($contextEvent)
                 <a href="{{ $section[1] }}" class="hover:text-blue-700">{{ $section[0] }}</a>
                 <span class="text-slate-300">/</span>
-                <a href="{{ route('events.attendance', $contextEvent) }}" class="max-w-48 truncate text-slate-700 hover:text-blue-700">{{ $contextEvent->title }}</a>
+                <a href="{{ route($user->isAudit() ? 'events.meals.index' : 'events.attendance', $contextEvent) }}" class="max-w-48 truncate text-slate-700 hover:text-blue-700">{{ $contextEvent->title }}</a>
                 @if($pageLabel)<span class="text-slate-300">/</span><span class="text-blue-700" aria-current="page">{{ $pageLabel }}</span>@endif
             @elseif($pageLabel)
                 <a href="{{ $section[1] }}" class="hover:text-blue-700">{{ $section[0] }}</a>

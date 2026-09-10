@@ -34,9 +34,9 @@ class RegisteredUserController extends Controller
             ? Company::orderBy('name')->get()
             : Company::query()->whereKey($currentUser->company_id)->get();
 
-        // A manager may only ever create ushers in their own company; an admin
+        // A manager may create attendance and audit staff in their own company; an admin
         // may create any staff role for any company.
-        $assignableRoles = $isAdmin ? ['usher', 'manager', 'admin'] : ['usher'];
+        $assignableRoles = $isAdmin ? ['usher', 'audit_head', 'audit_staff', 'manager', 'admin'] : ['usher', 'audit_head', 'audit_staff'];
 
         return view('admin.users.create', compact('companies', 'assignableRoles', 'isAdmin'));
     }
@@ -58,9 +58,10 @@ class RegisteredUserController extends Controller
         $currentUser = Auth::user();
         $isAdmin = $currentUser->hasRole('admin');
 
-        // A manager can only ever create an usher within their own company,
+        // A manager can create only attendance and audit roles within their own company,
         // regardless of what the submitted form fields say.
-        $role = $isAdmin ? $request->string('role')->toString() : 'usher';
+        $role = $request->string('role')->toString();
+        abort_unless($isAdmin || in_array($role, ['usher', 'audit_head', 'audit_staff'], true), 403);
         $companyId = $isAdmin ? $request->input('company_id') : $currentUser->company_id;
 
         $temporaryPassword = Str::password(16);
@@ -77,11 +78,11 @@ class RegisteredUserController extends Controller
 
         $user->assignRole(Role::findOrCreate($role));
 
-        // An usher assigned to a company starts staffed on every event currently
+        // New staff assigned to a company start staffed on every event currently
         // in that company, so they aren't left with zero access until a manager
         // remembers to go pick events one by one. Future new events still need
         // an explicit assignment via Edit Member.
-        if ($role === 'usher' && $companyId) {
+        if (in_array($role, ['usher', 'audit_head', 'audit_staff'], true) && $companyId) {
             $user->events()->sync(Event::where('company_id', $companyId)->pluck('id'));
         }
 

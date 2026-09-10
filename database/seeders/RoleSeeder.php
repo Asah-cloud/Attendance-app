@@ -33,6 +33,9 @@ class RoleSeeder extends Seeder
         $usher = Role::firstOrCreate(['name' => 'usher']);
         $usher->syncPermissions(['view events', 'mark attendance', 'view reports']);
 
+        Role::findOrCreate('audit_head', 'web');
+        Role::findOrCreate('audit_staff', 'web');
+
         $manager = Role::firstOrCreate(['name' => 'manager']);
         $manager->syncPermissions(Permission::all());
 

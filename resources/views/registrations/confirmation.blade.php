@@ -42,12 +42,7 @@
                 </div>
             @endif
 
-            @if($registration->food_required)
-                <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-5">
-                    <p class="text-xs font-black uppercase tracking-widest text-amber-700">Food</p>
-                    <p class="mt-2 text-sm font-bold text-amber-800">You're signed up for food at this event. Show your check-in QR at the food table.</p>
-                </div>
-            @endif
+
 
             @if($registration->status === \App\Models\EventRegistration::STATUS_CONFIRMED)
                 <div class="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-6">

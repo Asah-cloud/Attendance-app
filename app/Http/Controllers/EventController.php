@@ -25,6 +25,10 @@ class EventController extends Controller
     public function index()
     {
         $user = auth()->user();
+        if ($user->isAudit() && ! $user->hasAnyRole(['admin', 'manager'])) {
+            return view('audit.events', ['events' => $user->events()->where('company_id', $user->company_id)->withCount('confirmedParticipants')->orderBy('event_date')->get()]);
+        }
+
         $companies = collect(); // Default empty collection for non-admins
 
         if ($user->hasRole('admin')) {
@@ -156,7 +160,7 @@ class EventController extends Controller
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
         $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
-        $validated['food_registration_required'] = $request->boolean('food_registration_required');
+        $validated['food_registration_required'] = false;
         $validated['day'] = 1;
 
         // Enforce active subscription limits
@@ -232,7 +236,7 @@ class EventController extends Controller
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
         $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
-        $validated['food_registration_required'] = $request->boolean('food_registration_required');
+        $validated['food_registration_required'] = false;
         if (! $validated['has_arrival_session'] && (int) $event->day === 0) {
             $validated['day'] = 1;
         }

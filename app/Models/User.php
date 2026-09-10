@@ -46,6 +46,21 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(Participant::class, 'linked_user_id');
     }
 
+    public function isAudit(): bool
+    {
+        return $this->hasAnyRole(['audit_head', 'audit_staff']);
+    }
+
+    public function isAuditStaff(): bool
+    {
+        return $this->hasRole('audit_staff') && ! $this->hasAnyRole(['admin', 'manager', 'audit_head']);
+    }
+
+    public function mealStations(): BelongsToMany
+    {
+        return $this->belongsToMany(MealStation::class, 'meal_station_staff')->withTimestamps();
+    }
+
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_staff')->withTimestamps();

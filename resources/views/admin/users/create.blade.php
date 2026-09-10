@@ -5,8 +5,8 @@
         <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
                 <p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Team & access</p>
-                <h2 class="mt-1 text-2xl font-black">Add an usher</h2>
-                <p class="mt-2 text-sm text-slate-500">Create a staff login for attendance and QR scanning.</p>
+                <h2 class="mt-1 text-2xl font-black">Add a team member</h2>
+                <p class="mt-2 text-sm text-slate-500">Create a staff login for attendance or food operations.</p>
             </div>
         </div>
 
@@ -34,20 +34,16 @@
 
                 <div>
                     <x-input-label for="role" :value="__('Role')" />
-                    @if($isAdmin)
-                        <select id="role" name="role" class="mt-1 block w-full rounded-xl border-slate-300 focus:border-blue-500 focus:ring-blue-500" required>
+<select id="role" name="role" class="mt-1 block w-full rounded-xl border-slate-300 focus:border-blue-500 focus:ring-blue-500" required>
                             @foreach($assignableRoles as $roleOption)
-                                <option value="{{ $roleOption }}" {{ old('role', 'usher') === $roleOption ? 'selected' : '' }}>{{ ucfirst($roleOption) }}</option>
+                                <option value="{{ $roleOption }}" {{ old('role', 'usher') === $roleOption ? 'selected' : '' }}>{{ str($roleOption)->replace('_', ' ')->title() }}</option>
                             @endforeach
                         </select>
-                    @else
-                        <x-text-input class="mt-1 block w-full bg-slate-50" type="text" value="Usher" disabled />
-                        <input type="hidden" name="role" value="usher">
-                    @endif
+
                     <x-input-error :messages="$errors->get('role')" class="mt-1" />
                 </div>
             </div>
-            <p class="text-xs leading-5 text-slate-500">An usher is automatically staffed on every event currently in the selected company. You can fine-tune which events they can access afterwards from Edit Member.</p>
+            <p class="text-xs leading-5 text-slate-500">New staff are automatically assigned on every event currently in the selected company. You can fine-tune which events they can access afterwards from Edit Member.</p>
             <p class="text-xs leading-5 text-slate-500">A temporary password will be emailed to them. They'll be required to set their own password the first time they sign in.</p>
             <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
                 <a href="{{ route('admin.users.index') }}" class="rounded-xl border border-slate-200 px-5 py-3 text-center text-sm font-extrabold text-slate-600 hover:bg-slate-50">Cancel</a>

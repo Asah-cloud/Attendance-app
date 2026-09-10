@@ -31,7 +31,7 @@
                     <tr class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                         <th class="px-6 py-4">Full Name</th>
                         <th class="px-6 py-4">Contact Info</th>
-                        <th class="px-6 py-4">Spatie Role</th>
+                        <th class="px-6 py-4">Role</th>
                         <th class="px-6 py-4">Category</th>
                         <th class="px-6 py-4 text-right">Management</th>
                     </tr>
@@ -52,7 +52,7 @@
                             <td class="px-6 py-4">
                                 @foreach($user->roles as $role)
                                     <span class="px-2 py-1 bg-blue-100 text-blue-700 text-[9px] font-black uppercase rounded-md tracking-tighter">
-                                        {{ $role->name }}
+                                        {{ str($role->name)->replace('_', ' ')->title() }}
                                     </span>
                                 @endforeach
                             </td>

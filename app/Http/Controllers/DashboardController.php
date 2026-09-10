@@ -19,6 +19,10 @@ class DashboardController extends Controller
     {
         $user = request()->user();
 
+        if ($user->isAudit() && ! $user->hasAnyRole(['admin', 'manager'])) {
+            return view('audit.events', ['events' => $user->events()->where('company_id', $user->company_id)->withCount('confirmedParticipants')->orderBy('event_date')->get()]);
+        }
+
         if ($user->hasRole('admin')) {
             return $this->adminDashboard();
         }

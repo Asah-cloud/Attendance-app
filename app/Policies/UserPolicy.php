@@ -16,6 +16,6 @@ class UserPolicy
         return $actor->hasRole('manager')
             && $actor->company_id !== null
             && $actor->company_id === $subject->company_id
-            && $subject->hasRole('usher');
+            && $subject->hasAnyRole(['usher', 'audit_head', 'audit_staff']);
     }
 }

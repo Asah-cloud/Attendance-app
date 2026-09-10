@@ -31,7 +31,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Events assigned to this usher</label>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Assigned events</label>
                         <select name="event_ids[]" multiple class="w-full min-h-40 border-gray-100 bg-gray-50/50 rounded-2xl focus:ring-blue-500 focus:border-blue-500 font-bold text-gray-700">
                             @foreach($events as $event)
                                 <option value="{{ $event->id }}" {{ in_array($event->id, old('event_ids', $user->events->pluck('id')->all())) ? 'selected' : '' }}>
@@ -39,7 +39,7 @@
                                 </option>
                             @endforeach
                         </select>
-                        <p class="text-[9px] text-gray-400 mt-2 ml-1 italic">These assignments grant attendance access; they do not register the usher as an attendee.</p>
+                        <p class="text-[9px] text-gray-400 mt-2 ml-1 italic">Assignments grant access according to the staff role; they do not register staff as attendees.</p>
                     </div>
 
                     <!-- Email Address -->
@@ -54,9 +54,9 @@
                     <div>
                         <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">System Access Level</label>
                         <select name="role" class="w-full border-gray-100 bg-gray-50/50 rounded-2xl focus:ring-blue-500 focus:border-blue-500 font-bold text-gray-700">
-                            <option value="usher" {{ $user->hasRole('usher') ? 'selected' : '' }}>Usher (Attendance Staff)</option>
-                            <option value="manager" {{ $user->hasRole('manager') ? 'selected' : '' }}>Manager (Company Owner)</option>
-                            <option value="admin" {{ $user->hasRole('admin') ? 'selected' : '' }}>Administrator (Full Access)</option>
+                            @foreach(auth()->user()->hasRole('admin') ? ['usher', 'audit_head', 'audit_staff', 'manager', 'admin'] : ['usher', 'audit_head', 'audit_staff'] as $roleOption)
+                                <option value="{{ $roleOption }}" @selected(old('role', $user->role) === $roleOption)>{{ str($roleOption)->replace('_', ' ')->title() }}</option>
+                            @endforeach
                         </select>
                         @error('role') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>

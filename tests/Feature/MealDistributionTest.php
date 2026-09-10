@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
-    foreach (['manager', 'usher'] as $role) {
+    Notification::fake();
+    foreach (['admin', 'manager', 'usher'] as $role) {
         Role::findOrCreate($role);
     }
 });
@@ -394,7 +395,7 @@ it('renders one printable voucher per confirmed attendee with the shared attenda
         ->assertSee('Food voucher');
 });
 
-it('blocks issuing food to an attendee who did not sign up once sign-up is required', function () {
+it('serves confirmed attendees even when legacy food signup flags are enabled', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'food_registration_required' => true]);
@@ -402,7 +403,7 @@ it('blocks issuing food to an attendee who did not sign up once sign-up is requi
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
 
     $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $registration->registration_code])
-        ->assertStatus(422)->assertJsonPath('successful', false);
+        ->assertOk()->assertJsonPath('successful', true);
 
     $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
         'registration_code' => $registration->registration_code, 'override' => true, 'override_reason' => 'Speaker allowance',
@@ -423,45 +424,15 @@ it('issues food normally once an attendee is marked as needing it', function () 
         ->assertOk()->assertJsonPath('successful', true);
 });
 
-it('keeps already-confirmed attendees eligible when food sign-up is turned on, but not new ones', function () {
-    $company = Company::create(['name' => 'Acme']);
-    $manager = mealUser('manager', $company);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
-    $existing = mealRegistration($event, 'Already Confirmed');
-    $pending = mealRegistration($event, 'Still Pending');
-    $pending->update(['status' => EventRegistration::STATUS_PENDING]);
-
-    $this->actingAs($manager)->patch(route('events.meals.settings', $event), ['food_registration_required' => 1])
-        ->assertSessionHas('success');
-
-    expect($existing->fresh()->food_required)->toBeTrue()
-        ->and($pending->fresh()->food_required)->toBeFalse();
-
-    $newcomer = mealRegistration($event, 'New After The Switch');
-    expect($newcomer->fresh()->food_required)->toBeFalse();
-});
-
-it('lets a manager toggle an individual attendee and bulk-mark everyone as needing food', function () {
+it('removes food signup controls from the food dashboard', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'food_registration_required' => true]);
-    $registration = mealRegistration($event);
-
-    $this->actingAs($manager)->patch(route('events.meals.requirements.update', [$event, $registration]), ['food_required' => 1])
-        ->assertRedirect();
-    expect($registration->fresh()->food_required)->toBeTrue();
-
-    $second = mealRegistration($event, 'Second Guest');
-    $this->actingAs($manager)->post(route('events.meals.mark-all-required', $event), ['confirm_title' => 'wrong'])
-        ->assertSessionHas('error');
-    expect($second->fresh()->food_required)->toBeFalse();
-
-    $this->actingAs($manager)->post(route('events.meals.mark-all-required', $event), ['confirm_title' => 'Summit'])
-        ->assertSessionHas('success');
-    expect($second->fresh()->food_required)->toBeTrue();
+    $this->actingAs($manager)->get(route('events.meals.index', $event))->assertOk()
+        ->assertDontSee('Require food sign-up')->assertSee('Every confirmed participant is eligible');
 });
 
-it('only counts attendees who ticked the food box during public registration', function () {
+it('no longer requires or records food signup during public registration', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-food', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'food_registration_required' => true]);
     $event->ensureSystemRegistrationFields();
@@ -476,7 +447,7 @@ it('only counts attendees who ticked the food box during public registration', f
         'gender' => 'Male', 'category' => 'General', 'consent' => 1,
     ])->assertRedirect();
 
-    expect(EventRegistration::whereHas('participant', fn ($q) => $q->where('email', 'wants@example.com'))->firstOrFail()->food_required)->toBeTrue()
+    expect(EventRegistration::whereHas('participant', fn ($q) => $q->where('email', 'wants@example.com'))->firstOrFail()->food_required)->toBeFalse()
         ->and(EventRegistration::whereHas('participant', fn ($q) => $q->where('email', 'nofood@example.com'))->firstOrFail()->food_required)->toBeFalse();
 });
 

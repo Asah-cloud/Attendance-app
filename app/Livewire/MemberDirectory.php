@@ -37,7 +37,7 @@ class MemberDirectory extends Component
 
         // 2. Filter out imported list ('member' role)
         // Only show administrative and management roles on this page
-        $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['usher', 'manager', 'admin']));
+        $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['usher', 'audit_head', 'audit_staff', 'manager', 'admin']));
 
         // 3. Multitenancy isolation check
         // If the logged-in user is NOT a Super Admin, restrict them to their company's users

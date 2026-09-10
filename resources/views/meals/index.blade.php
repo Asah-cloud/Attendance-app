@@ -3,9 +3,16 @@
 
     <x-event-closed-banner :event="$event" />
 
-    <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and use attendee QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) for this event.</p></div>@can('update', $event)<div class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
+    <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and use attendee QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) for this event.</p></div>@can('manageMeals', $event)<div class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
 
-    @can('update', $event)
+    <div class="mb-6 flex flex-wrap gap-4 rounded-xl bg-blue-50 p-5">
+        <span><strong>{{ $confirmedCount }}</strong> confirmed participants</span>
+        <span><strong>{{ $checkedInCount }}</strong> checked-in participants</span>
+        <span>Every confirmed participant is eligible for meals.</span>
+        <a class="font-bold text-blue-700" href="{{ route('audit.approvals.index', $event) }}">Approval codes / restricted sections</a>
+    </div>
+    @if($errors->any())<p class="mb-5 rounded-xl bg-red-50 p-4 text-red-700">{{ $errors->first() }}</p>@endif
+    @can('manageMeals', $event)
         <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm" @if($errors->any()) open @endif>
             <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">+ Create food distribution</summary>
             <form method="POST" action="{{ route('events.meals.store', $event) }}" class="grid gap-5 border-t border-slate-100 p-6 sm:grid-cols-2">
@@ -14,7 +21,7 @@
                 <div><label class="text-xs font-black uppercase text-slate-500">Available portions</label><input name="total_portions" type="number" min="1" value="{{ old('total_portions') }}" required class="mt-2 w-full rounded-xl border-slate-200">@error('total_portions')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror</div>
                 <div><label class="text-xs font-black uppercase text-slate-500">Opens at (optional)</label><input name="opens_at" type="datetime-local" value="{{ old('opens_at') }}" class="mt-2 w-full rounded-xl border-slate-200"></div>
                 <div><label class="text-xs font-black uppercase text-slate-500">Closes at (optional)</label><input name="closes_at" type="datetime-local" value="{{ old('closes_at') }}" class="mt-2 w-full rounded-xl border-slate-200"></div>
-                <div><label class="text-xs font-black uppercase text-slate-500">Low stock alert threshold (optional)</label><input name="low_stock_threshold" type="number" min="0" value="{{ old('low_stock_threshold') }}" placeholder="e.g. 20" class="mt-2 w-full rounded-xl border-slate-200"><p class="mt-1 text-xs text-slate-400">Managers are notified once remaining stock drops to or below this number.</p></div>
+                <div><label class="text-xs font-black uppercase text-slate-500">Low stock alert threshold (optional)</label><input name="low_stock_threshold" type="number" min="0" value="{{ old('low_stock_threshold') }}" placeholder="e.g. 20" class="mt-2 w-full rounded-xl border-slate-200"><p class="mt-1 text-xs text-slate-400">Managers and assigned Audit Heads are notified once remaining stock drops to or below this number.</p></div>
                 <div><label class="text-xs font-black uppercase text-slate-500">Portion entitlements (optional)</label><textarea name="entitlements" rows="3" placeholder="VIP:2&#10;Staff:1" class="mt-2 w-full rounded-xl border-slate-200 font-mono text-xs"></textarea><p class="mt-1 text-xs text-slate-400">One "Category:portions" per line. Categories with no line here get 1 portion by default.</p></div>
                 <input type="hidden" name="is_active" value="1">
                 <div class="flex justify-end sm:col-span-2"><button class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-extrabold text-white">Create distribution</button></div>
@@ -22,59 +29,34 @@
         </details>
 
         <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">Serving stations ({{ $stations->count() }})</summary>
+            <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">Sharing points ({{ $stations->count() }})</summary>
             <form method="POST" action="{{ route('events.meals.stations.update', $event) }}" class="border-t border-slate-100 p-6">
                 @csrf
-                <label class="text-xs font-black uppercase text-slate-500">Station names, one per line</label>
+                <label class="text-xs font-black uppercase text-slate-500">Sharing point names, one per line</label>
                 <textarea name="stations" rows="3" placeholder="Gate A&#10;Gate B&#10;VIP Tent" class="mt-2 w-full rounded-xl border-slate-200 font-mono text-xs">{{ old('stations', $stations->pluck('name')->implode("\n")) }}</textarea>
-                <p class="mt-1 text-xs text-slate-400">Leave blank to remove station tracking. Staff pick their station once on the scanner page.</p>
-                <button class="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Save stations</button>
+                <p class="mt-1 text-xs text-slate-400">Existing sharing points with staff, allocated stock or collection history must be retained. Assign staff and allocate portions below.</p>
+                <button class="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Save sharing points</button>
             </form>
         </details>
 
-        <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm" @if($event->food_registration_required) open @endif>
-            <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">Food sign-up requirement</summary>
-            <form method="POST" action="{{ route('events.meals.settings', $event) }}" class="border-t border-slate-100 p-6">
-                @csrf @method('PATCH')
-                <label class="flex items-start gap-3">
-                    <input type="checkbox" name="food_registration_required" value="1" @checked($event->food_registration_required) class="mt-1 rounded border-slate-300 text-blue-600">
-                    <span>
-                        <span class="block text-sm font-black text-gray-900">Require food sign-up</span>
-                        <span class="mt-1 block text-xs leading-5 text-slate-500">When on, only attendees who asked for food during registration can collect it — the scanner blocks everyone else unless a manager overrides. Already-confirmed attendees are kept eligible the moment you turn this on. New registrations must tick a box to opt in.</span>
-                    </span>
-                </label>
-                <button class="mt-4 rounded-xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Save</button>
-            </form>
-        </details>
+    @endcan
 
-        @if($event->food_registration_required)
-            <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">Who needs food ({{ $registrations->where('food_required', true)->count() }} of {{ $registrations->count() }})</summary>
-                <div class="border-t border-slate-100 p-6">
-                    <details class="mb-4">
-                        <summary class="cursor-pointer text-xs font-black text-slate-500">Mark every confirmed attendee as needing food</summary>
-                        <form method="POST" action="{{ route('events.meals.mark-all-required', $event) }}" class="mt-3 flex flex-wrap items-center gap-2">
-                            @csrf
-                            <span class="text-xs text-slate-600">Type <strong>{{ $event->title }}</strong> to confirm:</span>
-                            <input name="confirm_title" placeholder="{{ $event->title }}" class="rounded-lg border-slate-300 text-xs">
-                            <button class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white">Apply</button>
-                        </form>
-                    </details>
-                    <div class="max-h-96 overflow-y-auto rounded-xl border border-slate-100">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-2">Attendee</th><th class="px-4 py-2">Needs food</th></tr></thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @forelse($registrations as $registration)
-                                    <tr><td class="px-4 py-2"><strong>{{ $registration->participant->name }}</strong><div class="text-xs text-slate-500">{{ $registration->participant->category ?: 'No category' }}</div></td><td class="px-4 py-2"><form method="POST" action="{{ route('events.meals.requirements.update', [$event, $registration]) }}">@csrf @method('PATCH')<label class="flex items-center gap-2"><input type="checkbox" name="food_required" value="1" onchange="this.form.requestSubmit()" @checked($registration->food_required)> {{ $registration->food_required ? 'Yes' : 'No' }}</label></form></td></tr>
-                                @empty
-                                    <tr><td colspan="2" class="p-6 text-center text-slate-500">No confirmed attendees yet.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </details>
-        @endif
+    @can('manageMeals', $event)
+    <details class="mb-6 rounded-2xl border bg-white p-6">
+        <summary class="cursor-pointer font-bold">Assign Audit Staff to sharing points</summary>
+        @forelse($stations as $station)
+        <form method="POST" action="{{ route('events.meals.stations.staff', [$event, $station]) }}" class="mt-5 border-t pt-4">
+            @csrf
+            <h3 class="font-bold">{{ $station->name }}</h3>
+            <div class="my-3 flex flex-wrap gap-4">
+                @forelse($auditStaff as $member)
+                <label><input type="checkbox" name="staff_ids[]" value="{{ $member->id }}" @checked($station->staff->contains('id', $member->id))> {{ $member->name }}</label>
+                @empty<p>Ask your manager to create and assign Audit Staff to this event.</p>@endforelse
+            </div>
+            <button class="rounded-lg bg-blue-600 px-4 py-2 text-white">Save staff assignment</button>
+        </form>
+        @empty<p class="mt-4">Create sharing points first.</p>@endforelse
+    </details>
     @endcan
 
     <div class="grid gap-5 lg:grid-cols-2">
@@ -82,8 +64,9 @@
             <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div class="flex items-start justify-between gap-4"><div><p class="text-xs font-black uppercase tracking-wider {{ $meal->isOpen() ? 'text-emerald-600' : 'text-slate-400' }}">{{ $meal->isOpen() ? 'Open now' : 'Closed' }}</p><h3 class="mt-2 text-xl font-black">{{ $meal->name }}</h3><p class="mt-2 text-xs text-slate-500">{{ $meal->opens_at?->format('M j, g:i A') ?? 'No opening time' }} — {{ $meal->closes_at?->format('M j, g:i A') ?? 'No closing time' }}</p></div><span class="rounded-full {{ $meal->isLowStock() ? 'bg-amber-100 text-amber-800' : 'bg-blue-50 text-blue-700' }} px-3 py-1 text-xs font-black">{{ $meal->remainingPortions() }} left</span></div>
                 <div class="mt-5 grid grid-cols-3 gap-3 text-center"><div class="rounded-xl bg-slate-50 p-3"><strong class="block text-lg">{{ $meal->total_portions }}</strong><span class="text-[10px] uppercase text-slate-500">Stock</span></div><div class="rounded-xl bg-slate-50 p-3"><strong class="block text-lg">{{ $meal->issuedPortions() }}</strong><span class="text-[10px] uppercase text-slate-500">Issued</span></div><div class="rounded-xl bg-slate-50 p-3"><strong class="block text-lg">{{ $meal->collections_count }}</strong><span class="text-[10px] uppercase text-slate-500">People</span></div></div>
-                <div class="mt-5 flex flex-wrap gap-2"><a href="{{ route('events.meals.scanner', [$event, $meal]) }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Open food scanner</a>@can('update', $event)<form method="POST" action="{{ route('events.meals.update', [$event, $meal]) }}">@csrf @method('PATCH')<input type="hidden" name="name" value="{{ $meal->name }}"><input type="hidden" name="total_portions" value="{{ $meal->total_portions }}"><input type="hidden" name="opens_at" value="{{ $meal->opens_at?->format('Y-m-d H:i:s') }}"><input type="hidden" name="closes_at" value="{{ $meal->closes_at?->format('Y-m-d H:i:s') }}"><input type="hidden" name="low_stock_threshold" value="{{ $meal->low_stock_threshold }}"><input type="hidden" name="entitlements" value="{{ $meal->entitlements->map(fn($e) => $e->category.':'.$e->portions_allowed)->implode("\n") }}"><input type="hidden" name="is_active" value="{{ $meal->is_active ? 0 : 1 }}"><button class="rounded-xl border border-slate-200 px-4 py-3 text-xs font-extrabold text-slate-600">{{ $meal->is_active ? 'Pause' : 'Activate' }}</button></form>@endcan</div>
-                @can('update', $event)
+                <p class="mt-3 text-sm text-slate-600">{{ max(0, $confirmedCount - $meal->collections_count) }} confirmed participants yet to collect this meal.</p>
+                <div class="mt-5 flex flex-wrap gap-2"><a href="{{ route('events.meals.scanner', [$event, $meal]) }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Open food scanner</a>@can('manageMeals', $event)<form method="POST" action="{{ route('events.meals.update', [$event, $meal]) }}">@csrf @method('PATCH')<input type="hidden" name="name" value="{{ $meal->name }}"><input type="hidden" name="total_portions" value="{{ $meal->total_portions }}"><input type="hidden" name="opens_at" value="{{ $meal->opens_at?->format('Y-m-d H:i:s') }}"><input type="hidden" name="closes_at" value="{{ $meal->closes_at?->format('Y-m-d H:i:s') }}"><input type="hidden" name="low_stock_threshold" value="{{ $meal->low_stock_threshold }}"><input type="hidden" name="entitlements" value="{{ $meal->entitlements->map(fn($e) => $e->category.':'.$e->portions_allowed)->implode("\n") }}"><input type="hidden" name="is_active" value="{{ $meal->is_active ? 0 : 1 }}"><button class="rounded-xl border border-slate-200 px-4 py-3 text-xs font-extrabold text-slate-600">{{ $meal->is_active ? 'Pause' : 'Activate' }}</button></form>@endcan</div>
+                @can('manageMeals', $event)
                     <details class="mt-5 border-t border-slate-100 pt-4">
                         <summary class="cursor-pointer text-xs font-black text-slate-500">Edit name, stock, entitlements, or serving time</summary>
                         <form method="POST" action="{{ route('events.meals.update', [$event, $meal]) }}" class="mt-4 grid gap-3 sm:grid-cols-2">

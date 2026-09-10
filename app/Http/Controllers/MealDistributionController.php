@@ -7,9 +7,11 @@ use App\Models\EventRegistration;
 use App\Models\MealCollection;
 use App\Models\MealCollectionAudit;
 use App\Models\MealDistribution;
+use App\Models\MealStation;
 use App\Models\MealWasteLog;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\MealStockLow;
+use App\Services\AuditApprovalService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -17,13 +19,14 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class MealDistributionController extends Controller
 {
     public function index(Event $event): View
     {
-        $this->authorize('view', $event);
+        $this->authorize('viewMeals', $event);
 
         $meals = $event->mealDistributions()
             ->withSum('collections', 'quantity')
@@ -33,61 +36,25 @@ class MealDistributionController extends Controller
             ->get();
         $stations = $event->mealStations()->orderBy('name')->get();
         $confirmedCount = $event->confirmedParticipants()->count();
-        $registrations = $event->registrations()
-            ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->with('participant')
-            ->orderByDesc('food_required')
-            ->get();
+        $checkedInCount = $event->attendances()->distinct()->count('participant_id');
+        $auditStaff = $event->staff()->where('company_id', $event->company_id)->role('audit_staff')->get();
+        $stations->load('staff');
+        if (request()->user()->isAuditStaff()) {
+            $stations = $this->staffStations($event)->get();
+            foreach ($meals as $meal) {
+                $meal->awaiting_collection_count = $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)->whereDoesntHave('mealCollections', fn ($q) => $q->where('meal_distribution_id', $meal->id))->count();
+                $this->scopeMealTotals($meal, $event);
+            }
 
-        return view('meals.index', compact('event', 'meals', 'stations', 'confirmedCount', 'registrations'));
-    }
-
-    public function updateSettings(Request $request, Event $event): RedirectResponse
-    {
-        $this->authorize('update', $event);
-        $wasRequired = $event->food_registration_required;
-        $nowRequired = $request->boolean('food_registration_required');
-        $event->update(['food_registration_required' => $nowRequired]);
-
-        $message = 'Food settings updated.';
-        if ($nowRequired && ! $wasRequired) {
-            $marked = $event->registrations()
-                ->where('status', EventRegistration::STATUS_CONFIRMED)
-                ->where('food_required', false)
-                ->update(['food_required' => true]);
-            $message .= " {$marked} already-confirmed attendee(s) were kept eligible for food. New registrations must now ask for food to be eligible.";
+            return view('audit.food', compact('event', 'meals', 'stations', 'confirmedCount', 'checkedInCount'));
         }
 
-        return back()->with('success', $message);
-    }
-
-    public function updateRequirement(Request $request, Event $event, EventRegistration $registration): RedirectResponse
-    {
-        $this->authorize('update', $event);
-        abort_unless($registration->event_id === $event->id, 404);
-        $registration->update(['food_required' => $request->boolean('food_required')]);
-
-        return back()->with('success', 'Food requirement updated.');
-    }
-
-    public function markAllRequired(Request $request, Event $event): RedirectResponse
-    {
-        $this->authorize('update', $event);
-        if (trim((string) $request->input('confirm_title')) !== $event->title) {
-            return back()->with('error', 'Type the exact event title to confirm.');
-        }
-
-        $count = $event->registrations()
-            ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->where('food_required', false)
-            ->update(['food_required' => true]);
-
-        return back()->with('success', "{$count} attendee(s) marked as needing food.");
+        return view('meals.index', compact('event', 'meals', 'stations', 'confirmedCount', 'checkedInCount', 'auditStaff'));
     }
 
     public function store(Request $request, Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $validated = $this->validateMeal($request);
         $meal = $event->mealDistributions()->create($validated);
         $this->syncEntitlements($meal, $request->string('entitlements')->toString());
@@ -97,10 +64,13 @@ class MealDistributionController extends Controller
 
     public function update(Request $request, Event $event, MealDistribution $meal): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
         $validated = $this->validateMeal($request);
         $issued = $meal->collections()->sum('quantity');
+        if ($validated['total_portions'] < $meal->stationAllocations()->sum('allocated_portions')) {
+            return back()->withErrors(['total_portions' => 'Stock cannot be lower than existing sharing point allocations.']);
+        }
         if ($validated['total_portions'] < $issued) {
             return back()->withErrors(['total_portions' => "Stock cannot be lower than the {$issued} portions already issued."])->withInput();
         }
@@ -115,7 +85,7 @@ class MealDistributionController extends Controller
 
     public function destroy(Event $event, MealDistribution $meal): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
         abort_if($meal->collections()->exists(), 422, 'A distribution with collections cannot be deleted.');
         $meal->delete();
@@ -125,17 +95,25 @@ class MealDistributionController extends Controller
 
     public function updateStations(Request $request, Event $event): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $names = collect(preg_split('/\r\n|\r|\n/', $request->string('stations')->toString()))
             ->map(fn ($name) => trim($name))
             ->filter()
             ->unique()
             ->values();
 
+        $request->validate(['stations' => ['nullable', 'string', 'max:10000']]);
         DB::transaction(function () use ($event, $names): void {
-            $event->mealStations()->delete();
+            $removed = $event->mealStations()->whereNotIn('name', $names)->get();
+            foreach ($removed as $station) {
+                if (MealCollection::where('meal_station_id', $station->id)->exists()
+                    || $station->allocations()->exists() || $station->staff()->exists()) {
+                    throw ValidationException::withMessages(['stations' => 'A sharing point with stock, assigned staff or collection history cannot be removed.']);
+                }
+                $station->delete();
+            }
             foreach ($names as $name) {
-                $event->mealStations()->create(['name' => $name]);
+                $event->mealStations()->firstOrCreate(['name' => $name]);
             }
         });
 
@@ -144,7 +122,7 @@ class MealDistributionController extends Controller
 
     public function updateStationAllocations(Request $request, Event $event, MealDistribution $meal): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
 
         $validated = $request->validate([
@@ -154,6 +132,17 @@ class MealDistributionController extends Controller
         $allocations = $validated['allocations'] ?? [];
 
         DB::transaction(function () use ($event, $meal, $allocations): void {
+            $meal = MealDistribution::query()->lockForUpdate()->findOrFail($meal->id);
+            $stationIds = $event->mealStations()->pluck('id');
+            if (collect($allocations)->keys()->diff($stationIds)->isNotEmpty() || array_sum($allocations) > $meal->total_portions) {
+                throw ValidationException::withMessages(['allocations' => 'Allocate only to this event\'s sharing points, within the total meal stock.']);
+            }
+            foreach ($stationIds as $stationId) {
+                $issued = $meal->issuedPortionsAtStation($stationId);
+                if ($issued > 0 && (! isset($allocations[$stationId]) || $allocations[$stationId] < $issued)) {
+                    throw ValidationException::withMessages(['allocations' => 'A sharing point allocation cannot be lower than portions already served there.']);
+                }
+            }
             foreach ($event->mealStations()->pluck('id') as $stationId) {
                 $portions = $allocations[$stationId] ?? null;
 
@@ -175,10 +164,11 @@ class MealDistributionController extends Controller
 
     public function scanner(Request $request, Event $event, MealDistribution $meal): View
     {
-        $this->authorize('scanAttendance', $event);
+        $this->authorize('viewMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
         $meal->loadSum('collections', 'quantity');
-        $stations = $event->mealStations()->orderBy('name')->get();
+        $stations = $this->staffStations($event)->orderBy('name')->get();
+        $this->scopeMealTotals($meal, $event);
 
         $matches = collect();
         if ($request->filled('q')) {
@@ -187,23 +177,24 @@ class MealDistributionController extends Controller
                 ->where('status', EventRegistration::STATUS_CONFIRMED)
                 ->whereHas('participant', fn ($query) => $query
                     ->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%"))
+                    ->when(! $request->user()->isAudit(), fn ($q) => $q->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
                 ->with(['participant', 'mealCollections' => fn ($query) => $query->where('meal_distribution_id', $meal->id)])
                 ->limit(10)
                 ->get();
         }
 
-        $recent = $meal->collections()->with(['participant', 'issuer', 'station'])->latest('collected_at')->limit(10)->get();
+        $recent = $meal->collections()->when(request()->user()->isAuditStaff(), fn ($q) => $q->whereIn('meal_station_id', $this->staffStations($event)->select('meal_stations.id')))->with(['participant', 'issuer', 'station'])->latest('collected_at')->limit(10)->get();
 
         return view('meals.scanner', compact('event', 'meal', 'matches', 'recent', 'stations'));
     }
 
     public function status(Event $event, MealDistribution $meal): JsonResponse
     {
-        $this->authorize('scanAttendance', $event);
+        $this->authorize('viewMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
         $meal->loadSum('collections', 'quantity');
+
+        $this->scopeMealTotals($meal, $event);
 
         return response()->json([
             'remaining' => $meal->remainingPortions(),
@@ -216,7 +207,7 @@ class MealDistributionController extends Controller
 
     public function issue(Request $request, Event $event, MealDistribution $meal): JsonResponse|RedirectResponse
     {
-        $this->authorize('scanAttendance', $event);
+        $this->authorize('viewMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
 
         if (in_array($event->status, ['closed', 'cancelled'], true)) {
@@ -227,7 +218,8 @@ class MealDistributionController extends Controller
             'registration_code' => ['required', 'string', 'max:100'],
             'override' => ['nullable', 'boolean'],
             'override_reason' => ['nullable', 'string', 'max:500', 'required_if:override,1'],
-            'meal_station_id' => ['nullable', Rule::exists('meal_stations', 'id')->where('event_id', $event->id)],
+            'approval_code' => ['nullable', 'string', 'max:100'],
+            'meal_station_id' => [request()->user()->isAuditStaff() ? 'required' : 'nullable', Rule::exists('meal_stations', 'id')->where('event_id', $event->id)],
             'scanned_at' => ['nullable', 'date'],
         ]);
 
@@ -241,17 +233,16 @@ class MealDistributionController extends Controller
         }
 
         $override = $request->boolean('override');
-        if ($override && ! $request->user()->can('update', $event)) {
-            abort(403);
+        if ($request->user()->isAuditStaff()) {
+            abort_unless($this->staffStations($event)->whereKey($validated['meal_station_id'])->exists(), 403);
         }
-
-        if ($event->food_registration_required && ! $registration->food_required && ! $override) {
-            return $this->issueResponse($request, false, "{$registration->participant->name} did not sign up for food. A manager can override this.", 422);
+        if ($override && ! $request->user()->can('manageMeals', $event)) {
+            abort_unless($request->user()->isAuditStaff(), 403);
         }
 
         $collectedAt = isset($validated['scanned_at']) ? min(now(), Carbon::parse($validated['scanned_at'])) : now();
 
-        $result = DB::transaction(function () use ($meal, $registration, $request, $override, $validated, $collectedAt): array {
+        $result = DB::transaction(function () use ($event, $meal, $registration, $request, $override, $validated, $collectedAt): array {
             $lockedMeal = MealDistribution::query()->lockForUpdate()->findOrFail($meal->id);
             $entitlement = $lockedMeal->entitlementFor($registration->participant->category);
             $collection = MealCollection::query()
@@ -273,11 +264,20 @@ class MealDistributionController extends Controller
             $stationId = $validated['meal_station_id'] ?? null;
             if ($stationId) {
                 $allocated = $lockedMeal->allocatedPortionsFor((int) $stationId);
+                if ($request->user()->isAuditStaff() && $allocated === null) {
+                    throw ValidationException::withMessages(['meal_station_id' => 'Ask your Audit Head to allocate stock to this sharing point first.']);
+                }
                 if ($allocated !== null && $lockedMeal->issuedPortionsAtStation((int) $stationId) >= $allocated && ! $override) {
                     return [false, 'No portions remain allocated to this station.', 422];
                 }
             }
 
+            if ($collection && $request->user()->isAuditStaff() && $collection->meal_station_id != ($validated['meal_station_id'] ?? null)) {
+                throw ValidationException::withMessages(['meal_station_id' => 'Additional portions must be issued at the original sharing point.']);
+            }
+            if ($override && ! $request->user()->can('manageMeals', $event)) {
+                app(AuditApprovalService::class)->consume($request, $event, 'override', $meal->id, $registration->id);
+            }
             if ($collection) {
                 $collection->increment('quantity');
                 $collection->update([
@@ -322,11 +322,19 @@ class MealDistributionController extends Controller
 
     public function reverse(Event $event, MealDistribution $meal, MealCollection $collection): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('viewMeals', $event);
+        abort_unless(request()->user()->can('manageMeals', $event) || request()->user()->isAuditStaff(), 403);
+        request()->validate(['reason' => [request()->user()->isAudit() ? 'required' : 'nullable', 'string', 'max:500']]);
+        if (request()->user()->isAuditStaff()) {
+            abort_unless($this->staffStations($event)->whereKey($collection->meal_station_id)->exists(), 403);
+        }
         $this->ensureMealBelongsToEvent($meal, $event);
         abort_unless($collection->meal_distribution_id === $meal->id, 404);
         DB::transaction(function () use ($event, $meal, $collection): void {
             $locked = MealCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            if (! request()->user()->can('manageMeals', $event)) {
+                app(AuditApprovalService::class)->consume(request(), $event, 'reverse', $meal->id, $collection->id);
+            }
             MealCollectionAudit::create([
                 'event_id' => $event->id,
                 'meal_distribution_id' => $meal->id,
@@ -335,7 +343,7 @@ class MealDistributionController extends Controller
                 'performed_by' => request()->user()->id,
                 'action' => 'reversed',
                 'quantity_change' => -1,
-                'reason' => 'Portion reversed by a manager.',
+                'reason' => request('reason') ?: 'Portion reversed by a manager.',
                 'occurred_at' => now(),
             ]);
             if ($locked->quantity > 1) {
@@ -350,7 +358,7 @@ class MealDistributionController extends Controller
 
     public function logWaste(Request $request, Event $event, MealDistribution $meal): RedirectResponse
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:1'],
@@ -364,11 +372,11 @@ class MealDistributionController extends Controller
 
     public function vouchers(Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $event->loadMissing('company');
         $registrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->when($event->food_registration_required, fn ($query) => $query->where('food_required', true))
+
             ->with('participant')
             ->get();
         $meals = $event->mealDistributions()->with('entitlements')->orderBy('opens_at')->get();
@@ -378,21 +386,29 @@ class MealDistributionController extends Controller
 
     public function report(Event $event): View
     {
-        $this->authorize('update', $event);
+        $this->authorize('viewMeals', $event);
+        if (request()->user()->isAuditStaff()) {
+            $collections = MealCollection::whereHas('distribution', fn ($q) => $q->where('event_id', $event->id))
+                ->whereIn('meal_station_id', $this->staffStations($event)->select('meal_stations.id'))
+                ->with(['participant', 'distribution', 'station'])->latest('collected_at')->paginate(30);
+
+            return view('audit.report', compact('event', 'collections'));
+        }
+        $this->authorize('manageMeals', $event);
 
         return view('meals.report', $this->reportData($event));
     }
 
     public function exportCsv(Event $event)
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
         $collections = $this->reportData($event)['collections'];
 
         return response()->streamDownload(function () use ($collections): void {
             $output = fopen('php://output', 'w');
             fputcsv($output, ['Distribution', 'Attendee', 'Category', 'Dietary notes', 'Email', 'Phone', 'Station', 'Portions', 'Override', 'Override reason', 'Issued by', 'Last served']);
             foreach ($collections as $collection) {
-                fputcsv($output, [$collection->distribution->name, $collection->participant->name, $collection->participant->category, $collection->participant->dietary_notes, $collection->participant->email, $collection->participant->phone, $collection->station?->name, $collection->quantity, $collection->was_overridden ? 'Yes' : 'No', $collection->override_reason, $collection->issuer?->name, $collection->collected_at?->format('Y-m-d H:i:s')]);
+                fputcsv($output, [$collection->distribution->name, $collection->participant->name, $collection->participant->category, $collection->participant->dietary_notes, request()->user()->isAudit() ? '' : $collection->participant->email, request()->user()->isAudit() ? '' : $collection->participant->phone, $collection->station?->name, $collection->quantity, $collection->was_overridden ? 'Yes' : 'No', $collection->override_reason, $collection->issuer?->name, $collection->collected_at?->format('Y-m-d H:i:s')]);
             }
             fclose($output);
         }, 'food-report-'.str($event->title)->slug().'.csv', ['Content-Type' => 'text/csv']);
@@ -400,7 +416,7 @@ class MealDistributionController extends Controller
 
     public function exportPdf(Event $event)
     {
-        $this->authorize('update', $event);
+        $this->authorize('manageMeals', $event);
 
         return Pdf::loadView('meals.report-pdf', $this->reportData($event))
             ->setPaper('a4', 'landscape')
@@ -419,7 +435,7 @@ class MealDistributionController extends Controller
 
         $eligibleRegistrations = $event->registrations()
             ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->when($event->food_registration_required, fn ($query) => $query->where('food_required', true))
+
             ->with('participant')
             ->get();
         $confirmedByCategory = $eligibleRegistrations->countBy(fn ($registration) => $registration->participant->category ?: 'Unspecified');
@@ -474,6 +490,36 @@ class MealDistributionController extends Controller
         ];
     }
 
+    public function assignStaff(Request $request, Event $event, MealStation $station): RedirectResponse
+    {
+        $this->authorize('manageMeals', $event);
+        abort_unless($station->event_id === $event->id, 404);
+        $data = $request->validate(['staff_ids' => ['nullable', 'array'], 'staff_ids.*' => ['integer', 'distinct']]);
+        $ids = $data['staff_ids'] ?? [];
+        $allowed = $event->staff()->where('company_id', $event->company_id)->role('audit_staff')->whereIn('users.id', $ids)->pluck('users.id');
+        abort_unless($allowed->count() === count($ids), 403);
+        $station->staff()->sync($allowed);
+
+        return back()->with('success', 'Sharing point staff updated.');
+    }
+
+    private function staffStations(Event $event)
+    {
+        return $event->mealStations()->when(request()->user()->isAuditStaff(),
+            fn ($q) => $q->whereHas('staff', fn ($users) => $users->where('users.id', request()->user()->id)));
+    }
+
+    private function scopeMealTotals(MealDistribution $meal, Event $event): void
+    {
+        if (! request()->user()->isAuditStaff()) {
+            return;
+        }
+        $ids = $this->staffStations($event)->pluck('meal_stations.id');
+        $meal->total_portions = (int) $meal->stationAllocations()->whereIn('meal_station_id', $ids)->sum('allocated_portions');
+        $meal->collections_sum_quantity = (int) $meal->collections()->whereIn('meal_station_id', $ids)->sum('quantity');
+        $meal->collections_count = $meal->collections()->whereIn('meal_station_id', $ids)->count();
+    }
+
     private function validateMeal(Request $request): array
     {
         return $request->validate([
@@ -517,7 +563,9 @@ class MealDistributionController extends Controller
 
         $meal->update(['low_stock_notified_at' => now()]);
         $meal->loadMissing('event.company.users');
-        foreach ($meal->event->company->users->where('role', 'manager') as $manager) {
+        $recipients = $meal->event->company->users->filter(fn ($user) => $user->hasRole('manager')
+            || ($user->hasRole('audit_head') && $user->events()->whereKey($meal->event_id)->exists()));
+        foreach ($recipients as $manager) {
             NotifiesPerChannel::send($manager, new MealStockLow($meal));
         }
     }

@@ -10,7 +10,7 @@
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p class="text-xs font-black uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h1 class="mt-2 text-3xl font-black">{{ $meal->name }}</h1><p class="mt-2 text-sm text-slate-500">Scan the attendee's existing event QR code.</p></div><div class="rounded-2xl bg-blue-50 px-5 py-3 text-center"><strong class="block text-2xl text-blue-800" id="remaining-count">{{ $meal->remainingPortions() }}</strong><span class="text-[10px] font-black uppercase text-blue-600">Portions left</span></div></div>
 
             @if($stations->isNotEmpty())
-                <div class="mt-6"><label for="station-select" class="text-xs font-black uppercase text-slate-500">Serving station</label><select id="station-select" class="mt-2 w-full rounded-xl border-slate-300"><option value="">No station</option>@foreach($stations as $station)@php $stationRemaining = $meal->remainingPortionsAtStation($station->id); @endphp<option value="{{ $station->id }}">{{ $station->name }}{{ $stationRemaining !== null ? ' ('.$stationRemaining.' left)' : '' }}</option>@endforeach</select></div>
+                <div class="mt-6"><label for="station-select" class="text-xs font-black uppercase text-slate-500">Sharing point</label><select id="station-select" class="mt-2 w-full rounded-xl border-slate-300"><option value="">Choose sharing point</option>@foreach($stations as $station)@php $stationRemaining = $meal->remainingPortionsAtStation($station->id); @endphp<option value="{{ $station->id }}">{{ $station->name }}{{ $stationRemaining !== null ? ' ('.$stationRemaining.' left)' : '' }}</option>@endforeach</select></div>
             @endif
 
             <div id="qr-reader" class="mt-7 overflow-hidden rounded-2xl border border-slate-200"></div>
@@ -18,19 +18,67 @@
             <div id="pending-badge" class="mt-3 hidden rounded-xl bg-slate-100 p-3 text-xs font-black text-slate-700">Pending sync: <span id="pending-count">0</span> <button type="button" id="sync-now" class="ml-2 underline">Sync now</button></div>
             <form id="manual-scan" class="mt-6 border-t border-slate-100 pt-6"><label for="registration-code" class="text-xs font-black uppercase text-slate-500">Registration code</label><div class="mt-3 flex flex-col gap-3 sm:flex-row"><input id="registration-code" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Scan or paste code" required><button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Issue portion</button></div></form>
 
-            <form method="GET" class="mt-7 border-t border-slate-100 pt-6"><label class="text-xs font-black uppercase text-slate-500">Find attendee manually</label><div class="mt-3 flex gap-3"><input name="q" value="{{ request('q') }}" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Name, email, or phone"><button class="rounded-xl border border-slate-200 px-5 py-3 text-sm font-extrabold">Search</button></div></form>
-            @if(request()->filled('q'))<div class="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200">@forelse($matches as $registration)<div class="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"><div><p class="font-extrabold">{{ $registration->participant->name }}</p><p class="text-xs text-slate-500">{{ $registration->participant->email ?: $registration->participant->phone }}</p>@if($registration->participant->dietary_notes)<span class="mt-1 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700">{{ $registration->participant->dietary_notes }}</span>@endif</div>@if($registration->mealCollections->isNotEmpty())@can('update', $event)<form method="POST" action="{{ route('events.meals.issue', [$event, $meal]) }}" class="flex flex-col gap-2 sm:flex-row">@csrf<input type="hidden" name="registration_code" value="{{ $registration->registration_code }}"><input type="hidden" name="override" value="1"><input name="override_reason" required maxlength="500" placeholder="Reason for extra portion" class="rounded-lg border-slate-200 text-xs"><button class="rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white">Manager override</button></form>@else<span class="text-xs font-black text-amber-700">Entitlement reached</span>@endcan @elseif($event->food_registration_required && ! $registration->food_required)@can('update', $event)<form method="POST" action="{{ route('events.meals.issue', [$event, $meal]) }}" class="flex flex-col gap-2 sm:flex-row">@csrf<input type="hidden" name="registration_code" value="{{ $registration->registration_code }}"><input type="hidden" name="override" value="1"><input name="override_reason" required maxlength="500" placeholder="Reason for override" class="rounded-lg border-slate-200 text-xs"><button class="rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white">Override — didn't sign up</button></form>@else<span class="text-xs font-black text-amber-700">Didn't sign up for food</span>@endcan @else<form method="POST" action="{{ route('events.meals.issue', [$event, $meal]) }}">@csrf<input type="hidden" name="registration_code" value="{{ $registration->registration_code }}"><button class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Issue</button></form>@endif</div>@empty<p class="p-5 text-sm text-slate-500">No confirmed attendee found.</p>@endforelse</div>@endif
+            <form method="GET" class="mt-7 border-t border-slate-100 pt-6"><label class="text-xs font-black uppercase text-slate-500">Find attendee manually</label><div class="mt-3 flex gap-3"><input name="q" value="{{ request('q') }}" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Participant name"><button class="rounded-xl border border-slate-200 px-5 py-3 text-sm font-extrabold">Search</button></div></form>
+            @if($errors->any())<p class="my-4 rounded-xl bg-red-50 p-4 text-red-700">{{ $errors->first() }}</p>@endif
+            <p class="mt-4 text-sm"><a class="font-bold text-blue-700" href="{{ route('audit.approvals.index', $event) }}">Approval codes</a> — <a class="text-blue-700" href="{{ route('events.meals.index', $event) }}">Food dashboard</a></p>
+            @if(request()->filled('q'))
+            <div class="mt-4 divide-y rounded-xl border">
+                @forelse($matches as $registration)
+                @php $reached = $registration->mealCollections->sum('quantity') >= $meal->entitlementFor($registration->participant->category); @endphp
+                <div class="p-4">
+                    <p class="font-bold">{{ $registration->participant->name }}</p>
+                    <p class="text-xs text-slate-500">{{ $registration->registration_code }} — Confirmed</p>
+                    @if($registration->participant->dietary_notes)<p class="text-sm text-emerald-700">{{ $registration->participant->dietary_notes }}</p>@endif
+                    <p class="my-2 text-xs">{{ $registration->mealCollections->sum('quantity') }} portion(s) already collected for this meal.</p>
+                    <form method="POST" action="{{ route('events.meals.issue', [$event, $meal]) }}" class="meal-action-form mt-3 flex flex-wrap gap-2">
+                        @csrf
+                        <input type="hidden" name="registration_code" value="{{ $registration->registration_code }}">
+                        <input type="hidden" name="meal_station_id" class="selected-station">
+                        @if($reached)
+                            @if(auth()->user()->can('manageMeals', $event) || auth()->user()->isAuditStaff())
+                            <input type="hidden" name="override" value="1">
+                            <input name="override_reason" required maxlength="500" placeholder="Reason for extra portion" class="rounded-lg border-slate-300">
+                            @cannot('manageMeals', $event)<input name="approval_code" required autocomplete="off" placeholder="Audit Head approval code" class="rounded-lg border-slate-300">@endcannot
+                            <button class="rounded-lg bg-amber-500 px-4 py-2 font-bold">Issue approved extra portion</button>
+                            @else<p>Entitlement reached. Ask your manager for assistance.</p>@endif
+                        @else
+                            <button class="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white">Issue portion</button>
+                        @endif
+                    </form>
+                </div>
+                @empty<p class="p-4">No confirmed participant found.</p>@endforelse
+            </div>
+            @endif
         </section>
 
-        <aside class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h2 class="font-black">Recent collections</h2><div class="mt-4 divide-y divide-slate-100">@forelse($recent as $collection)<div class="py-4"><div class="flex justify-between gap-3"><div><p class="text-sm font-bold">{{ $collection->participant->name }}</p><p class="mt-1 text-xs text-slate-500">{{ $collection->quantity }} portion(s) · {{ $collection->collected_at->format('g:i A') }}{{ $collection->station ? ' · '.$collection->station->name : '' }}</p>@if($collection->participant->dietary_notes)<p class="mt-1 text-[10px] font-black uppercase text-emerald-700">{{ $collection->participant->dietary_notes }}</p>@endif</div>@can('update', $event)<form method="POST" action="{{ route('events.meals.collections.reverse', [$event, $meal, $collection]) }}">@csrf @method('DELETE')<button class="text-xs font-bold text-red-600">Reverse</button></form>@endcan</div>@if($collection->was_overridden)<p class="mt-2 text-xs text-amber-700">Override: {{ $collection->override_reason }}</p>@endif</div>@empty<p class="py-8 text-center text-sm text-slate-500">Nothing issued yet.</p>@endforelse</div></aside>
+        <aside class="rounded-3xl border bg-white p-6">
+            <h2 class="font-black">Recent collections</h2>
+            <div class="mt-4 divide-y">
+            @forelse($recent as $collection)
+                <div class="py-4">
+                    <p class="font-bold">{{ $collection->participant->name }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ $collection->quantity }} portion(s) — {{ $collection->collected_at->format('g:i A') }} — {{ $collection->station?->name }}</p>
+                    @if($collection->was_overridden)<p class="my-2 text-xs text-amber-700">Override: {{ $collection->override_reason }}</p>@endif
+                    @if(auth()->user()->can('manageMeals', $event) || auth()->user()->isAuditStaff())
+                    <form method="POST" action="{{ route('events.meals.collections.reverse', [$event, $meal, $collection]) }}" class="mt-3 grid gap-2">
+                        @csrf @method('DELETE')
+                        <input name="reason" required maxlength="500" placeholder="Reason for reversal" class="rounded-lg border-slate-300 text-xs">
+                        @cannot('manageMeals', $event)<input name="approval_code" required autocomplete="off" placeholder="Audit Head approval code" class="rounded-lg border-slate-300 text-xs">@endcannot
+                        <button class="text-left text-xs font-bold text-red-600">Reverse one portion</button>
+                    </form>
+                    @endif
+                </div>
+            @empty<p class="py-5">Nothing issued yet.</p>@endforelse
+            </div>
+        </aside>
     </div>
 
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const mealId = @js($meal->id);
-            const queueKey = `meal-queue-${mealId}`;
-            const stationKey = @js('meal-station-'.$event->id);
+            const queueKey = `meal-queue-${@js(auth()->id())}-${mealId}`;
+            const stationKey = @js('meal-station-'.auth()->id().'-'.$event->id);
             const result = document.getElementById('scan-result');
             const input = document.getElementById('registration-code');
             const stationSelect = document.getElementById('station-select');
@@ -41,9 +89,14 @@
 
             if (stationSelect) {
                 const saved = localStorage.getItem(stationKey);
-                if (saved) stationSelect.value = saved;
+                if (saved && Array.from(stationSelect.options).some(option => option.value === saved)) stationSelect.value = saved;
+                if (!stationSelect.value && stationSelect.options.length === 2) stationSelect.selectedIndex = 1;
                 stationSelect.addEventListener('change', () => localStorage.setItem(stationKey, stationSelect.value));
             }
+
+            document.querySelectorAll('.meal-action-form').forEach(form => form.addEventListener('submit', () => {
+                form.querySelector('.selected-station').value = stationSelect?.value || '';
+            }));
 
             const showResult = (message, successful) => { result.classList.remove('hidden'); result.textContent = message; result.className = `mt-5 rounded-2xl p-5 font-bold ${successful ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`; };
 

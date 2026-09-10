@@ -128,10 +128,9 @@ it('lets a manager create an usher pre-staffed on every current event in their c
         ->post(route('admin.register.store'), [
             'name' => 'New Usher',
             'email' => 'newusher@example.com',
-            // A manager can't choose company/role from the form, but even if
-            // someone tampers with the request it must not be honored.
+            // A manager may choose a staff role, but cannot change the company.
             'company_id' => $otherCompany->id,
-            'role' => 'manager',
+            'role' => 'usher',
         ])
         ->assertRedirect(route('admin.users.index'));
 

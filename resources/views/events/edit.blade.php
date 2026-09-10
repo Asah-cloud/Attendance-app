@@ -66,10 +66,7 @@
                             <input type="checkbox" name="accommodation_enabled" value="1" {{ old('accommodation_enabled', $event->accommodation_enabled) ? 'checked' : '' }} class="mt-1 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
                             <span><span class="block text-sm font-black text-indigo-950">Use rooms &amp; accommodation</span><span class="mt-1 block text-xs leading-5 text-indigo-800/70">Let attendees request a room. Set up sites, blocks, and rooms from the Accommodation tab.</span></span>
                         </label>
-                        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-6">
-                            <input type="checkbox" name="food_registration_required" value="1" {{ old('food_registration_required', $event->food_registration_required) ? 'checked' : '' }} class="mt-1 rounded border-amber-300 text-amber-600 focus:ring-amber-500">
-                            <span><span class="block text-sm font-black text-amber-950">Use food sign-up</span><span class="mt-1 block text-xs leading-5 text-amber-800/70">Attendees opt in to food during registration. Add meals and stations from the Meals tab.</span></span>
-                        </label>
+
                     </div>
 
                     {{-- Description --}}
@@ -134,7 +131,7 @@
 
                     <div class="pt-6 border-t border-gray-50 flex flex-col sm:flex-row justify-end items-center gap-6">
                         <a href="{{ route('events.index') }}" class="text-sm font-bold text-gray-400 hover:text-red-600 transition-colors">Discard Changes</a>
-                        
+
                         <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center px-10 py-4 bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-0.5 active:translate-y-0 transition-all">
                             Update Event
                         </button>

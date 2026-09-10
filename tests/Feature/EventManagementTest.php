@@ -48,7 +48,7 @@ it('ignores a manager supplied company_id and always scopes the new event to the
     $this->assertDatabaseHas('events', ['title' => 'Sneaky Event', 'company_id' => $company->id]);
 });
 
-it('lets a manager enable rooms and food sign-up while creating an event', function () {
+it('lets a manager enable rooms while creating an event; food sign-up is no longer a setting', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = eventManagementManager($company);
 
@@ -61,10 +61,12 @@ it('lets a manager enable rooms and food sign-up while creating an event', funct
         ])
         ->assertRedirect('/events');
 
+    // Food registration was removed: every confirmed participant is meal-eligible,
+    // so the flag is always stored false regardless of what the form submits.
     $this->assertDatabaseHas('events', [
         'title' => 'Retreat',
         'accommodation_enabled' => true,
-        'food_registration_required' => true,
+        'food_registration_required' => false,
     ]);
 });
 

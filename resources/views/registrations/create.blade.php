@@ -119,13 +119,7 @@
                         </div>
                     @endif
 
-                    @if($event->food_registration_required)
-                        <div class="rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
-                            <p class="text-xs font-black uppercase tracking-wide text-amber-700">Food</p>
-                            <input type="hidden" name="food_required" value="0">
-                            <label class="mt-3 flex items-start gap-3"><input type="checkbox" name="food_required" value="1" @checked(old('food_required')) class="mt-1 rounded border-amber-300 text-amber-600"><span><strong class="block text-sm text-slate-800">I want food at this event</strong><span class="text-xs text-slate-500">Only attendees who tick this can collect a meal at the event.</span></span></label>
-                        </div>
-                    @endif
+
 
                     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
                         <div class="prose prose-sm max-w-none text-slate-600">{{ $event->registration_terms }}</div>
