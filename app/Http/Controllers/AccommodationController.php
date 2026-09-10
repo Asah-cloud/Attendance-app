@@ -359,9 +359,34 @@ class AccommodationController extends Controller
             $this->sendPendingNotifications($event);
         }
 
+        $assigned = $result['assigned'];
+        $unallocated = $result['unallocated'];
         $scope = collect([$category ? "category: {$category}" : null, $gender ? "gender: {$gender}" : null])->filter()->implode(', ');
+        $scopeLabel = $scope ? " for {$scope}" : '';
 
-        return back()->with('success', "{$result['assigned']} attendee(s) allocated".($scope ? " ({$scope})" : '').". {$result['unallocated']} remain unallocated in this selection.");
+        // Nothing was placed: say why, as an error, and drop the manager onto the
+        // preview so they can see each blocked attendee's reason instead of a
+        // success toast that vanishes before they've scrolled back to it.
+        if ($assigned === 0) {
+            $message = $unallocated > 0
+                ? "No rooms assigned{$scopeLabel}. {$unallocated} attendee(s) still need a room, but no active room has a free bed that matches their gender/category. Check the room restrictions or add rooms."
+                : "No unassigned attendee matches this selection{$scopeLabel}. Confirm they are confirmed and ticked as \"Needs room\".";
+
+            return redirect()->route('events.accommodation.index', array_filter([
+                'event' => $event, 'preview' => 1, 'category' => $category, 'gender' => $gender,
+            ]))->with('error', $message);
+        }
+
+        $message = "Assigned rooms to {$assigned} attendee(s){$scopeLabel}.";
+        if ($unallocated > 0) {
+            $message .= " {$unallocated} still need a room — see who below.";
+
+            return redirect()->route('events.accommodation.index', array_filter([
+                'event' => $event, 'preview' => 1, 'category' => $category, 'gender' => $gender,
+            ]))->with('success', $message);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function assign(Request $request, Event $event, EventRegistration $registration): RedirectResponse

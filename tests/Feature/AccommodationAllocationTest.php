@@ -97,6 +97,25 @@ it('allocates only the selected participant category and gender', function () {
     expect($generalWoman->fresh()->roomAssignment)->toBeNull();
 });
 
+it('explains why a filtered assign run placed nobody instead of a silent success', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    // Female-only room; the only person needing a room is Male → cannot be placed.
+    accommodationRoom($event, 'F01', 2, ['gender' => 'Female']);
+    accommodationRegistration($event, 'Male Guest', 'Male', 'STAFF');
+
+    // Filter that matches nobody unassigned.
+    $this->actingAs($manager)->post(route('events.accommodation.allocate', $event), ['category' => 'VIP', 'gender' => ''])
+        ->assertRedirect(route('events.accommodation.index', ['event' => $event, 'preview' => 1, 'category' => 'VIP']))
+        ->assertSessionHas('error', fn ($m) => str_contains($m, 'No unassigned attendee matches'));
+
+    // Filter matches the Male STAFF guest, but no compatible room has a free bed.
+    $this->actingAs($manager)->post(route('events.accommodation.allocate', $event), ['category' => 'STAFF', 'gender' => ''])
+        ->assertRedirect(route('events.accommodation.index', ['event' => $event, 'preview' => 1, 'category' => 'STAFF']))
+        ->assertSessionHas('error', fn ($m) => str_contains($m, 'no active room has a free bed'));
+});
+
 it('lets a manager build inventory and blocks another company manager', function () {
     $company = Company::create(['name' => 'Acme']);
     $other = Company::create(['name' => 'Other']);
