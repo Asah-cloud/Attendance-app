@@ -142,7 +142,14 @@
                             </svg>
                         </div>
                         <h3 class="text-xl font-black text-gray-900 mb-2">Import Participants</h3>
-                        <p class="text-sm text-gray-500 mb-6">Select your Excel file to bulk-add members.</p>
+                        <p class="text-sm text-gray-500 mb-6">Select your Excel or CSV file to bulk-add members.</p>
+                    </div>
+
+                    <div class="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-left">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Column order (first row is skipped as a header)</p>
+                        <p class="text-xs leading-6 text-gray-600">
+                            <strong>A</strong> ID &nbsp;·&nbsp; <strong>B</strong> Name <span class="text-gray-400">(required)</span> &nbsp;·&nbsp; <strong>C</strong> Gender &nbsp;·&nbsp; <strong>D</strong> — &nbsp;·&nbsp; <strong>E</strong> Category &nbsp;·&nbsp; <strong>F</strong> Phone &nbsp;·&nbsp; <strong>G</strong> Email
+                        </p>
                     </div>
 
                     <div class="mb-6">

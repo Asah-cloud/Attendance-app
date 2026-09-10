@@ -37,6 +37,7 @@ class UsersImport implements OnEachRow
 
         $id = trim((string) $data[0]);
         $name = trim((string) $data[1]);
+        $gender = ! empty(trim($data[2] ?? '')) ? trim($data[2]) : null;
         $category = ! empty(trim($data[4] ?? '')) ? trim($data[4]) : 'Member';
 
         $rawPhone = ! empty(trim($data[5] ?? '')) ? trim($data[5]) : null;
@@ -51,6 +52,7 @@ class UsersImport implements OnEachRow
             'phone' => $rawPhone,
             'member_id' => $companyMemberId,
             'category' => $category,
+            'gender' => $gender,
             'lookup_emails' => array_filter([$rawEmail, $legacyEmail, $companyEmail]),
             'generated_email' => $companyEmail,
         ], 'import');

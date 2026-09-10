@@ -144,6 +144,7 @@ it('imports participants into the event company with normalized phones without s
         ->and($user->phone)->toBe('201234567')
         ->and($user->email)->toBe('jane@example.com')
         ->and($user->category)->toBe('Member')
+        ->and($user->gender)->toBe('Female')
         ->and($event->confirmedParticipants()->whereKey($user->id)->exists())->toBeTrue();
 
     Notification::assertNothingSent();
