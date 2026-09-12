@@ -277,6 +277,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/', [ParticipantMergeController::class, 'index'])->name('index');
         Route::get('/compare', [ParticipantMergeController::class, 'compare'])->name('compare');
         Route::post('/merge', [ParticipantMergeController::class, 'merge'])->name('merge');
+        Route::delete('/clear-all', [ParticipantMergeController::class, 'destroyAll'])->name('clear-all');
     });
 
     // --- SUPER ADMIN ONLY ROUTES ---

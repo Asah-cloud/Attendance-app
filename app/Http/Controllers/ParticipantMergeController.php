@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Participant;
+use App\Services\ApplicationCache;
 use App\Services\ParticipantMergeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ParticipantMergeController extends Controller
@@ -29,7 +31,11 @@ class ParticipantMergeController extends Controller
                 ->get();
         }
 
-        return view('participants.duplicates', ['query' => $query, 'participants' => $participants]);
+        return view('participants.duplicates', [
+            'query' => $query,
+            'participants' => $participants,
+            'company' => $request->user()->company,
+        ]);
     }
 
     public function compare(Request $request): View|RedirectResponse
@@ -73,5 +79,35 @@ class ParticipantMergeController extends Controller
         $merger->merge($primary, $duplicate, $request->user());
 
         return redirect()->route('participants.duplicates.index')->with('success', "Merged into {$primary->name}.");
+    }
+
+    /**
+     * Wipe the company's participant roster. Anyone with recorded attendance anywhere
+     * is kept, mirroring the "delete all attendees" event tool's protection of check-in
+     * history — this clears rosters, not the historical record of who actually showed up.
+     */
+    public function destroyAll(Request $request, ApplicationCache $cache): RedirectResponse
+    {
+        $company = $request->user()->company;
+        abort_unless($company, 403);
+
+        if (trim((string) $request->input('confirm_name')) !== $company->name) {
+            throw ValidationException::withMessages(['confirm_name' => 'Type the exact company name to confirm.']);
+        }
+
+        $deletable = fn () => Participant::where('company_id', $company->id)->doesntHave('attendances');
+
+        $total = Participant::where('company_id', $company->id)->count();
+        $removed = $deletable()->count();
+        $deletable()->delete();
+        $cache->invalidateCompany($company->id);
+
+        $kept = $total - $removed;
+        $message = "Deleted {$removed} participant".($removed === 1 ? '' : 's').'.';
+        if ($kept > 0) {
+            $message .= " Kept {$kept} with recorded attendance.";
+        }
+
+        return redirect()->route('participants.duplicates.index')->with('success', $message);
     }
 }

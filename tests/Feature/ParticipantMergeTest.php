@@ -95,3 +95,37 @@ it('prevents an usher from accessing the duplicate merge tool', function () {
 
     $this->actingAs($usher)->get(route('participants.duplicates.index'))->assertForbidden();
 });
+
+it('deletes participants without attendance history but keeps those who checked in, scoped to the manager\'s own company', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $otherCompany = Company::create(['name' => 'Other Co']);
+    $manager = mergeManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Event A', 'event_date' => now()]);
+
+    $noHistory = Participant::create(['company_id' => $company->id, 'name' => 'No History']);
+    $checkedIn = Participant::create(['company_id' => $company->id, 'name' => 'Checked In']);
+    $checkedIn->registrations()->create(['event_id' => $event->id, 'status' => 'confirmed']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $checkedIn->id, 'day' => 1, 'status' => 'present']);
+    $outsider = Participant::create(['company_id' => $otherCompany->id, 'name' => 'Outsider']);
+
+    $this->actingAs($manager)
+        ->delete(route('participants.duplicates.clear-all'), ['confirm_name' => 'Acme Co'])
+        ->assertRedirect(route('participants.duplicates.index'))
+        ->assertSessionHas('success', 'Deleted 1 participant. Kept 1 with recorded attendance.');
+
+    expect(Participant::find($noHistory->id))->toBeNull()
+        ->and(Participant::find($checkedIn->id))->not->toBeNull()
+        ->and(Participant::find($outsider->id))->not->toBeNull();
+});
+
+it('requires typing the exact company name to clear participants', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = mergeManager($company);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'Jane Doe']);
+
+    $this->actingAs($manager)
+        ->delete(route('participants.duplicates.clear-all'), ['confirm_name' => 'wrong'])
+        ->assertSessionHasErrors('confirm_name');
+
+    expect(Participant::find($participant->id))->not->toBeNull();
+});
