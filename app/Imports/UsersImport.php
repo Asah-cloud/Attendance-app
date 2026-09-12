@@ -30,8 +30,10 @@ class UsersImport implements OnEachRow
     {
         $data = $row->toArray();
 
-        // Skip header or empty rows (Checking index 1 for Name)
-        if (empty($data[1]) || strtolower(trim($data[1])) === 'name') {
+        // Skip empty rows (checking index 1 for Name), and the header row specifically
+        // (only on row 1, so a real attendee named e.g. "Staff" is never mistaken for one).
+        $headerLabels = ['name', 'staff', 'full name', 'participant', 'participant name'];
+        if (empty($data[1]) || ($row->getIndex() === 1 && in_array(strtolower(trim($data[1])), $headerLabels, true))) {
             return;
         }
 
@@ -43,6 +45,10 @@ class UsersImport implements OnEachRow
 
         $rawPhone = ! empty(trim($data[5] ?? '')) ? trim($data[5]) : null;
         $rawEmail = ! empty(trim($data[6] ?? '')) ? trim($data[6]) : null;
+        // A blank column A (e.g. a merged "Department/Role" cell that only the extractor's
+        // top row kept) must not collide multiple attendees onto the same member_id — fall
+        // back to the row number, which still keeps re-imports of the same file idempotent.
+        $id = $id !== '' ? $id : 'row'.$row->getIndex();
         $companyMemberId = $this->event->company_id.':'.$id;
         $legacyEmail = 'event'.$this->event->id.'_user'.$id.'@example.invalid';
         $companyEmail = 'company'.$this->event->company_id.'_member'.$id.'@example.invalid';

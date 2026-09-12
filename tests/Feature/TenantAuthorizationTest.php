@@ -168,6 +168,20 @@ it('does not notify a participant when the same import row is processed again', 
     Notification::assertNothingSent();
 });
 
+it('imports every row as a distinct participant when the id column is blank, and skips only the header', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'Import Event',
+        'event_date' => now(),
+    ]);
+
+    Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants_blank_department.csv'));
+
+    expect(Participant::where('company_id', $company->id)->pluck('name')->sort()->values()->all())
+        ->toBe(['Siloam 1', 'Siloam 2', 'Siloam 3']);
+});
+
 it('sends notifications after a registered participant import when requested', function () {
     Notification::fake();
 
