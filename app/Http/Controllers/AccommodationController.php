@@ -333,10 +333,13 @@ class AccommodationController extends Controller
     {
         $this->authorize('update', $event);
         abort_unless($registration->event_id === $event->id, 404);
-        $data = $request->validate(['accommodation_required' => ['nullable', 'boolean'], 'accessibility_required' => ['nullable', 'boolean'], 'accommodation_notes' => ['nullable', 'string', 'max:2000']]);
+        $data = $request->validate(['accommodation_required' => ['nullable', 'boolean'], 'accessibility_required' => ['nullable', 'boolean'], 'accommodation_notes' => ['nullable', 'string', 'max:2000'], 'room_group' => ['nullable', 'string', 'max:255']]);
+        $roomGroup = trim((string) ($data['room_group'] ?? '')) ?: null;
+        unset($data['room_group']);
         $data['accommodation_required'] = $request->boolean('accommodation_required');
         $data['accessibility_required'] = $data['accommodation_required'] && $request->boolean('accessibility_required');
         $registration->update($data);
+        $registration->participant->update(['room_group' => $roomGroup]);
         if (! $data['accommodation_required'] && $registration->roomAssignment?->status !== 'checked_in') {
             $registration->roomAssignment?->delete();
         }
@@ -453,11 +456,11 @@ class AccommodationController extends Controller
 
         return response()->streamDownload(function () use ($assignments): void {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['Attendee', 'Gender', 'Category', 'Email', 'Phone', 'Location', 'Building', 'Floor', 'Room', 'Status', 'Method', 'Checked in', 'Checked out']);
+            fputcsv($output, ['Attendee', 'Gender', 'Category', 'Room group', 'Email', 'Phone', 'Location', 'Building', 'Floor', 'Room', 'Status', 'Method', 'Checked in', 'Checked out']);
             foreach ($assignments as $assignment) {
                 $participant = $assignment->registration->participant;
                 $room = $assignment->room;
-                fputcsv($output, [$participant->name, $participant->gender, $participant->category, $participant->email, $participant->phone, $room->floor->block->site->name, $room->floor->block->name, $room->floor->name, $room->name, $assignment->status, $assignment->method, $assignment->checked_in_at?->format('Y-m-d H:i:s'), $assignment->checked_out_at?->format('Y-m-d H:i:s')]);
+                fputcsv($output, [$participant->name, $participant->gender, $participant->category, $participant->room_group, $participant->email, $participant->phone, $room->floor->block->site->name, $room->floor->block->name, $room->floor->name, $room->name, $assignment->status, $assignment->method, $assignment->checked_in_at?->format('Y-m-d H:i:s'), $assignment->checked_out_at?->format('Y-m-d H:i:s')]);
             }
             fclose($output);
         }, 'rooming-list-'.str($event->title)->slug().'.csv', ['Content-Type' => 'text/csv']);

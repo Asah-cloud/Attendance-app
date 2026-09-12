@@ -64,6 +64,7 @@ class ParticipantRegistrationService
                 'member_id' => $memberId,
                 'category' => $this->usableString($data['category'] ?? null) ?? 'Member',
                 'gender' => $this->usableString($data['gender'] ?? null),
+                'room_group' => $this->usableString($data['room_group'] ?? null),
                 'company_id' => $event->company_id,
             ]);
         }
@@ -79,6 +80,9 @@ class ParticipantRegistrationService
             'gender' => $trusted
                 ? ($this->usableString($data['gender'] ?? null) ?? $user->gender)
                 : ($user->gender ?? $this->usableString($data['gender'] ?? null)),
+            'room_group' => $trusted
+                ? ($this->usableString($data['room_group'] ?? null) ?? $user->room_group)
+                : ($user->room_group ?? $this->usableString($data['room_group'] ?? null)),
             'company_id' => $user->company_id ?? $event->company_id,
         ])->save();
 

@@ -97,6 +97,39 @@ it('allocates only the selected participant category and gender', function () {
     expect($generalWoman->fresh()->roomAssignment)->toBeNull();
 });
 
+it('prefers seating people who share a room group together, even over an empty higher-priority room', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    $roomX = accommodationRoom($event, 'X01', 3); // created first: higher priority, currently empty
+    $roomY = accommodationRoom($event, 'Y01', 3); // created second: lower priority, already holds their group
+
+    $seed = accommodationRegistration($event, 'Seed Guest');
+    $seed->participant->update(['room_group' => 'Kumasi Area']);
+    $seed->roomAssignment()->create(['accommodation_room_id' => $roomY->id, 'status' => 'assigned', 'method' => 'manual']);
+
+    $newcomer = accommodationRegistration($event, 'New Guest');
+    $newcomer->participant->update(['room_group' => 'Kumasi Area']);
+
+    $result = app(RoomAllocationService::class)->commit($event, null);
+
+    expect($result)->toBe(['assigned' => 1, 'unallocated' => 0]);
+    expect($newcomer->fresh()->roomAssignment->accommodation_room_id)->toBe($roomY->id)
+        ->and($roomX->activeAssignments()->count())->toBe(0);
+});
+
+it('lets a manager set a participant\'s room group from the accommodation page', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    $registration = accommodationRegistration($event, 'Grouped Guest');
+
+    $this->actingAs($manager)->patch(route('events.accommodation.requirements.update', [$event, $registration]), [
+        'accommodation_required' => 1, 'room_group' => 'Kumasi Area',
+    ])->assertRedirect();
+
+    expect($registration->participant->fresh()->room_group)->toBe('Kumasi Area');
+});
+
 it('explains why a filtered assign run placed nobody instead of a silent success', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);

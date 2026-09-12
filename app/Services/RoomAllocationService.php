@@ -16,6 +16,10 @@ class RoomAllocationService
     {
         $rooms = $this->eligibleRooms($event);
         $occupancy = $rooms->mapWithKeys(fn ($room) => [$room->id => $room->active_assignments_count]);
+        // Which room_group values already sit in each room — seeded from existing occupants,
+        // then updated as this run proposes new placements, so a whole group clusters together
+        // even across multiple people processed in the same pass.
+        $roomGroups = $rooms->mapWithKeys(fn ($room) => [$room->id => $this->existingGroups($room)])->all();
         $proposals = collect();
         $unallocated = collect();
 
@@ -31,9 +35,13 @@ class RoomAllocationService
             ->values();
 
         foreach ($registrations as $registration) {
-            $room = $rooms->first(function ($room) use ($registration, $occupancy) {
-                return $occupancy[$room->id] < $room->capacity && $this->matches($registration, $room);
-            });
+            $group = $this->normalizeText($registration->participant->room_group);
+            $room = $this->pickRoom(
+                $rooms,
+                $registration,
+                fn ($room) => $occupancy[$room->id],
+                fn ($room) => $roomGroups[$room->id] ?? []
+            );
 
             if (! $room) {
                 $unallocated->push(['registration' => $registration, 'reason' => 'No active room has compatible restrictions and free capacity.']);
@@ -41,11 +49,54 @@ class RoomAllocationService
                 continue;
             }
 
+            $groupMatched = $group && in_array($group, $roomGroups[$room->id] ?? [], true);
             $occupancy->put($room->id, $occupancy->get($room->id, 0) + 1);
-            $proposals->push(['registration' => $registration, 'room' => $room, 'reason' => $this->reason($registration, $room)]);
+            if ($group) {
+                $roomGroups[$room->id] = array_merge($roomGroups[$room->id] ?? [], [$group]);
+            }
+            $proposals->push(['registration' => $registration, 'room' => $room, 'reason' => $this->reason($registration, $room, $groupMatched)]);
         }
 
         return compact('proposals', 'unallocated');
+    }
+
+    /**
+     * From a rooms list (each annotated with the fields matches()/occupancy need), pick the best
+     * free, compatible room for one registration: a room that already holds their room_group,
+     * else an empty room (starts a fresh room for that group), else any compatible room with space.
+     */
+    private function pickRoom(Collection $rooms, EventRegistration $registration, callable $occupancyOf, callable $groupsOf): ?AccommodationRoom
+    {
+        $group = $this->normalizeText($registration->participant->room_group);
+
+        if ($group) {
+            $sameGroup = $rooms->first(fn ($room) => $occupancyOf($room) < $room->capacity
+                && $this->matches($registration, $room)
+                && in_array($group, $groupsOf($room), true));
+
+            if ($sameGroup) {
+                return $sameGroup;
+            }
+        }
+
+        $empty = $rooms->first(fn ($room) => $occupancyOf($room) === 0 && $this->matches($registration, $room));
+
+        if ($empty) {
+            return $empty;
+        }
+
+        return $rooms->first(fn ($room) => $occupancyOf($room) < $room->capacity && $this->matches($registration, $room));
+    }
+
+    /** The distinct, normalized room_group values already occupying a room. */
+    private function existingGroups(AccommodationRoom $room): array
+    {
+        return $room->activeAssignments
+            ->map(fn ($assignment) => $this->normalizeText($assignment->registration?->participant?->room_group))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** @return array{assigned: int, unallocated: int} */
@@ -97,12 +148,20 @@ class RoomAllocationService
                 return $registration->roomAssignment;
             }
 
-            $candidate = $this->eligibleRooms($registration->event)
-                ->first(fn ($room) => $room->active_assignments_count < $room->capacity && $this->matches($registration, $room));
+            $rooms = $this->eligibleRooms($registration->event);
+            $candidate = $this->pickRoom(
+                $rooms,
+                $registration,
+                fn ($room) => $room->active_assignments_count,
+                fn ($room) => $this->existingGroups($room)
+            );
 
             if (! $candidate) {
                 return null;
             }
+
+            $group = $this->normalizeText($registration->participant->room_group);
+            $groupMatched = $group && in_array($group, $this->existingGroups($candidate), true);
 
             $room = AccommodationRoom::query()->lockForUpdate()->findOrFail($candidate->id);
             if ($room->activeAssignments()->lockForUpdate()->get()->count() >= $room->capacity) {
@@ -114,7 +173,7 @@ class RoomAllocationService
                 'accommodation_room_id' => $room->id,
                 'status' => 'assigned',
                 'method' => 'automatic',
-                'allocation_reason' => $this->reason($registration, $candidate),
+                'allocation_reason' => $this->reason($registration, $candidate, $groupMatched),
                 'assigned_by' => $userId,
                 'assigned_at' => now(),
             ]);
@@ -124,7 +183,7 @@ class RoomAllocationService
     private function eligibleRooms(Event $event): Collection
     {
         return AccommodationRoom::query()
-            ->with(['floor.block.site'])
+            ->with(['floor.block.site', 'activeAssignments.registration.participant'])
             ->withCount(['activeAssignments'])
             ->where('status', AccommodationRoom::STATUS_ACTIVE)
             ->whereHas('floor', fn ($query) => $query->where('is_active', true)
@@ -246,9 +305,12 @@ class RoomAllocationService
             && (! $this->normalizeGender($gender) || $this->normalizeGender($gender) === $this->normalizeGender($participant->gender));
     }
 
-    private function reason(EventRegistration $registration, AccommodationRoom $room): string
+    private function reason(EventRegistration $registration, AccommodationRoom $room, bool $groupMatched = false): string
     {
         $reasons = ['First compatible room by configured priority'];
+        if ($groupMatched) {
+            $reasons[] = 'kept with their room group';
+        }
         if ($registration->accessibility_required) {
             $reasons[] = 'accessible room/floor';
         }
