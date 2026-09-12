@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Attendance;
 use App\Models\Company;
+use App\Models\Event;
+use App\Models\Participant;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -155,6 +158,47 @@ it('renders the admin events workspace for both subscription and pay-per-event c
         ->assertSee('of 5 event slots used')
         ->assertSee('Pay Per Event Co')
         ->assertSee('pay-per-event, no cap');
+});
+
+it('lets the super admin clear a company\'s participants without checked-in history', function () {
+    $admin = companyManagementAdmin();
+    $company = Company::create(['name' => 'Acme Co']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Event A', 'event_date' => now()]);
+
+    $noHistory = Participant::create(['company_id' => $company->id, 'name' => 'No History']);
+    $checkedIn = Participant::create(['company_id' => $company->id, 'name' => 'Checked In']);
+    $checkedIn->registrations()->create(['event_id' => $event->id, 'status' => 'confirmed']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $checkedIn->id, 'day' => 1, 'status' => 'present']);
+
+    $this->actingAs($admin)
+        ->delete(route('companies.participants.clear', $company), ['confirm_name' => 'Acme Co'])
+        ->assertRedirect(route('companies.edit', $company))
+        ->assertSessionHas('success', 'Deleted 1 participant from Acme Co. Kept 1 with recorded attendance.');
+
+    expect(Participant::find($noHistory->id))->toBeNull()
+        ->and(Participant::find($checkedIn->id))->not->toBeNull();
+});
+
+it('requires typing the exact company name before the super admin can clear its participants', function () {
+    $admin = companyManagementAdmin();
+    $company = Company::create(['name' => 'Acme Co']);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'Jane Doe']);
+
+    $this->actingAs($admin)
+        ->delete(route('companies.participants.clear', $company), ['confirm_name' => 'wrong'])
+        ->assertSessionHasErrors('confirm_name');
+
+    expect(Participant::find($participant->id))->not->toBeNull();
+});
+
+it('prevents a manager from clearing another company\'s participants', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)
+        ->delete(route('companies.participants.clear', $company), ['confirm_name' => 'Acme Co'])
+        ->assertForbidden();
 });
 
 it('prevents a manager from accessing company management', function () {

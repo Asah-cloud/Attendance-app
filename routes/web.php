@@ -284,6 +284,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::middleware(['role:admin'])->group(function () {
         // Full CRUD Company Tenant Management Resources
         Route::resource('companies', CompanyController::class)->except('show');
+        Route::delete('/companies/{company}/participants', [CompanyController::class, 'clearParticipants'])->name('companies.participants.clear');
 
         // Archived (soft-deleted) companies: browse their events/attendees
         // and either restore them or permanently delete them for good.

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Participant;
-use App\Services\ApplicationCache;
 use App\Services\ParticipantMergeService;
+use App\Services\ParticipantRosterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -81,12 +81,8 @@ class ParticipantMergeController extends Controller
         return redirect()->route('participants.duplicates.index')->with('success', "Merged into {$primary->name}.");
     }
 
-    /**
-     * Wipe the company's participant roster. Anyone with recorded attendance anywhere
-     * is kept, mirroring the "delete all attendees" event tool's protection of check-in
-     * history — this clears rosters, not the historical record of who actually showed up.
-     */
-    public function destroyAll(Request $request, ApplicationCache $cache): RedirectResponse
+    /** Wipe the manager's own company's participant roster (see ParticipantRosterService). */
+    public function destroyAll(Request $request, ParticipantRosterService $roster): RedirectResponse
     {
         $company = $request->user()->company;
         abort_unless($company, 403);
@@ -95,14 +91,8 @@ class ParticipantMergeController extends Controller
             throw ValidationException::withMessages(['confirm_name' => 'Type the exact company name to confirm.']);
         }
 
-        $deletable = fn () => Participant::where('company_id', $company->id)->doesntHave('attendances');
+        ['removed' => $removed, 'kept' => $kept] = $roster->clearRosterWithoutAttendance($company);
 
-        $total = Participant::where('company_id', $company->id)->count();
-        $removed = $deletable()->count();
-        $deletable()->delete();
-        $cache->invalidateCompany($company->id);
-
-        $kept = $total - $removed;
         $message = "Deleted {$removed} participant".($removed === 1 ? '' : 's').'.';
         if ($kept > 0) {
             $message .= " Kept {$kept} with recorded attendance.";

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\ParticipantRosterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CompanyController extends Controller
 {
@@ -95,5 +97,22 @@ class CompanyController extends Controller
         $company->delete();
 
         return redirect()->route('companies.index')->with('success', "{$company->name} has been archived. Find it in History to restore or permanently delete it.");
+    }
+
+    /** Wipe a company's participant roster (see ParticipantRosterService). */
+    public function clearParticipants(Request $request, Company $company, ParticipantRosterService $roster)
+    {
+        if (trim((string) $request->input('confirm_name')) !== $company->name) {
+            throw ValidationException::withMessages(['confirm_name' => 'Type the exact company name to confirm.']);
+        }
+
+        ['removed' => $removed, 'kept' => $kept] = $roster->clearRosterWithoutAttendance($company);
+
+        $message = "Deleted {$removed} participant".($removed === 1 ? '' : 's')." from {$company->name}.";
+        if ($kept > 0) {
+            $message .= " Kept {$kept} with recorded attendance.";
+        }
+
+        return redirect()->route('companies.edit', $company)->with('success', $message);
     }
 }
