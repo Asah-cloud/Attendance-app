@@ -25,7 +25,7 @@
 <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#071426] text-white shadow-2xl transition-transform duration-300 lg:translate-x-0">
     <div class="flex h-20 items-center justify-between border-b border-white/10 px-6">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
-            <span class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-xl font-black shadow-lg shadow-blue-950">A</span>
+            <x-application-logo class="h-11 w-11 shrink-0" />
             <span><span class="block text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300">Asah Apex</span><span class="block text-base font-extrabold">Attendance</span></span>
         </a>
         <button type="button" @click="sidebarOpen = false" class="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/10 lg:hidden" aria-label="Close navigation">

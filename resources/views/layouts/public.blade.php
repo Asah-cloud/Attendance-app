@@ -24,6 +24,7 @@
     <meta name="twitter:description" content="{{ $metaDescription }}">
     <meta name="twitter:image" content="{{ $metaImage }}">
     <title>{{ $metaTitle }}</title>
+        <x-site-icons />
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800&display=swap" rel="stylesheet">
     <x-compiled-assets />
@@ -35,7 +36,7 @@
             "@@type": "Organization",
             "name": "Asah Apex Attendance",
             "url": "{{ url('/') }}",
-            "logo": "{{ asset('og-asah-apex-attendance.webp') }}"
+            "logo": "{{ asset('images/asah-apex-logo-512.png') }}"
         }
         </script>
     @endunless
@@ -45,7 +46,7 @@
     <header x-data="{ mobileMenuOpen: false }" @keydown.escape.window="mobileMenuOpen = false" class="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#071426]/90 text-white backdrop-blur-xl">
         <nav class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8" aria-label="Main navigation">
             <a href="{{ route('home') }}" class="flex items-center gap-3" aria-label="Asah Apex Attendance home">
-                <span class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-lg font-extrabold shadow-lg shadow-blue-950/40">A</span>
+                <x-application-logo class="h-10 w-10 shrink-0" />
                 <span>
                     <span class="block text-[10px] font-bold uppercase tracking-[0.34em] text-amber-300">Asah Apex</span>
                     <span class="block text-sm font-extrabold tracking-tight">Attendance</span>

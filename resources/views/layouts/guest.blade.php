@@ -7,6 +7,7 @@
         <meta name="robots" content="noindex, nofollow">
 
         <title>{{ config('app.name', 'Asah Apex Attendance') }}</title>
+        <x-site-icons />
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />

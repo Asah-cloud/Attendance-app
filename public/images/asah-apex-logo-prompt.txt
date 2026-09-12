@@ -1,0 +1,9 @@
+Created using the built-in image generation tool.
+
+Initial prompt:
+Use case: logo-brand. Create one polished square logo mark for Asah Apex Attendance, an event check-in and attendance management web application. A bold geometric white apex letter A integrated with a clear golden yellow checkmark, centered on a solid royal blue #2563eb square background. Simple flat vector-like design, strong silhouette readable at favicon size, balanced generous margins of about 12 percent. Fits existing navy, blue and amber website branding. No words, no extra letters, no mockup, no shadows, no textures, no gradients. Output a single square production-ready logo image.
+
+Final refinement prompt:
+Keep this exact A and checkmark silhouette. Make a production favicon logo: flatten all shading, remove all glow and shadows, pure white A and flat gold checkmark. Crucially fill the ENTIRE square canvas with opaque royal blue #2563eb, no transparent background. Preserve centered mark and margins. Single square image no text.
+
+Assets: asah-apex-logo.png is the original generated artwork; asah-apex-logo-512.png is the web-sized logo. Browser and Apple icons are in the public directory.
