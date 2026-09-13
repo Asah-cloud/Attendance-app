@@ -281,7 +281,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::delete('/clear-all', [ParticipantMergeController::class, 'destroyAll'])->name('clear-all');
     });
 
-    Route::middleware(['role:manager'])->prefix('support-staff')->name('support-staff.')->group(function () {
+    Route::middleware(['role:admin|manager'])->prefix('support-staff')->name('support-staff.')->group(function () {
         Route::get('/', [SupportStaffController::class, 'index'])->name('index');
         Route::post('/import', [SupportStaffController::class, 'import'])->name('import');
     });

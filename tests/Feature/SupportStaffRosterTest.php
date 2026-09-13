@@ -54,6 +54,42 @@ it('imports one company staff identity and assigns its reusable qr to selected e
         ->and(BadgeDesign::qrPayload($first->registrations()->first()))->toBe($payload);
 });
 
+it('lets the super admin choose a company and import its event staff', function () {
+    $firstCompany = Company::create(['name' => 'First Company']);
+    $secondCompany = Company::create(['name' => 'Second Company']);
+    $event = Event::create(['company_id' => $secondCompany->id, 'title' => 'Second Event', 'event_date' => today()]);
+    $admin = User::factory()->create(['company_id' => null, 'role' => 'admin']);
+    $admin->assignRole('admin');
+
+    $this->actingAs($admin)->get(route('support-staff.index', ['company_id' => $secondCompany->id]))
+        ->assertOk()->assertSee('Second Company');
+
+    $this->actingAs($admin)->post(route('support-staff.import'), [
+        'company_id' => $secondCompany->id,
+        'file' => UploadedFile::fake()->createWithContent('staff.csv', "Name,Department,Category\nAkosua Boateng,Protocol,Staff\n"),
+        'event_ids' => [$event->id],
+    ])->assertRedirect(route('support-staff.index', ['company_id' => $secondCompany->id]));
+
+    expect(Participant::where('company_id', $secondCompany->id)->where('is_support_staff', true)->count())->toBe(1)
+        ->and(Participant::where('company_id', $firstCompany->id)->count())->toBe(0);
+});
+
+it('prevents the super admin from assigning staff to an event from another company', function () {
+    $firstCompany = Company::create(['name' => 'First Company']);
+    $secondCompany = Company::create(['name' => 'Second Company']);
+    $event = Event::create(['company_id' => $secondCompany->id, 'title' => 'Second Event', 'event_date' => today()]);
+    $admin = User::factory()->create(['company_id' => null, 'role' => 'admin']);
+    $admin->assignRole('admin');
+
+    $this->actingAs($admin)->post(route('support-staff.import'), [
+        'company_id' => $firstCompany->id,
+        'file' => UploadedFile::fake()->createWithContent('staff.csv', "Name,Department,Category\nAkosua Boateng,Protocol,Staff\n"),
+        'event_ids' => [$event->id],
+    ])->assertForbidden();
+
+    expect(Participant::where('is_support_staff', true)->count())->toBe(0);
+});
+
 it('uses the same staff qr to record attendance in separate events', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = supportStaffManager($company);

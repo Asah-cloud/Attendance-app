@@ -9,10 +9,23 @@
         @if(session('success'))<div class="rounded-2xl bg-emerald-50 p-4 font-bold text-emerald-800">{{ session('success') }}</div>@endif
         @if($errors->any())<div class="rounded-2xl bg-rose-50 p-4 text-rose-800">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
 
+        @if(auth()->user()->hasRole('admin'))
+            <form method="GET" action="{{ route('support-staff.index') }}" class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <label for="company_id" class="text-sm font-bold text-slate-700">Company</label>
+                <div class="mt-2 flex gap-3">
+                    <select id="company_id" name="company_id" class="block w-full rounded-xl border-slate-300" onchange="this.form.submit()">
+                        @foreach($companies as $company)<option value="{{ $company->id }}" @selected($company->id === $selectedCompany->id)>{{ $company->name }}</option>@endforeach
+                    </select>
+                    <noscript><button class="rounded-xl bg-blue-700 px-5 py-2 font-bold text-white">Open</button></noscript>
+                </div>
+            </form>
+        @endif
+
         <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <h2 class="text-xl font-black text-slate-900">Import staff roster</h2>
             <p class="mt-2 text-sm text-slate-600">Columns: <strong>A Name</strong>, <strong>B Department</strong>, <strong>C Category</strong>. Category may be left blank and will default to Staff. Re-importing the same name and department updates the existing person.</p>
             <form method="POST" action="{{ route('support-staff.import') }}" enctype="multipart/form-data" class="mt-5 grid gap-5 lg:grid-cols-2">@csrf
+                @if(auth()->user()->hasRole('admin'))<input type="hidden" name="company_id" value="{{ $selectedCompany->id }}">@endif
                 <div><label class="text-sm font-bold text-slate-700">Spreadsheet</label><input class="mt-2 block w-full rounded-xl border-slate-300" type="file" name="file" accept=".xlsx,.xls,.csv" required></div>
                 <div><p class="text-sm font-bold text-slate-700">Assign everyone in this file to</p><div class="mt-2 max-h-44 space-y-2 overflow-auto rounded-xl border border-slate-200 p-3">
                     @forelse($events as $event)<label class="flex items-center gap-3 text-sm"><input type="checkbox" name="event_ids[]" value="{{ $event->id }}"> <span><strong>{{ $event->title }}</strong> · {{ $event->event_date->format('j M Y') }}</span></label>@empty<p class="text-sm text-slate-500">There are no upcoming events.</p>@endforelse
