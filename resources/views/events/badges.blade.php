@@ -71,5 +71,5 @@ window.badgeStudio = {
     pdfUrl: @json(route('events.badges.pdf',$event)),
     hasErrors: @json($errors->any())
 };
-</script><script src="{{ asset('js/badge-studio.js') }}" defer></script>
+</script><script src="{{ asset('js/badge-studio.js') }}?v={{ filemtime(public_path('js/badge-studio.js')) }}" defer></script>
 </body></html>
