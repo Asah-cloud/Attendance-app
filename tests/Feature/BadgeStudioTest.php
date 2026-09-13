@@ -48,6 +48,35 @@ it('saves a full background design and movable fields with optional name initial
     expect(BadgeDesign::values($event, $registration)['name'])->toBe('Asah A. K. Isaac');
 });
 
+it('saves custom text on a badge field and renders it on the badge', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event);
+    $fields = BadgeDesign::defaults();
+    $fields['custom'] = array_replace($fields['custom'], ['visible' => true, 'text' => 'Sponsored by Acme']);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $event->refresh();
+    expect($event->badge_fields['custom']['text'])->toBe('Sponsored by Acme')
+        ->and($event->badge_fields['custom']['visible'])->toBeTrue();
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertSee('Sponsored by Acme');
+});
+
+it('rejects custom badge text over the length limit', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $fields = BadgeDesign::defaults();
+    $fields['custom'] = array_replace($fields['custom'], ['text' => str_repeat('a', 201)]);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertSessionHasErrors('badge_fields.custom.text');
+});
+
 it('prints only the bare room name on the badge, without block or floor', function () {
     [$event] = badgeStudioFixture();
     $event->update(['accommodation_published' => true]);

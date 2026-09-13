@@ -96,6 +96,8 @@
         $("field-color").disabled = isGraphic || f.color === null;
         for (const id of ["field-size", "field-align"])
             $(id).disabled = isGraphic;
+        $("field-text-wrap").classList.toggle("hidden", selected !== "custom");
+        if (selected === "custom") $("field-text").value = f.text || "";
         canvas
             .querySelectorAll(".badge-field")
             .forEach((el) =>
@@ -285,6 +287,8 @@
             }
         }
         renderValues(attendee());
+        const customEl = fieldElement("custom")?.querySelector(".field-content");
+        if (customEl) customEl.textContent = fields.custom.text || "";
         sync();
         inspect();
         updatePrint();
@@ -339,6 +343,11 @@
         });
     $("field-align").addEventListener("change", () => {
         fields[selected].align = $("field-align").value;
+        markDirty();
+        render();
+    });
+    $("field-text").addEventListener("input", () => {
+        fields.custom.text = $("field-text").value;
         markDirty();
         render();
     });

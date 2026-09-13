@@ -37,6 +37,8 @@
             @elseif(in_array($key, ['company_logo','event_logo']))
                 @php $logo = $imageUrl($key === 'company_logo' ? $event->company?->logo_path : $event->logo_path); @endphp
                 @if($logo)<img src="{{ $logo }}" alt="{{ $key === 'company_logo' ? 'Company' : 'Event' }} logo" style="max-width:100%;max-height:100%">@endif
+            @elseif($key === 'custom')
+                <div class="field-content">{{ $field['text'] ?? '' }}</div>
             @else
                 <div class="field-content">{{ $values[$key] ?? '' }}</div>
             @endif

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 final class BadgeDesign
 {
-    public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'category' => 'Category', 'member' => 'Member ID', 'room' => 'Room assignment', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
+    public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'category' => 'Category', 'member' => 'Member ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
 
     public static function defaults(string $layout = 'standard'): array
     {
@@ -16,7 +16,8 @@ final class BadgeDesign
             'company' => [22, 7, 70, 9, 12], 'event' => [7, 22, 86, 12, 17],
             'meta' => [7, 35, 86, 9, 9], 'name' => [7, 49, 86, 17, 25],
             'category' => [7, 68, 53, 7, 11], 'member' => [7, 81, 51, 9, 11],
-            'room' => [7, 92, 86, 5, 8], 'qr' => [64, 75, 29, 21, 10],
+            'room' => [7, 92, 86, 5, 8], 'custom' => [7, 16, 86, 5, 9],
+            'qr' => [64, 75, 29, 21, 10],
             'company_logo' => [7, 6, 12, 10, 10], 'event_logo' => [78, 7, 14, 10, 10],
         ];
         if (in_array($layout, ['image_header', 'split'])) {
@@ -27,7 +28,10 @@ final class BadgeDesign
 
         $bold = ['name', 'event', 'company', 'category'];
 
-        return collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => $key !== 'event_logo', 'color' => null, 'bold' => in_array($key, $bold, true)])->all();
+        $defaults = collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => ! in_array($key, ['event_logo', 'custom'], true), 'color' => null, 'bold' => in_array($key, $bold, true)])->all();
+        $defaults['custom']['text'] = '';
+
+        return $defaults;
     }
 
     public static function fields(Event $event): array

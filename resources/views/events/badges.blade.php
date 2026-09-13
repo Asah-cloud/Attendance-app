@@ -45,6 +45,7 @@
 <input type="color" id="field-color">
 <div class="row">@foreach(['x'=>'Left (%)','y'=>'Top (%)','w'=>'Width (%)','h'=>'Height (%)'] as $key=>$label)<div><label for="field-{{ $key }}">{{ $label }}</label><input type="number" id="field-{{ $key }}" data-property="{{ $key }}" min="{{ in_array($key,['x','y']) ? 0 : ($key==='w'?5:3) }}" max="{{ in_array($key,['x','y']) ? 95 : 100 }}" step="0.1"></div>@endforeach</div>
 <label for="field-size">Font size (pt)</label><input type="number" id="field-size" data-property="size" min="6" max="48" step="0.5"><label for="field-align">Text alignment</label><select id="field-align"><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></select>
+<div id="field-text-wrap" class="hidden"><label for="field-text">Custom text</label><input type="text" id="field-text" maxlength="200" placeholder="e.g. Sponsored by Acme"></div>
 <p class="help field-note">Use the arrow keys on a selected field to move it; hold Shift for larger steps. The QR code stays visible on a white background, at least 25 mm square.</p>
 <div id="field-inputs"></div><button class="btn wide" type="submit">Save design</button><p id="save-status" class="help" role="status">Saved design ready for PDF.</p><p class="help">Saved designs can be reused by other events in your company.</p>
 </section>
