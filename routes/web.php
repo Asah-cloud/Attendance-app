@@ -31,6 +31,7 @@ use App\Http\Controllers\SuperAdmin\CompanyPricingController;
 use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
 use App\Http\Controllers\SuperAdmin\IntegrationSettingsController;
 use App\Http\Controllers\SuperAdmin\PlanController;
+use App\Http\Controllers\SupportStaffController;
 use App\Http\Middleware\VerifyPaystackSignature;
 use Illuminate\Support\Facades\Route;
 
@@ -278,6 +279,11 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/compare', [ParticipantMergeController::class, 'compare'])->name('compare');
         Route::post('/merge', [ParticipantMergeController::class, 'merge'])->name('merge');
         Route::delete('/clear-all', [ParticipantMergeController::class, 'destroyAll'])->name('clear-all');
+    });
+
+    Route::middleware(['role:manager'])->prefix('support-staff')->name('support-staff.')->group(function () {
+        Route::get('/', [SupportStaffController::class, 'index'])->name('index');
+        Route::post('/import', [SupportStaffController::class, 'import'])->name('import');
     });
 
     // --- SUPER ADMIN ONLY ROUTES ---

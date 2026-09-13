@@ -146,7 +146,9 @@ class EventBillingService
         $event = $charge->event;
         abort_unless($event->status === 'closed', 422, 'This event has not closed yet.');
 
-        $checkedInCount = $event->checkedInParticipantCount();
+        $checkedInCount = $event->attendances()
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
+            ->distinct('participant_id')->count('participant_id');
         $calc = $this->pricing->calculate($event->company, $checkedInCount, $event);
         $refundAmount = max(0, $charge->amount_minor - $calc['amount_minor']);
 
@@ -199,7 +201,9 @@ class EventBillingService
 
     private function registeredCount(Event $event): int
     {
-        return $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)->count();
+        return $event->registrations()->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
+            ->count();
     }
 
     private function notifyManagers(Event $event, Notification $notification): void

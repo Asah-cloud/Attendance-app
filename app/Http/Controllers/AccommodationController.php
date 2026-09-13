@@ -82,7 +82,7 @@ class AccommodationController extends Controller
                         foreach ($floor->rooms as $room) {
                             $destRoom = $destFloor->rooms()->firstOrCreate(
                                 ['name' => $room->name],
-                                ['capacity' => $room->capacity, 'gender_restriction' => $room->gender_restriction, 'category_restriction' => $room->category_restriction, 'is_accessible' => $room->is_accessible, 'priority' => $room->priority, 'notes' => $room->notes, 'status' => AccommodationRoom::STATUS_ACTIVE]
+                                ['capacity' => $room->capacity, 'gender_restriction' => $room->gender_restriction, 'category_restriction' => $room->category_restriction, 'is_accessible' => $room->is_accessible, 'priority' => $room->priority, 'notes' => $room->notes, 'status' => $room->status]
                             );
                             $counts['room'] += $destRoom->wasRecentlyCreated ? 1 : 0;
                         }
@@ -500,12 +500,19 @@ class AccommodationController extends Controller
     {
         $this->authorize('update', $event);
         $this->floorBelongs($floor, $event);
-        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'priority' => ['required', 'integer', 'min:0'], 'is_active' => ['nullable', 'boolean'], 'is_accessible' => ['nullable', 'boolean']]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'priority' => ['required', 'integer', 'min:0'], 'is_active' => ['nullable', 'boolean'], 'is_accessible' => ['nullable', 'boolean'], 'room_status' => ['nullable', Rule::in(['active', 'reserved', 'closed'])]]);
+        $roomStatus = $data['room_status'] ?? null;
+        unset($data['room_status']);
         $data['is_active'] = $request->boolean('is_active');
         $data['is_accessible'] = $request->boolean('is_accessible');
-        $floor->update($data);
+        DB::transaction(function () use ($floor, $data, $roomStatus): void {
+            $floor->update($data);
+            if ($roomStatus) {
+                $floor->rooms()->update(['status' => $roomStatus]);
+            }
+        });
 
-        return back()->with('success', 'Floor updated.');
+        return back()->with('success', $roomStatus ? 'Floor and all its rooms updated.' : 'Floor updated.');
     }
 
     public function destroyInventory(Event $event, string $type, int $id): RedirectResponse

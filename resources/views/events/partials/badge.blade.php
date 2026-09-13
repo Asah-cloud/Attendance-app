@@ -30,7 +30,7 @@
         <div class="badge-field" data-field="{{ $key }}" style="left:{{ $field['x'] * $badgeWidth / 100 }}mm;top:{{ $field['y'] * $badgeHeight / 100 }}mm;width:{{ $field['w'] * $badgeWidth / 100 }}mm;height:{{ $field['h'] * $badgeHeight / 100 }}mm;font-size:{{ $field['size'] }}pt;text-align:{{ $field['align'] }};font-weight:{{ ($field['bold'] ?? false) ? 'bold' : 'normal' }};@if(!empty($field['color'])) color:{{ $field['color'] }}; @endif @if(!$field['visible']) display:none; @endif @if($key === 'category') background:{{ $categoryColor }}; @endif" @if(!($pdfMode ?? false)) tabindex="0" role="button" aria-label="Edit {{ \App\Support\BadgeDesign::LABELS[$key] }}" @endif>
             @if($key === 'qr')
                 @if($registration)
-                <img src="{{ \App\Support\Pdf\PdfQrCode::dataUri('ASAH-ATTENDANCE:'.$registration->registration_code, 400, 4) }}" alt="Attendance &amp; meal collection QR code" style="width:{{ $qrSize }}mm;height:{{ $qrSize }}mm">
+                <img src="{{ \App\Support\Pdf\PdfQrCode::dataUri(\App\Support\BadgeDesign::qrPayload($registration), 400, 4) }}" alt="Attendance &amp; meal collection QR code" style="width:{{ $qrSize }}mm;height:{{ $qrSize }}mm">
                 @else
                 <div class="field-content" style="padding:3mm;font-size:9pt">QR code<br>Sample only</div>
                 @endif

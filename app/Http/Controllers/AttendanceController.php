@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Services\ApplicationCache;
+use App\Services\EventRegistrationResolver;
 use App\Services\ParticipantRegistrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +17,7 @@ class AttendanceController extends Controller
     public function __construct(
         private readonly ApplicationCache $cache,
         private readonly ParticipantRegistrationService $registrations,
+        private readonly EventRegistrationResolver $registrationResolver,
     ) {}
 
     private function getEventDay(Request $request, Event $event)
@@ -262,12 +264,8 @@ class AttendanceController extends Controller
             'registration_code' => ['required', 'string', 'max:500'],
         ]);
 
-        $code = $this->registrationCodeFromScan($validated['registration_code']);
-
-        $registration = $event->registrations()
-            ->with(['participant', 'roomAssignment.room.floor.block.site'])
-            ->where('registration_code', $code)
-            ->first();
+        $registration = $this->registrationResolver->fromScan($event, $validated['registration_code']);
+        $registration?->load(['participant', 'roomAssignment.room.floor.block.site']);
 
         if (! $registration) {
             return response()->json(['message' => 'We could not match this QR code to this event. Please check the code and try again, or ask a manager for help.'], 422);
@@ -315,22 +313,6 @@ class AttendanceController extends Controller
     private function totalDays(Event $event): int
     {
         return $event->totalDays();
-    }
-
-    private function registrationCodeFromScan(string $value): string
-    {
-        $value = trim($value);
-
-        if (str_starts_with($value, 'ASAH-ATTENDANCE:')) {
-            return substr($value, strlen('ASAH-ATTENDANCE:'));
-        }
-
-        $path = parse_url($value, PHP_URL_PATH);
-        if (is_string($path) && preg_match('#/check-in/([^/]+)$#', $path, $matches)) {
-            return rawurldecode($matches[1]);
-        }
-
-        return $value;
     }
 
     private function ensureValidDay(Event $event, int $day): void

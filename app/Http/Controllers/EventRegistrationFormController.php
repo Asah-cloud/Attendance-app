@@ -248,7 +248,8 @@ class EventRegistrationFormController extends Controller
     {
         $this->authorize('manageWhenOpen', $event);
         abort_unless($registration->event_id === $event->id && $registration->status === EventRegistration::STATUS_CONFIRMED, 404);
-        $uri = PdfQrCode::dataUri('ASAH-ATTENDANCE:'.$registration->registration_code, 400, 4);
+        $registration->loadMissing('participant');
+        $uri = PdfQrCode::dataUri(BadgeDesign::qrPayload($registration), 400, 4);
 
         return response(base64_decode(explode(',', $uri, 2)[1]), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store']);
     }

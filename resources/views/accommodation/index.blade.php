@@ -217,6 +217,8 @@
                                                                     <select name="priority" class="rounded-lg border-slate-300 text-xs">@foreach(Priority::options($floor->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $floor->priority)>{{ $label }}</option>@endforeach</select>
                                                                     <label class="text-xs"><input type="checkbox" name="is_accessible" value="1" @checked($floor->is_accessible)> Step-free access (no stairs)</label>
                                                                     <label class="text-xs"><input type="checkbox" name="is_active" value="1" @checked($floor->is_active)> Active</label>
+                                                                    <label class="text-xs font-bold text-slate-700">Set every room on this floor</label>
+                                                                    <select name="room_status" class="rounded-lg border-slate-300 text-xs"><option value="">Keep room statuses</option><option value="reserved">Reserved</option><option value="active">Active</option><option value="closed">Closed</option></select>
                                                                     <button class="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save</button>
                                                                 </form>
                                                                 <form method="POST" action="{{ route('events.accommodation.inventory.destroy', [$event, 'floor', $floor->id]) }}">@csrf @method('DELETE')<button class="text-xs font-bold text-red-600">Delete empty floor</button></form>

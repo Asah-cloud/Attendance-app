@@ -55,7 +55,15 @@ The importer expects the following zero-based spreadsheet layout:
 | E | Category (optional) |
 | F | Phone (optional) |
 
-The first row may contain headings. Imported accounts receive a random unusable password and are assigned to the selected event and its company.
+The first row may contain headings. Imported participants are assigned to the selected event and its company.
+
+## Event support staff roster
+
+Managers can import non-system event workers from **Event Staff** using a spreadsheet with Name in column A, Department in column B, and Category in column C. Category defaults to `Staff`. The manager selects one or more events during import.
+
+Each imported worker receives a generated staff ID and a permanent company staff QR code. The same badge can be scanned at every event to which the worker is assigned. Support staff do not receive login accounts and are excluded from attendee billing. Badge Studio can filter by category and print the worker's department and staff ID.
+
+Accommodation remains event-scoped. Managers can reserve every room on a floor from the floor editor, manually assign only the staff who need beds, and copy accommodation inventory to another company event. Copied inventory preserves room reservation status but does not copy occupants.
 
 ## Roles and tenancy
 

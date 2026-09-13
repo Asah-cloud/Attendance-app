@@ -14,6 +14,7 @@
         request()->routeIs('billing.*') => ['Billing', route('billing.index')],
         request()->routeIs('organization.*') => ['Organization', route('organization.branding.edit')],
         request()->routeIs('participants.duplicates.*') => ['Merge duplicates', route('participants.duplicates.index')],
+        request()->routeIs('support-staff.*') => ['Event staff', route('support-staff.index')],
         request()->routeIs('profile.*') => ['Profile', route('profile.edit')],
         default => null,
     };

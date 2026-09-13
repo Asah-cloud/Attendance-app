@@ -24,3 +24,5 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /tmp
+/output
+/training-build

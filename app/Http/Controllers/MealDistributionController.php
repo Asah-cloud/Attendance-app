@@ -12,6 +12,7 @@ use App\Models\MealWasteLog;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\MealStockLow;
 use App\Services\AuditApprovalService;
+use App\Services\EventRegistrationResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -223,10 +224,8 @@ class MealDistributionController extends Controller
             'scanned_at' => ['nullable', 'date'],
         ]);
 
-        $code = str_starts_with($validated['registration_code'], 'ASAH-ATTENDANCE:')
-            ? substr($validated['registration_code'], strlen('ASAH-ATTENDANCE:'))
-            : $validated['registration_code'];
-        $registration = $event->registrations()->with('participant')->where('registration_code', $code)->first();
+        $registration = app(EventRegistrationResolver::class)->fromScan($event, $validated['registration_code']);
+        $registration?->load('participant');
 
         if (! $registration || $registration->status !== EventRegistration::STATUS_CONFIRMED) {
             return $this->issueResponse($request, false, 'This QR code does not belong to a confirmed attendee for this event.', 422);

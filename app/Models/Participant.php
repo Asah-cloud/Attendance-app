@@ -26,7 +26,12 @@ class Participant extends Model
         return '233'.ltrim($phone, '0');
     }
 
-    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'member_id', 'category', 'gender', 'dietary_notes', 'room_group'];
+    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group'];
+
+    protected function casts(): array
+    {
+        return ['is_support_staff' => 'boolean'];
+    }
 
     public function company(): BelongsTo
     {

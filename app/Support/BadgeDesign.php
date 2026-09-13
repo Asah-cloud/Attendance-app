@@ -8,14 +8,14 @@ use Illuminate\Support\Facades\Storage;
 
 final class BadgeDesign
 {
-    public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'category' => 'Category', 'member' => 'Member ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
+    public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'department' => 'Department', 'category' => 'Category', 'member' => 'Member or staff ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
 
     public static function defaults(string $layout = 'standard'): array
     {
         $positions = [
             'company' => [22, 7, 70, 9, 12], 'event' => [7, 22, 86, 12, 17],
             'meta' => [7, 35, 86, 9, 9], 'name' => [7, 49, 86, 17, 25],
-            'category' => [7, 68, 53, 7, 11], 'member' => [7, 81, 51, 9, 11],
+            'department' => [7, 66, 53, 6, 10], 'category' => [7, 73, 53, 7, 11], 'member' => [7, 82, 51, 8, 10],
             'room' => [7, 92, 86, 5, 8], 'custom' => [7, 16, 86, 5, 9],
             'qr' => [64, 75, 29, 21, 10],
             'company_logo' => [7, 6, 12, 10, 10], 'event_logo' => [78, 7, 14, 10, 10],
@@ -67,9 +67,19 @@ final class BadgeDesign
         return [
             'company' => $event->company?->name ?? 'Event Organizer', 'event' => $event->title,
             'meta' => $event->event_date->format('j M Y').($event->end_date && ! $event->end_date->equalTo($event->event_date) ? ' - '.$event->end_date->format('j M Y') : '').($event->location ? ' · '.$event->location : ''),
-            'name' => $name, 'category' => $registration?->participant->category ?: 'Attendee',
-            'member' => $registration?->participant->member_id ?: 'Event Pass',
+            'name' => $name, 'department' => $registration?->participant->department ?: '',
+            'category' => $registration?->participant->category ?: 'Attendee',
+            'member' => $registration?->participant->staff_code ?: ($registration?->participant->member_id ?: 'Event Pass'),
             'room' => $event->accommodation_published && $assignment ? $assignment->room->name : '',
         ];
+    }
+
+    public static function qrPayload(EventRegistration $registration): string
+    {
+        $participant = $registration->participant;
+
+        return $participant?->is_support_staff && $participant->staff_qr_token
+            ? 'ASAH-STAFF:'.$participant->staff_qr_token
+            : 'ASAH-ATTENDANCE:'.$registration->registration_code;
     }
 }
