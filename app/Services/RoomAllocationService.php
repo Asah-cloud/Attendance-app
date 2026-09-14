@@ -6,6 +6,8 @@ use App\Models\AccommodationRoom;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\RoomAssignment;
+use App\Notifications\Concerns\NotifiesPerChannel;
+use App\Notifications\RoomAssigned;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -256,6 +258,61 @@ class RoomAllocationService
 
             return ['ok' => true, 'message' => 'Your room is confirmed: '.$room->label().'.'];
         });
+    }
+
+    /**
+     * Manually place a registration in a specific room, bypassing gender/category/accessibility
+     * restrictions (a deliberate manager override) - shared by the accommodation controller's
+     * plain form and the Livewire room-assignment table so both enforce the same rules.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function assignManually(EventRegistration $registration, AccommodationRoom $room, int $assignedByUserId, bool $isLocked, bool $sendNotification, bool $eventPublished): array
+    {
+        $assignment = $registration->roomAssignment;
+        if ($assignment?->status === 'checked_in' && $assignment->accommodation_room_id !== $room->id) {
+            return ['ok' => false, 'message' => 'Checked-in attendees cannot be moved.'];
+        }
+        if ($room->status === AccommodationRoom::STATUS_CLOSED) {
+            return ['ok' => false, 'message' => 'That room is closed. Set it to active or reserved first.'];
+        }
+        if (! $room->floor->is_active || ! $room->floor->block->is_active) {
+            return ['ok' => false, 'message' => 'That room is on an inactive floor or block. Reactivate it first.'];
+        }
+        if ($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->count() >= $room->capacity) {
+            return ['ok' => false, 'message' => 'That room is already full.'];
+        }
+
+        RoomAssignment::updateOrCreate(['event_registration_id' => $registration->id], [
+            'accommodation_room_id' => $room->id,
+            'status' => 'assigned',
+            'method' => 'manual',
+            'is_locked' => $isLocked,
+            'allocation_reason' => 'Manually assigned by a manager.',
+            'assigned_by' => $assignedByUserId,
+            'assigned_at' => now(),
+        ]);
+        $registration->update(['accommodation_required' => true]);
+
+        if ($eventPublished && $sendNotification) {
+            $fresh = $registration->roomAssignment()->firstOrFail();
+            $fresh->loadMissing('registration.participant');
+            NotifiesPerChannel::send($fresh->registration->participant, new RoomAssigned($fresh));
+            $fresh->update(['notification_sent_at' => now()]);
+        }
+
+        return ['ok' => true, 'message' => 'Room assigned.'];
+    }
+
+    /** @return array{ok: bool, message: string} */
+    public function removeAssignment(EventRegistration $registration): array
+    {
+        if ($registration->roomAssignment?->status === 'checked_in') {
+            return ['ok' => false, 'message' => 'Checked-in assignments cannot be removed.'];
+        }
+        $registration->roomAssignment?->delete();
+
+        return ['ok' => true, 'message' => 'Room assignment removed.'];
     }
 
     public function matches(EventRegistration $registration, AccommodationRoom $room): bool

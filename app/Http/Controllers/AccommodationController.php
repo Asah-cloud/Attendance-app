@@ -384,38 +384,31 @@ class AccommodationController extends Controller
         return back()->with('success', $message);
     }
 
-    public function assign(Request $request, Event $event, EventRegistration $registration): RedirectResponse
+    public function assign(Request $request, Event $event, EventRegistration $registration, RoomAllocationService $allocator): RedirectResponse
     {
         $this->authorize('update', $event);
         abort_unless($registration->event_id === $event->id, 404);
         $data = $request->validate(['room_id' => ['required', 'integer'], 'is_locked' => ['nullable', 'boolean'], 'send_notification' => ['nullable', 'boolean']]);
         $room = AccommodationRoom::with('floor.block.site')->findOrFail($data['room_id']);
         $this->roomBelongs($room, $event);
-        $assignment = $registration->roomAssignment;
-        abort_if($assignment?->status === 'checked_in' && $assignment->accommodation_room_id !== $room->id, 422, 'Checked-in attendees cannot be moved.');
-        abort_if($room->status === 'closed', 422, 'That room is closed. Set it to active or reserved first.');
-        abort_if(! $room->floor->is_active || ! $room->floor->block->is_active, 422, 'That room is on an inactive floor or block. Reactivate it first.');
-        abort_if($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->count() >= $room->capacity, 422, 'That room is already full.');
-        RoomAssignment::updateOrCreate(['event_registration_id' => $registration->id], ['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual', 'is_locked' => $request->boolean('is_locked'), 'allocation_reason' => 'Manually assigned by a manager.', 'assigned_by' => $request->user()->id, 'assigned_at' => now()]);
-        $registration->update(['accommodation_required' => true]);
+
         // Defaults to sending immediately (unchanged behaviour); unticking "Email
         // this attendee now" leaves notification_sent_at null so the assignment
         // is still picked up later by the bulk "Email rooms to attendees" action.
-        if ($event->accommodation_published && $request->boolean('send_notification', true)) {
-            $this->notifyAssignment($registration->roomAssignment()->firstOrFail());
-        }
+        $result = $allocator->assignManually($registration, $room, $request->user()->id, $request->boolean('is_locked'), $request->boolean('send_notification', true), $event->accommodation_published);
+        abort_if(! $result['ok'], 422, $result['message']);
 
-        return back()->with('success', 'Room assigned.');
+        return back()->with('success', $result['message']);
     }
 
-    public function destroyAssignment(Event $event, EventRegistration $registration): RedirectResponse
+    public function destroyAssignment(Event $event, EventRegistration $registration, RoomAllocationService $allocator): RedirectResponse
     {
         $this->authorize('update', $event);
         abort_unless($registration->event_id === $event->id, 404);
-        abort_if($registration->roomAssignment?->status === 'checked_in', 422, 'Checked-in assignments cannot be removed.');
-        $registration->roomAssignment?->delete();
+        $result = $allocator->removeAssignment($registration);
+        abort_if(! $result['ok'], 422, $result['message']);
 
-        return back()->with('success', 'Room assignment removed.');
+        return back()->with('success', $result['message']);
     }
 
     public function checkIn(Request $request, Event $event, EventRegistration $registration): RedirectResponse
