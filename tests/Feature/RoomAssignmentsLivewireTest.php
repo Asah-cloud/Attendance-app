@@ -57,7 +57,7 @@ it('assigns a room through the Livewire component without a page navigation', fu
         ->assertSee($room->name)
         ->set("selectedRoom.{$registration->id}", $room->id)
         ->call('assign', $registration->id)
-        ->assertSet('flash', 'Room assigned.');
+        ->assertDispatched('notify', message: 'Room assigned.', type: 'success');
 
     $registration->refresh();
     expect($registration->roomAssignment->accommodation_room_id)->toBe($room->id)
@@ -110,14 +110,14 @@ it('lets a manager remove an assignment through the component, but not once chec
     $this->actingAs($manager);
     Livewire::test(RoomAssignments::class, ['event' => $event])
         ->call('removeAssignment', $registration->id)
-        ->assertSet('flash', 'Room assignment removed.');
+        ->assertDispatched('notify', message: 'Room assignment removed.', type: 'success');
 
     expect($registration->fresh()->roomAssignment)->toBeNull();
 
     $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'checked_in']);
     Livewire::test(RoomAssignments::class, ['event' => $event])
         ->call('removeAssignment', $registration->id)
-        ->assertSet('flashType', 'error');
+        ->assertDispatched('notify', type: 'error');
 
     expect($registration->fresh()->roomAssignment)->not->toBeNull();
 });
@@ -145,8 +145,7 @@ it('rejects assigning a full room', function () {
     Livewire::test(RoomAssignments::class, ['event' => $event])
         ->set("selectedRoom.{$newcomer->id}", $room->id)
         ->call('assign', $newcomer->id)
-        ->assertSet('flashType', 'error')
-        ->assertSet('flash', 'That room is already full.');
+        ->assertDispatched('notify', message: 'That room is already full.', type: 'error');
 
     expect(RoomAssignment::where('event_registration_id', $newcomer->id)->exists())->toBeFalse();
 });

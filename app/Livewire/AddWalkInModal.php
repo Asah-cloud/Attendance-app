@@ -57,7 +57,7 @@ class AddWalkInModal extends Component
         // Tell the parent page to refresh its attendee list grid
         $this->dispatch('refreshAttendeeList');
 
-        session()->flash('message', '🎉 Walk-in member registered successfully!');
+        $this->dispatch('notify', message: 'Walk-in member registered successfully!', type: 'success');
     }
 
     public function render()

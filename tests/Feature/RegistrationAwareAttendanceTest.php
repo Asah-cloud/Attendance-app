@@ -145,7 +145,8 @@ it('reuses an existing participant when a manager adds a walk in', function () {
         ->set('email', 'walkin@example.com')
         ->set('phone', '0201234567')
         ->call('registerWalkIn')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->assertDispatched('notify', type: 'success');
 
     expect(Participant::where('email', 'walkin@example.com')->count())->toBe(1)
         ->and($participant->fresh()->name)->toBe('Updated Walk In')

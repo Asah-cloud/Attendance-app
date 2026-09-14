@@ -90,6 +90,21 @@ it('checks a staff member in from the manual list via the Livewire toggle', func
     $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => -1]);
 });
 
+it('notifies through the shared toast bubble instead of a silent session flash', function () {
+    [, $event, $manager, $staff] = staffCheckInFixture();
+    $event->update(['cancelled_at' => now()]);
+
+    $this->actingAs($manager);
+    Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
+        ->call('toggleAttendance', $staff->id)
+        ->assertDispatched('notify', message: 'This event is closed.', type: 'error');
+
+    $event->update(['cancelled_at' => null]);
+    Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
+        ->call('deleteUser', $staff->id)
+        ->assertDispatched('notify', message: 'Member removed successfully.', type: 'success');
+});
+
 it('checks a staff member in via their staff QR and keeps it separate from daily attendance', function () {
     [, $event, $manager, $staff] = staffCheckInFixture();
 

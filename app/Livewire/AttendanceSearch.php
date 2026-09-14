@@ -98,18 +98,18 @@ class AttendanceSearch extends Component
 
         if ($this->mode === 'staff') {
             if ($this->event->isClosed()) {
-                session()->flash('error', 'This event is closed.');
+                $this->dispatch('notify', message: 'This event is closed.', type: 'error');
 
                 return;
             }
         } else {
             if ($this->selectedDay === 'all') {
-                session()->flash('error', 'Select a specific event day before changing attendance.');
+                $this->dispatch('notify', message: 'Select a specific event day before changing attendance.', type: 'error');
 
                 return;
             }
             if (! $this->event->canMarkAttendanceForDay((int) $this->selectedDay)) {
-                session()->flash('error', 'Attendance can only be changed for a day that has started while the event is active.');
+                $this->dispatch('notify', message: 'Attendance can only be changed for a day that has started while the event is active.', type: 'error');
 
                 return;
             }
@@ -147,7 +147,7 @@ class AttendanceSearch extends Component
         Gate::authorize('update', $this->event);
         $this->participantsQuery()->findOrFail($participantId);
         $this->event->registrations()->where('participant_id', $participantId)->delete();
-        session()->flash('message', '🗑️ Member removed successfully.');
+        $this->dispatch('notify', message: 'Member removed successfully.', type: 'success');
     }
 
     public function render()

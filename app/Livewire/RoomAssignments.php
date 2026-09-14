@@ -31,10 +31,6 @@ class RoomAssignments extends Component
     /** @var array<int, bool> */
     public array $emailNow = [];
 
-    public ?string $flash = null;
-
-    public string $flashType = 'success';
-
     protected $queryString = ['search' => ['except' => '']];
 
     public function mount(Event $event): void
@@ -65,8 +61,7 @@ class RoomAssignments extends Component
         $roomId = $this->selectedRoom[$registrationId] ?? null;
 
         if (! $roomId) {
-            $this->flash = 'Choose a room before assigning.';
-            $this->flashType = 'error';
+            $this->dispatch('notify', message: 'Choose a room before assigning.', type: 'error');
 
             return;
         }
@@ -83,8 +78,7 @@ class RoomAssignments extends Component
             $this->event->accommodation_published
         );
 
-        $this->flash = $result['message'];
-        $this->flashType = $result['ok'] ? 'success' : 'error';
+        $this->dispatch('notify', message: $result['message'], type: $result['ok'] ? 'success' : 'error');
     }
 
     public function removeAssignment(int $registrationId, RoomAllocationService $allocator): void
@@ -93,8 +87,7 @@ class RoomAssignments extends Component
         $registration = $this->event->registrations()->findOrFail($registrationId);
         $result = $allocator->removeAssignment($registration);
 
-        $this->flash = $result['message'];
-        $this->flashType = $result['ok'] ? 'success' : 'error';
+        $this->dispatch('notify', message: $result['message'], type: $result['ok'] ? 'success' : 'error');
         unset($this->selectedRoom[$registrationId]);
     }
 

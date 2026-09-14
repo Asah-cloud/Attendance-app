@@ -1,8 +1,4 @@
 <div>
-    @if($flash)
-        <div class="mb-4 rounded-2xl p-4 text-sm font-bold {{ $flashType === 'success' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800' }}" role="status">{{ $flash }}</div>
-    @endif
-
     <div class="flex flex-wrap items-center gap-3">
         <input wire:model.live.debounce.300ms="search" type="search" placeholder="Search name, email or room…" class="w-full rounded-xl border-slate-300 text-sm sm:w-72">
         <label class="flex items-center gap-2 text-xs font-bold text-slate-600"><input type="checkbox" wire:model.live="unassignedOnly"> Unassigned only</label>
