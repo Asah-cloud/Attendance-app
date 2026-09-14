@@ -576,6 +576,7 @@
         img.src = artwork;
     }
     render();
+    filter();
     if (dirty) markDirty();
     document.fonts.ready.then(render);
 })();

@@ -36,13 +36,13 @@
 
         {{-- Walk-in Form Trigger Button --}}
         @can('update', $event)
-        @if($mode !== 'arrival')
+        @if(!in_array($mode, ['arrival', 'staff'], true))
         <button type="button" wire:click="$dispatch('openWalkInModal')" class="w-full md:w-auto h-full px-6 py-5 bg-blue-900 border border-blue-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-md hover:bg-blue-950 transition-all transform hover:-translate-y-0.5 active:scale-95 whitespace-nowrap flex items-center justify-center gap-2">
             <span>➕ Add Walk-in Member</span>
         </button>
         @endif
         @else
-        <a href="{{ $mode === 'arrival' ? route('events.arrival.scanner', $event) : route('events.scanner', $event) }}" class="flex w-full items-center justify-center whitespace-nowrap rounded-2xl bg-blue-900 px-6 py-5 text-sm font-black uppercase tracking-wider text-white shadow-md hover:bg-blue-950 md:w-auto">Open QR scanner</a>
+        <a href="{{ match($mode) { 'arrival' => route('events.arrival.scanner', $event), 'staff' => route('support-staff.checkin.scanner', $event), default => route('events.scanner', $event) } }}" class="flex w-full items-center justify-center whitespace-nowrap rounded-2xl bg-blue-900 px-6 py-5 text-sm font-black uppercase tracking-wider text-white shadow-md hover:bg-blue-950 md:w-auto">Open QR scanner</a>
         @endcan
     </div>
 
@@ -107,7 +107,7 @@
                                             <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                             </svg>
-                                            {{ $mode === 'arrival' ? 'ARRIVED' : 'PRESENT' }}
+                                            {{ match($mode) { 'arrival' => 'ARRIVED', 'staff' => 'CHECKED IN', default => 'PRESENT' } }}
                                         </span>
                                         <button wire:click="toggleAttendance({{ $user->id }})" 
                                                 wire:loading.attr="disabled"
@@ -121,7 +121,7 @@
                                             class="group relative inline-flex items-center justify-center px-8 py-3 bg-white border-2 border-blue-600 text-blue-600 rounded-xl font-black text-xs uppercase tracking-widest overflow-hidden transition-all hover:bg-blue-600 hover:text-white active:scale-95 disabled:opacity-50">
                                         
                                         <span wire:loading.remove wire:target="toggleAttendance({{ $user->id }})">
-                                            {{ $mode === 'arrival' ? 'Check in arrival' : 'Mark Present' }}
+                                            {{ match($mode) { 'arrival' => 'Check in arrival', 'staff' => 'Check In', default => 'Mark Present' } }}
                                         </span>
                                         
                                         <span wire:loading wire:target="toggleAttendance({{ $user->id }})" class="flex items-center">
@@ -131,7 +131,7 @@
                                     </button>
                                 @endif
                                 @else
-                                    <span class="inline-flex rounded-xl bg-slate-100 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">{{ $isPresent ? 'Present' : 'Use QR scanner' }}</span>
+                                    <span class="inline-flex rounded-xl bg-slate-100 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">{{ $isPresent ? ($mode === 'staff' ? 'Checked in' : 'Present') : 'Use QR scanner' }}</span>
                                 @endcan
                             </td>
                         </tr>
@@ -164,6 +164,6 @@
 
     {{-- Walk-in Modal Subcomponent --}}
     @can('update', $event)
-        @if($mode !== 'arrival')<livewire:add-walk-in-modal :event="$event" />@endif
+        @if(!in_array($mode, ['arrival', 'staff'], true))<livewire:add-walk-in-modal :event="$event" />@endif
     @endcan
 </div>

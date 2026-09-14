@@ -174,10 +174,19 @@ class Event extends Model
             ->withTimestamps();
     }
 
+    /** Confirmed registrations, excluding event support staff - see confirmedStaff(). */
     public function confirmedParticipants(): BelongsToMany
     {
         return $this->registeredParticipants()
-            ->wherePivot('status', EventRegistration::STATUS_CONFIRMED);
+            ->wherePivot('status', EventRegistration::STATUS_CONFIRMED)
+            ->where('is_support_staff', false);
+    }
+
+    public function confirmedStaff(): BelongsToMany
+    {
+        return $this->registeredParticipants()
+            ->wherePivot('status', EventRegistration::STATUS_CONFIRMED)
+            ->where('is_support_staff', true);
     }
 
     public function arrivedParticipants(): BelongsToMany

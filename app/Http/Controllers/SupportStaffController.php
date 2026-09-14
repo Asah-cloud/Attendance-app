@@ -3,16 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Imports\SupportStaffImport;
+use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\EventRegistration;
 use App\Models\Participant;
+use App\Services\ApplicationCache;
+use App\Services\EventRegistrationResolver;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
 class SupportStaffController extends Controller
 {
+    /** The day value recorded for a support-staff check-in - see AttendanceSearch::STAFF_CHECKIN_DAY. */
+    private const CHECKIN_DAY = -1;
+
     public function index(Request $request): View
     {
         $companies = collect();
@@ -58,5 +68,104 @@ class SupportStaffController extends Controller
 
         return redirect()->route('support-staff.index', $request->user()->hasRole('admin') ? ['company_id' => $companyId] : [])
             ->with('success', "Staff roster imported: {$import->created} created, {$import->updated} matched, {$import->assigned} new event assignment(s).");
+    }
+
+    public function checkin(Event $event): View
+    {
+        $this->authorize('view', $event);
+
+        return view('support-staff.checkin', compact('event'));
+    }
+
+    public function checkinScanner(Event $event): View
+    {
+        $this->authorize('scanAttendance', $event);
+
+        return view('support-staff.scanner', compact('event'));
+    }
+
+    public function scan(Request $request, Event $event, EventRegistrationResolver $resolver): JsonResponse
+    {
+        $this->authorize('scanAttendance', $event);
+
+        $validated = $request->validate(['registration_code' => ['required', 'string', 'max:500']]);
+
+        $registration = $resolver->fromScan($event, $validated['registration_code']);
+        $registration?->loadMissing('participant');
+
+        if (! $registration || ! $registration->participant->is_support_staff) {
+            return response()->json(['message' => 'This code does not belong to event staff for this event.'], 422);
+        }
+
+        if ($registration->status !== EventRegistration::STATUS_CONFIRMED) {
+            return response()->json(['message' => "{$registration->participant->name} is not a confirmed staff member for this event."], 422);
+        }
+
+        if ($event->isClosed()) {
+            return response()->json(['message' => 'This event is closed.'], 422);
+        }
+
+        $attendance = Attendance::query()->createOrFirst([
+            'event_id' => $event->id,
+            'participant_id' => $registration->participant_id,
+            'day' => self::CHECKIN_DAY,
+        ], [
+            'status' => 'present',
+            'marked_by' => Auth::id(),
+        ]);
+
+        app(ApplicationCache::class)->invalidateEvent($event->id, $event->company_id);
+
+        $message = $attendance->wasRecentlyCreated
+            ? "Welcome, {$registration->participant->name}! Badge check-in complete."
+            : "{$registration->participant->name} is already checked in.";
+
+        return response()->json(['successful' => true, 'message' => $message]);
+    }
+
+    public function report(Event $event): View
+    {
+        $this->authorize('view', $event);
+
+        [$staff, $checkedIn, $notCheckedIn] = $this->reportData($event);
+
+        return view('support-staff.report', [
+            'event' => $event,
+            'total' => $staff->count(),
+            'checkedIn' => $checkedIn,
+            'notCheckedIn' => $notCheckedIn,
+        ]);
+    }
+
+    public function reportCsv(Event $event)
+    {
+        $this->authorize('view', $event);
+        [, $checkedIn, $notCheckedIn] = $this->reportData($event);
+        $filename = Str::slug($event->title).'-staff-checkin.csv';
+
+        return response()->streamDownload(function () use ($checkedIn, $notCheckedIn): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Staff', 'Staff ID', 'Department', 'Category', 'Status', 'Checked in at']);
+            foreach ($checkedIn as $person) {
+                fputcsv($handle, [$person->name, $person->staff_code, $person->department, $person->category, 'Checked in', $person->attendances->first()?->created_at?->toDateTimeString()]);
+            }
+            foreach ($notCheckedIn as $person) {
+                fputcsv($handle, [$person->name, $person->staff_code, $person->department, $person->category, 'Not checked in', '']);
+            }
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /** @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection} */
+    private function reportData(Event $event): array
+    {
+        $staff = $event->confirmedStaff()
+            ->with(['attendances' => fn ($query) => $query->where('event_id', $event->id)->where('day', self::CHECKIN_DAY)])
+            ->orderBy('name')->get();
+
+        $checkedIn = $staff->filter(fn ($person) => $person->attendances->isNotEmpty())->values();
+        $notCheckedIn = $staff->diff($checkedIn)->values();
+
+        return [$staff, $checkedIn, $notCheckedIn];
     }
 }

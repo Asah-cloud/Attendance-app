@@ -34,6 +34,7 @@ class EventRegistrationFormController extends Controller
         $status = $request->string('status')->toString();
         $registrations = $event->registrations()
             ->with('participant')
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->latest('registered_at')
             ->paginate(25)
@@ -401,7 +402,9 @@ class EventRegistrationFormController extends Controller
         return response()->streamDownload(function () use ($event): void {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Name', 'Email', 'Phone', 'Category', 'Gender', 'Status', 'Source', 'Registered At', 'Registration Code']);
-            $event->registrations()->with('participant')->latest('registered_at')->chunk(250, function ($registrations) use ($handle): void {
+            $event->registrations()->with('participant')
+                ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
+                ->latest('registered_at')->chunk(250, function ($registrations) use ($handle): void {
                 foreach ($registrations as $registration) {
                     fputcsv($handle, [$registration->participant->name, $registration->participant->email, $registration->participant->phone, $registration->participant->category, $registration->participant->gender, $registration->status, $registration->source, $registration->registered_at?->toDateTimeString(), $registration->registration_code]);
                 }

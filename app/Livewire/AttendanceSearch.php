@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Attendance;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -12,6 +13,10 @@ use Livewire\WithPagination;
 class AttendanceSearch extends Component
 {
     use WithPagination;
+
+    /** The day value recorded for a support-staff check-in - a fixed sentinel, distinct from
+     *  arrival (day 0) and the event's numbered attendance days (day >= 1). */
+    private const STAFF_CHECKIN_DAY = -1;
 
     public $event;
 
@@ -41,8 +46,18 @@ class AttendanceSearch extends Component
         Gate::authorize('view', $this->event);
 
         $this->mode = $mode;
-        $this->selectedDay = $day ?? (int) request()->query('day', 1);
+        $this->selectedDay = $mode === 'staff' ? self::STAFF_CHECKIN_DAY : ($day ?? (int) request()->query('day', 1));
         $this->loadAttendedUserIds();
+    }
+
+    /** The participant relation this mode searches, toggles and validates against. */
+    private function participantsQuery(): BelongsToMany
+    {
+        return match ($this->mode) {
+            'staff' => $this->event->confirmedStaff(),
+            'arrival' => $this->event->confirmedParticipants(),
+            default => $this->event->attendanceEligibleParticipants(),
+        };
     }
 
     public function setDay($val)
@@ -79,17 +94,25 @@ class AttendanceSearch extends Component
     public function toggleAttendance(int $participantId)
     {
         Gate::authorize('update', $this->event);
-        $this->event->confirmedParticipants()->findOrFail($participantId);
+        $this->participantsQuery()->findOrFail($participantId);
 
-        if ($this->selectedDay === 'all') {
-            session()->flash('error', 'Select a specific event day before changing attendance.');
+        if ($this->mode === 'staff') {
+            if ($this->event->isClosed()) {
+                session()->flash('error', 'This event is closed.');
 
-            return;
-        }
-        if (! $this->event->canMarkAttendanceForDay((int) $this->selectedDay)) {
-            session()->flash('error', 'Attendance can only be changed for a day that has started while the event is active.');
+                return;
+            }
+        } else {
+            if ($this->selectedDay === 'all') {
+                session()->flash('error', 'Select a specific event day before changing attendance.');
 
-            return;
+                return;
+            }
+            if (! $this->event->canMarkAttendanceForDay((int) $this->selectedDay)) {
+                session()->flash('error', 'Attendance can only be changed for a day that has started while the event is active.');
+
+                return;
+            }
         }
 
         // Changed $this->day to $this->selectedDay
@@ -122,7 +145,7 @@ class AttendanceSearch extends Component
     public function deleteUser(int $participantId)
     {
         Gate::authorize('update', $this->event);
-        $this->event->confirmedParticipants()->findOrFail($participantId);
+        $this->participantsQuery()->findOrFail($participantId);
         $this->event->registrations()->where('participant_id', $participantId)->delete();
         session()->flash('message', '🗑️ Member removed successfully.');
     }
@@ -132,9 +155,7 @@ class AttendanceSearch extends Component
         Gate::authorize('view', $this->event);
         $words = explode(' ', trim($this->search));
 
-        $users = ($this->mode === 'arrival'
-            ? $this->event->confirmedParticipants()
-            : $this->event->attendanceEligibleParticipants())
+        $users = $this->participantsQuery()
             ->where(function ($q) use ($words) {
                 foreach ($words as $word) {
                     if (! empty($word)) {

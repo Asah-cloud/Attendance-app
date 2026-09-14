@@ -34,6 +34,25 @@
             </form>
         </section>
 
+        <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <h2 class="text-xl font-black text-slate-900">Manage staff by event</h2>
+            <p class="mt-2 text-sm text-slate-600">Check staff in when they collect their badge, see who has checked in, and print their badges — separate from your attendee tools.</p>
+            <div class="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-200">
+                @forelse($events as $event)
+                    <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+                        <div><strong class="text-sm text-slate-900">{{ $event->title }}</strong><span class="ml-2 text-xs text-slate-500">{{ $event->event_date->format('j M Y') }}</span></div>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('support-staff.checkin', $event) }}" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">Staff check-in</a>
+                            <a href="{{ route('support-staff.report', $event) }}" class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">Report</a>
+                            <a href="{{ route('events.badges', ['event' => $event, 'category' => 'Staff']) }}" class="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">Print staff badges</a>
+                        </div>
+                    </div>
+                @empty
+                    <p class="p-4 text-sm text-slate-500">There are no upcoming events.</p>
+                @endforelse
+            </div>
+        </section>
+
         <section class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
             <div class="border-b border-slate-200 p-6"><h2 class="text-xl font-black text-slate-900">Company staff roster</h2><p class="mt-1 text-sm text-slate-500">{{ $staff->total() }} staff member(s)</p></div>
             <div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm"><thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500"><tr><th class="px-6 py-4">Staff</th><th class="px-6 py-4">Department</th><th class="px-6 py-4">Category</th><th class="px-6 py-4">Assigned events</th></tr></thead><tbody class="divide-y divide-slate-100">

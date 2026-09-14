@@ -134,6 +134,13 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::post('/events/{event}/scanner/check-in', [AttendanceController::class, 'scan'])
         ->middleware('throttle:60,1')
         ->name('events.scanner.check-in');
+    Route::get('/support-staff/{event}/check-in', [SupportStaffController::class, 'checkin'])->name('support-staff.checkin');
+    Route::get('/support-staff/{event}/check-in/scanner', [SupportStaffController::class, 'checkinScanner'])->name('support-staff.checkin.scanner');
+    Route::post('/support-staff/{event}/check-in/scanner', [SupportStaffController::class, 'scan'])
+        ->middleware('throttle:60,1')
+        ->name('support-staff.checkin.scan');
+    Route::get('/support-staff/{event}/report', [SupportStaffController::class, 'report'])->name('support-staff.report');
+    Route::get('/support-staff/{event}/report/csv', [SupportStaffController::class, 'reportCsv'])->name('support-staff.report.csv');
     Route::get('/events/{event}/meals', [MealDistributionController::class, 'index'])->name('events.meals.index');
     Route::get('/events/{event}/meals/{meal}/scanner', [MealDistributionController::class, 'scanner'])->name('events.meals.scanner');
     Route::get('/events/{event}/meals/{meal}/status', [MealDistributionController::class, 'status'])->name('events.meals.status');
