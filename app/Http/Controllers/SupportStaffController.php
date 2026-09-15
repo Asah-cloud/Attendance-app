@@ -10,11 +10,13 @@ use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Services\ApplicationCache;
 use App\Services\EventRegistrationResolver;
+use App\Services\ParticipantRosterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -68,6 +70,29 @@ class SupportStaffController extends Controller
 
         return redirect()->route('support-staff.index', $request->user()->hasRole('admin') ? ['company_id' => $companyId] : [])
             ->with('success', "Staff roster imported: {$import->created} created, {$import->updated} matched, {$import->assigned} new event assignment(s).");
+    }
+
+    /** Wipe a company's support-staff roster, keeping anyone with recorded attendance (see ParticipantRosterService). */
+    public function destroyAll(Request $request, ParticipantRosterService $roster): RedirectResponse
+    {
+        $company = $request->user()->hasRole('admin')
+            ? Company::find($request->integer('company_id'))
+            : $request->user()->company;
+        abort_unless($company, 403);
+
+        if (trim((string) $request->input('confirm_name')) !== $company->name) {
+            throw ValidationException::withMessages(['confirm_name' => 'Type the exact company name to confirm.']);
+        }
+
+        ['removed' => $removed, 'kept' => $kept] = $roster->clearSupportStaffWithoutAttendance($company);
+
+        $message = "Deleted {$removed} staff member".($removed === 1 ? '' : 's').'.';
+        if ($kept > 0) {
+            $message .= " Kept {$kept} with recorded attendance.";
+        }
+
+        return redirect()->route('support-staff.index', $request->user()->hasRole('admin') ? ['company_id' => $company->id] : [])
+            ->with('success', $message);
     }
 
     public function checkin(Event $event): View

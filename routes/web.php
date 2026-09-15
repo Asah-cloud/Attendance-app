@@ -291,6 +291,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::middleware(['role:admin|manager'])->prefix('support-staff')->name('support-staff.')->group(function () {
         Route::get('/', [SupportStaffController::class, 'index'])->name('index');
         Route::post('/import', [SupportStaffController::class, 'import'])->name('import');
+        Route::delete('/clear-all', [SupportStaffController::class, 'destroyAll'])->name('clear-all');
     });
 
     // --- SUPER ADMIN ONLY ROUTES ---

@@ -60,5 +60,17 @@
                 @empty<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">No event support staff imported yet.</td></tr>@endforelse
             </tbody></table></div><div class="p-5">{{ $staff->links() }}</div>
         </section>
+
+        <div class="rounded-2xl border border-red-200 bg-red-50 p-6">
+            <h2 class="text-sm font-black uppercase tracking-wider text-red-700">Danger zone</h2>
+            <p class="mt-2 text-sm text-red-700">Permanently delete every support staff member in {{ $selectedCompany->name }} who has never been checked in anywhere. Staff with recorded attendance are kept. This cannot be undone.</p>
+            <form method="POST" action="{{ route('support-staff.clear-all') }}" class="mt-4 flex flex-wrap items-center gap-2" onsubmit="return confirm('Delete all eligible staff in {{ $selectedCompany->name }}? This cannot be undone.');">
+                @csrf @method('DELETE')
+                @if(auth()->user()->hasRole('admin'))<input type="hidden" name="company_id" value="{{ $selectedCompany->id }}">@endif
+                <label class="text-xs font-bold text-red-700">Type "{{ $selectedCompany->name }}" to confirm</label>
+                <input name="confirm_name" autocomplete="off" placeholder="{{ $selectedCompany->name }}" class="rounded-lg border-red-300 text-xs">
+                <button class="rounded-lg bg-red-600 px-4 py-2 text-xs font-black text-white">Delete all eligible staff</button>
+            </form>
+        </div>
     </div>
 </x-app-layout>

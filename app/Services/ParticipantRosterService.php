@@ -15,9 +15,27 @@ class ParticipantRosterService
      */
     public function clearRosterWithoutAttendance(Company $company): array
     {
-        $deletable = fn () => Participant::where('company_id', $company->id)->doesntHave('attendances');
+        return $this->clearWithoutAttendance($company, fn ($query) => $query);
+    }
 
-        $total = Participant::where('company_id', $company->id)->count();
+    /**
+     * Delete a company's support staff who have never been marked present anywhere,
+     * leaving ordinary attendees untouched.
+     *
+     * @return array{removed: int, kept: int}
+     */
+    public function clearSupportStaffWithoutAttendance(Company $company): array
+    {
+        return $this->clearWithoutAttendance($company, fn ($query) => $query->where('is_support_staff', true));
+    }
+
+    /** @return array{removed: int, kept: int} */
+    private function clearWithoutAttendance(Company $company, \Closure $scope): array
+    {
+        $base = fn () => $scope(Participant::where('company_id', $company->id));
+        $deletable = fn () => $scope(Participant::where('company_id', $company->id))->doesntHave('attendances');
+
+        $total = $base()->count();
         $removed = $deletable()->count();
         $deletable()->delete();
 

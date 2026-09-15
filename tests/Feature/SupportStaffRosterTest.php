@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AccommodationRoom;
+use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
@@ -117,6 +118,39 @@ it('prints department and staff id values and excludes support staff from attend
     expect(BadgeDesign::values($event, $registration)['department'])->toBe('Protocol')
         ->and(BadgeDesign::values($event, $registration)['member'])->toBe('STF-000001')
         ->and(app(EventBillingService::class)->estimate($event)['registered_count'])->toBe(1);
+});
+
+it('clears support staff without recorded attendance and keeps everyone else', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = supportStaffManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Event A', 'event_date' => now()]);
+
+    $noHistory = Participant::create(['company_id' => $company->id, 'name' => 'No History', 'is_support_staff' => true]);
+    $checkedIn = Participant::create(['company_id' => $company->id, 'name' => 'Checked In', 'is_support_staff' => true]);
+    $checkedIn->registrations()->create(['event_id' => $event->id, 'status' => 'confirmed']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $checkedIn->id, 'day' => -1, 'status' => 'present']);
+    $attendee = Participant::create(['company_id' => $company->id, 'name' => 'Regular Attendee']);
+
+    $this->actingAs($manager)
+        ->delete(route('support-staff.clear-all'), ['confirm_name' => 'Acme Co'])
+        ->assertRedirect(route('support-staff.index'))
+        ->assertSessionHas('success', 'Deleted 1 staff member. Kept 1 with recorded attendance.');
+
+    expect(Participant::find($noHistory->id))->toBeNull()
+        ->and(Participant::find($checkedIn->id))->not->toBeNull()
+        ->and(Participant::find($attendee->id))->not->toBeNull();
+});
+
+it('requires typing the exact company name to clear support staff', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = supportStaffManager($company);
+    $staff = Participant::create(['company_id' => $company->id, 'name' => 'Jane Doe', 'is_support_staff' => true]);
+
+    $this->actingAs($manager)
+        ->delete(route('support-staff.clear-all'), ['confirm_name' => 'wrong'])
+        ->assertSessionHasErrors('confirm_name');
+
+    expect(Participant::find($staff->id))->not->toBeNull();
 });
 
 it('reserves every room on a floor and preserves reservations when inventory is copied', function () {
