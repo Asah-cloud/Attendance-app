@@ -17,6 +17,14 @@ return [
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
     ],
 
+    'health' => [
+        'email' => env('HEALTH_CHECK_EMAIL'),
+        'queue_warning' => (int) env('HEALTH_QUEUE_WARNING', 100),
+        'disk_free_warning' => (int) env('HEALTH_DISK_FREE_WARNING', 20),
+        'memory_available_warning' => (int) env('HEALTH_MEMORY_AVAILABLE_WARNING', 15),
+        'minimum_workers' => (int) env('HEALTH_MINIMUM_WORKERS', 2),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

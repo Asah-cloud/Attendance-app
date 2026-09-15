@@ -89,3 +89,8 @@ Schedule::call(function (): void {
             }
         });
 })->hourly()->name('allocate-accommodation-after-self-select')->withoutOverlapping();
+
+Schedule::command('health:weekly')
+    ->weeklyOn(1, '07:00')
+    ->name('weekly-production-health-check')
+    ->withoutOverlapping();

@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Accra
+    open-pull-requests-limit: 5
+    groups:
+      safe-composer-updates:
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Africa/Accra
+    open-pull-requests-limit: 5
+    groups:
+      safe-npm-updates:
+        update-types:
+          - patch
+          - minor
