@@ -4,6 +4,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\NewAccountCredentials;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -139,10 +140,12 @@ it('lets a manager create an usher pre-staffed on every current event in their c
     expect($usher->company_id)->toBe($company->id)
         ->and($usher->hasRole('usher'))->toBeTrue()
         ->and($usher->hasRole('manager'))->toBeFalse()
+        ->and($usher->hasVerifiedEmail())->toBeTrue()
         ->and($usher->must_change_password)->toBeTrue()
         ->and($usher->events()->pluck('events.id')->all())->toBe([$ownEvent->id]);
 
     Notification::assertSentTo($usher, NewAccountCredentials::class);
+    Notification::assertNotSentTo($usher, VerifyEmail::class);
 });
 
 it('lets a super admin pick the company and role when creating a user', function () {

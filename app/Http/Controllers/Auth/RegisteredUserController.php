@@ -7,7 +7,6 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\NewAccountCredentials;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -73,6 +72,7 @@ class RegisteredUserController extends Controller
             'category' => 'staff',
             'role' => $role,
             'company_id' => $companyId,
+            'email_verified_at' => now(),
             'must_change_password' => true,
         ]);
 
@@ -85,8 +85,6 @@ class RegisteredUserController extends Controller
         if (in_array($role, ['usher', 'audit_head', 'audit_staff'], true) && $companyId) {
             $user->events()->sync(Event::where('company_id', $companyId)->pluck('id'));
         }
-
-        event(new Registered($user));
 
         $user->notify(new NewAccountCredentials($temporaryPassword));
 
