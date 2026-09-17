@@ -255,6 +255,41 @@ it('renders the manager attendee list with gender and category columns', functio
         ->assertSee('Gender');
 });
 
+it('lets a manager search the attendee list and combine it with the status filter', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $match = Participant::create([
+        'company_id' => $event->company_id,
+        'name' => 'Ama Mensah',
+        'email' => 'ama@example.com',
+        'phone' => '0244000111',
+        'member_id' => 'RET-104',
+        'category' => 'Retiree',
+        'gender' => 'Female',
+    ]);
+    $other = Participant::create([
+        'company_id' => $event->company_id,
+        'name' => 'Kojo Owusu',
+        'email' => 'kojo@example.com',
+        'category' => 'Guest',
+        'gender' => 'Male',
+    ]);
+    $event->registrations()->create(['participant_id' => $match->id, 'status' => 'confirmed']);
+    $otherRegistration = $event->registrations()->create(['participant_id' => $other->id, 'status' => 'pending']);
+
+    $this->actingAs($manager)->get(route('events.registrations.index', [$event, 'search' => 'Ama Female', 'status' => 'confirmed']))
+        ->assertOk()
+        ->assertSee('Ama Mensah')
+        ->assertDontSee('Kojo Owusu')
+        ->assertSee('value="Ama Female"', false);
+
+    $this->actingAs($manager)->get(route('events.registrations.index', [$event, 'search' => $otherRegistration->registration_code]))
+        ->assertOk()
+        ->assertSee('Kojo Owusu')
+        ->assertDontSee('Ama Mensah');
+});
+
 it('lets a manager turn the category field into a dropdown and enforces its options', function () {
     $event = publicRegistrationEvent();
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);

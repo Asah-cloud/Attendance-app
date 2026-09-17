@@ -32,17 +32,33 @@ class EventRegistrationFormController extends Controller
         $this->authorize('manageWhenOpen', $event);
         $event->ensureSystemRegistrationFields();
         $status = $request->string('status')->toString();
+        $search = trim($request->string('search')->toString());
         $registrations = $event->registrations()
             ->with('participant')
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($search !== '', function ($query) use ($search): void {
+                foreach (preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $term) {
+                    $query->where(function ($query) use ($term): void {
+                        $query->where('registration_code', 'like', "%{$term}%")
+                            ->orWhereHas('participant', function ($query) use ($term): void {
+                                $query->where('name', 'like', "%{$term}%")
+                                    ->orWhere('email', 'like', "%{$term}%")
+                                    ->orWhere('phone', 'like', "%{$term}%")
+                                    ->orWhere('member_id', 'like', "%{$term}%")
+                                    ->orWhere('category', 'like', "%{$term}%")
+                                    ->orWhere('gender', 'like', "%{$term}%");
+                            });
+                    });
+                }
+            })
             ->latest('registered_at')
             ->paginate(25)
             ->withQueryString();
         $categoryField = $event->registrationFields()->where('field_key', 'category')->first();
         $genderField = $event->registrationFields()->where('field_key', 'gender')->first();
 
-        return view('events.registrations', compact('event', 'registrations', 'status', 'categoryField', 'genderField'));
+        return view('events.registrations', compact('event', 'registrations', 'status', 'search', 'categoryField', 'genderField'));
     }
 
     public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
@@ -405,10 +421,10 @@ class EventRegistrationFormController extends Controller
             $event->registrations()->with('participant')
                 ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
                 ->latest('registered_at')->chunk(250, function ($registrations) use ($handle): void {
-                foreach ($registrations as $registration) {
-                    fputcsv($handle, [$registration->participant->name, $registration->participant->email, $registration->participant->phone, $registration->participant->category, $registration->participant->gender, $registration->status, $registration->source, $registration->registered_at?->toDateTimeString(), $registration->registration_code]);
-                }
-            });
+                    foreach ($registrations as $registration) {
+                        fputcsv($handle, [$registration->participant->name, $registration->participant->email, $registration->participant->phone, $registration->participant->category, $registration->participant->gender, $registration->status, $registration->source, $registration->registered_at?->toDateTimeString(), $registration->registration_code]);
+                    }
+                });
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
     }
