@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
 use App\Services\EventBillingService;
+use App\Services\PdfParticipantListParser;
 use App\Services\RegistrationLifecycleService;
 // Added these for the import to work
 use Carbon\Carbon;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EventController extends Controller
@@ -54,13 +56,13 @@ class EventController extends Controller
     /**
      * Handle the Excel Import
      */
-    public function import(Request $request, Event $event)
+    public function import(Request $request, Event $event, PdfParticipantListParser $pdfParser)
     {
         $this->authorize('manageWhenOpen', $event);
 
         // 1. Validate the file
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv|max:2048',
+            'file' => 'required|mimes:xlsx,xls,csv,pdf|max:10240',
             'send_notifications' => ['nullable', 'boolean'],
             'needs_room' => ['nullable', 'boolean'],
         ]);
@@ -68,7 +70,16 @@ class EventController extends Controller
         try {
             // 2. Run the import using your UsersImport class
             $import = new UsersImport($event, $event->accommodation_enabled && $request->boolean('needs_room'));
-            Excel::import($import, $request->file('file'));
+            DB::transaction(function () use ($import, $pdfParser, $request): void {
+                $file = $request->file('file');
+                if (strtolower($file->getClientOriginalExtension()) === 'pdf') {
+                    foreach ($pdfParser->parse($file->getRealPath()) as $index => $row) {
+                        $import->importRow($row, $index + 2);
+                    }
+                } else {
+                    Excel::import($import, $file);
+                }
+            });
 
             if ($request->boolean('send_notifications')) {
                 $import->sendNotifications();
@@ -82,13 +93,22 @@ class EventController extends Controller
             }
 
             return back()->with('success', $message);
+        } catch (ValidationException $exception) {
+            Log::warning('Participant import contained conflicting records.', [
+                'event_id' => $event->id,
+                'errors' => $exception->errors(),
+            ]);
+
+            return back()->with('error', collect($exception->errors())->flatten()->first());
         } catch (\Throwable $exception) {
             Log::error('Participant import failed.', [
                 'event_id' => $event->id,
                 'exception' => $exception,
             ]);
 
-            return back()->with('error', 'The import could not be completed. Check the file format and try again.');
+            return back()->with('error', $request->file('file')?->getClientOriginalExtension() === 'pdf'
+                ? $exception->getMessage()
+                : 'The import could not be completed. Check the file format and try again.');
         }
     }
 

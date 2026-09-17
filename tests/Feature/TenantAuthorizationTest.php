@@ -210,6 +210,38 @@ it('sends notifications after a registered participant import when requested', f
     Notification::assertSentTo($participant, EventRegistrationSubmitted::class);
 });
 
+it('imports participants from a text-based PDF table', function () {
+    $company = Company::create(['name' => 'One']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'PDF Import Event',
+        'event_date' => now(),
+    ]);
+
+    $dompdf = new Dompdf\Dompdf;
+    $dompdf->loadHtml(<<<'HTML'
+        <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Gender</th><th>Area</th><th>Category</th><th>Phone</th><th>Email</th></tr></thead>
+            <tbody><tr><td>77</td><td>PDF Guest</td><td>Female</td><td>Kumasi North</td><td>Participant</td><td>0241234567</td><td>pdf@example.com</td></tr></tbody>
+        </table>
+        HTML);
+    $dompdf->render();
+    $file = UploadedFile::fake()->createWithContent('participants.pdf', $dompdf->output());
+
+    $this->actingAs($manager)
+        ->post(route('events.import.store', $event), ['file' => $file])
+        ->assertSessionHas('success');
+
+    $participant = Participant::where('member_id', $company->id.':77')->firstOrFail();
+    expect($participant->name)->toBe('PDF Guest')
+        ->and($participant->gender)->toBe('Female')
+        ->and($participant->room_group)->toBe('Kumasi North')
+        ->and($participant->phone)->toBe('241234567')
+        ->and($participant->email)->toBe('pdf@example.com');
+});
+
 it('allows a manager to reach the import workflow for their company event', function () {
     $company = Company::create(['name' => 'One']);
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);

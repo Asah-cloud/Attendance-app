@@ -142,7 +142,7 @@
                             </svg>
                         </div>
                         <h3 class="text-xl font-black text-gray-900 mb-2">Import Participants</h3>
-                        <p class="text-sm text-gray-500 mb-6">Select your Excel or CSV file to bulk-add members.</p>
+                        <p class="text-sm text-gray-500 mb-6">Select an Excel, CSV, or text-based PDF table to bulk-add members.</p>
                     </div>
 
                     <div class="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-left">
@@ -153,8 +153,9 @@
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Select Excel File</label>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Select participant list</label>
                         <input type="file" name="file" required
+                               accept=".xlsx,.xls,.csv,.pdf"
                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-widest file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all border border-gray-100 rounded-2xl p-2">
                     </div>
 
