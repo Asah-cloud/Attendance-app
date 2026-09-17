@@ -24,7 +24,7 @@
         {{-- Walk-in Form Trigger Button --}}
         @can('update', $event)
         @if(!in_array($mode, ['arrival', 'staff'], true))
-        <button type="button" wire:click="$dispatch('openWalkInModal')" class="w-full md:w-auto h-full px-6 py-5 bg-blue-900 border border-blue-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-md hover:bg-blue-950 transition-all transform hover:-translate-y-0.5 active:scale-95 whitespace-nowrap flex items-center justify-center gap-2">
+        <button type="button" wire:click="$dispatch('openWalkInModal')" class="flex h-full w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-blue-700 bg-blue-900 px-6 py-5 text-sm font-black uppercase tracking-wider text-white shadow-md transition-colors hover:bg-blue-950 md:w-auto">
             <span>➕ Add Walk-in Member</span>
         </button>
         @endif
@@ -34,7 +34,7 @@
     </div>
 
     {{-- Table Section --}}
-    <div class="bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.02)] overflow-hidden border border-gray-100">
+    <div data-no-lift class="bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.02)] overflow-hidden border border-gray-100">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-50">
                 <thead>

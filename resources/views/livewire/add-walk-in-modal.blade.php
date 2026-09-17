@@ -1,7 +1,7 @@
 <div>
     @if($showModal)
-        <div class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-            <div role="dialog" aria-modal="true" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-gray-100 animate-fade-in">
+        <div class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto bg-gray-900/60 p-4 backdrop-blur-sm">
+            <div role="dialog" aria-modal="true" class="relative w-full min-w-0 max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl animate-fade-in">
                 <h3 class="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Register Walk-In Attendee</h3>
                 
                 <form wire:submit.prevent="registerWalkIn" class="space-y-4">

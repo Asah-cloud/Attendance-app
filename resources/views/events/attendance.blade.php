@@ -113,7 +113,7 @@
 
                 {{-- Right Side Search --}}
                 <div class="lg:col-span-2" data-aos="fade-left" data-aos-delay="300">
-                    <div class="bg-white shadow-sm border border-gray-100 rounded-3xl overflow-hidden">
+                    <div data-no-lift class="bg-white shadow-sm border border-gray-100 rounded-3xl overflow-hidden">
                         <div class="bg-gray-50/50 p-6 border-b border-gray-100">
                             <h3 class="font-black text-gray-900 tracking-tight uppercase text-xs">Manual Registry</h3>
                         </div>

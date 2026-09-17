@@ -5,10 +5,11 @@
 @layer components {
     [data-ui="app"] main a,
     [data-ui="app"] main button { @apply transition-all duration-200; }
-    [data-ui="app"] main :is(section, article, div).bg-white.rounded-3xl:not([role="dialog"]),
-    [data-ui="app"] main :is(section, article, div).bg-white.rounded-2xl:not([role="dialog"]) { transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
-    [data-ui="app"] main :is(section, article, div).bg-white.rounded-3xl:not([role="dialog"]):hover,
-    [data-ui="app"] main :is(section, article, div).bg-white.rounded-2xl:not([role="dialog"]):hover { transform: translateY(-2px); border-color: rgb(191 219 254); box-shadow: 0 18px 35px -24px rgb(15 23 42 / 0.45); }
+    [data-ui="app"] main { overflow-x: clip; }
+    [data-ui="app"] main :is(section, article, div).bg-white.rounded-3xl:not([role="dialog"]):not([data-no-lift]),
+    [data-ui="app"] main :is(section, article, div).bg-white.rounded-2xl:not([role="dialog"]):not([data-no-lift]) { transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+    [data-ui="app"] main :is(section, article, div).bg-white.rounded-3xl:not([role="dialog"]):not([data-no-lift]):hover,
+    [data-ui="app"] main :is(section, article, div).bg-white.rounded-2xl:not([role="dialog"]):not([data-no-lift]):hover { transform: translateY(-2px); border-color: rgb(191 219 254); box-shadow: 0 18px 35px -24px rgb(15 23 42 / 0.45); }
     [data-ui="app"] main table tbody tr { transition: background-color 160ms ease, color 160ms ease; }
     [data-ui="app"] main table tbody tr:hover { background-color: rgb(239 246 255 / 0.7); }
     [data-ui="app"] main button:not(:disabled):active,
