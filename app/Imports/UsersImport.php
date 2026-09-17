@@ -55,7 +55,6 @@ class UsersImport implements OnEachRow
         // back to the row number, which still keeps re-imports of the same file idempotent.
         $id = $id !== '' ? $id : 'row'.$rowIndex;
         $companyMemberId = $this->event->company_id.':'.$id;
-        $legacyEmail = 'event'.$this->event->id.'_user'.$id.'@example.invalid';
         $companyEmail = 'company'.$this->event->company_id.'_member'.$id.'@example.invalid';
 
         [, $registration] = app(ParticipantRegistrationService::class)->register($this->event, [
@@ -66,7 +65,9 @@ class UsersImport implements OnEachRow
             'category' => $category,
             'gender' => $gender,
             'room_group' => $roomGroup,
-            'lookup_emails' => array_filter([$rawEmail, $legacyEmail, $companyEmail]),
+            // Synthetic placeholder addresses are storage fallbacks, not proof of identity.
+            // Matching them can connect a reused row number from a new list to the wrong person.
+            'lookup_emails' => array_filter([$rawEmail]),
             'generated_email' => $companyEmail,
         ], 'import');
 

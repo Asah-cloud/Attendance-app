@@ -179,6 +179,7 @@ it('prefers a contact match when a trusted import row id collides with another p
         'company_id' => $company->id,
         'name' => 'Existing Member 41',
         'member_id' => $company->id.':41',
+        'email' => 'company'.$company->id.'_member41@example.invalid',
         'phone' => '201111111',
     ]);
     $contactOwner = Participant::create([
