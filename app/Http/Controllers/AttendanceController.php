@@ -187,12 +187,12 @@ class AttendanceController extends Controller
             return back()->withInput()->with('error', 'We could not find a confirmed attendee with that phone number. Please check the number or ask an usher for help.');
         }
 
-        if ($day > 0 && ! $event->participantHasArrived($registration->participant_id)) {
-            return back()->withInput()->with('error', 'Arrival check-in must be completed before daily attendance can be marked.');
+        if (! $event->canMarkAttendanceForDay($day)) {
+            return back()->with('error', $this->attendanceClosedMessage($event, $day));
         }
 
-        if (! $event->canMarkAttendanceForDay($day)) {
-            return back()->with('error', 'Attendance is not open for this event right now. Please ask an event manager for help.');
+        if ($day > 0 && ! $event->participantHasArrived($registration->participant_id)) {
+            return back()->withInput()->with('error', 'Arrival check-in must be completed before daily attendance can be marked.');
         }
 
         $marker = $request->user();
@@ -275,12 +275,12 @@ class AttendanceController extends Controller
             return response()->json(['message' => "Welcome, {$registration->participant->name}. Your registration is not confirmed yet. Please speak with an event manager for assistance."], 422);
         }
 
-        if ($day > 0 && ! $event->participantHasArrived($registration->participant_id)) {
-            return response()->json(['message' => "{$registration->participant->name} has not completed Arrival check-in yet."], 422);
+        if (! $event->canMarkAttendanceForDay($day)) {
+            return response()->json(['message' => $this->attendanceClosedMessage($event, $day)], 422);
         }
 
-        if (! $event->canMarkAttendanceForDay($day)) {
-            return response()->json(['message' => 'Thanks for checking in! Attendance is not open for this event right now. Please confirm the event date or ask a manager for help.'], 422);
+        if ($day > 0 && ! $event->participantHasArrived($registration->participant_id)) {
+            return response()->json(['message' => "{$registration->participant->name} has not completed Arrival check-in yet."], 422);
         }
 
         $attendance = Attendance::query()->createOrFirst([
@@ -329,5 +329,18 @@ class AttendanceController extends Controller
                 'day' => 'Attendance can only be changed for a day that has started while the event is active.',
             ]);
         }
+    }
+
+    private function attendanceClosedMessage(Event $event, int $day): string
+    {
+        $sessionDate = $day === 0
+            ? $event->arrival_date?->startOfDay()
+            : $event->event_date->copy()->addDays(max(0, $day - 1))->startOfDay();
+
+        if ($sessionDate && now()->startOfDay()->lt($sessionDate)) {
+            return 'This event has not started yet. QR check-in will open on '.$sessionDate->format('M j, Y').'.';
+        }
+
+        return 'Attendance is not open for this event right now. Please ask an event manager for help.';
     }
 }

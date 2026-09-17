@@ -1,4 +1,15 @@
 <x-public-layout :title="'Check in | '.$event->title" :noindex="true">
+    @unless($event->canMarkAttendanceForDay($session))
+        @php
+            $sessionDate = $session === 0
+                ? $event->arrival_date?->startOfDay()
+                : $event->event_date->copy()->addDays(max(0, $session - 1))->startOfDay();
+            $closedMessage = $sessionDate && now()->startOfDay()->lt($sessionDate)
+                ? 'This event has not started yet. QR check-in will open on '.$sessionDate->format('M j, Y').'.'
+                : 'Attendance is not open for this event right now.';
+        @endphp
+        <div x-data x-init="$dispatch('notify', { message: @js($closedMessage), type: 'error' })"></div>
+    @endunless
     <section class="min-h-screen bg-slate-50 px-5 pb-20 pt-28">
         <div class="mx-auto max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/70">
             <div class="bg-gradient-to-br from-blue-700 to-blue-900 px-7 py-8 text-center text-white">

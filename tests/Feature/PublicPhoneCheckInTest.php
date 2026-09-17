@@ -112,7 +112,7 @@ it('does not check anyone in outside the active event dates', function () {
 
     $this->actingAs($staff)->post(route('attendance.check', ['event' => $registration->event->slug]), [
         'phone' => '0201234567',
-    ])->assertSessionHas('error', 'Attendance is not open for this event right now. Please ask an event manager for help.');
+    ])->assertSessionHas('error', 'This event has not started yet. QR check-in will open on '.now()->addDay()->format('M j, Y').'.');
 
     $this->assertDatabaseCount('attendances', 0);
 });

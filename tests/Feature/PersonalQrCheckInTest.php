@@ -85,6 +85,34 @@ it('allows a company manager to scan a confirmed attendee', function () {
     ]);
 });
 
+it('blocks attendee QR check-in before the event starts and shows a bubble notification', function () {
+    $registration = personalQrRegistration([
+        'event_date' => now()->addDays(2)->toDateString(),
+        'has_arrival_session' => true,
+        'arrival_date' => now()->addDay()->toDateString(),
+    ]);
+    $manager = qrStaff($registration);
+
+    $message = 'This event has not started yet. QR check-in will open on '.now()->addDays(2)->format('M j, Y').'.';
+
+    $this->actingAs($manager)
+        ->postJson(route('events.scanner.check-in', $registration->event), [
+            'registration_code' => $registration->registration_code,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', $message);
+
+    $this->get(route('attendance.personal', $registration->registration_code))
+        ->assertOk()
+        ->assertSee('This event has not started yet. QR check-in will open on '.now()->addDay()->format('M j, Y').'.');
+
+    $this->get(route('events.scanner', $registration->event))
+        ->assertOk()
+        ->assertSee("new CustomEvent('notify'", false);
+
+    $this->assertDatabaseCount('attendances', 0);
+});
+
 it('allows staff to scan the same personal QR URL used for self check-in', function () {
     $registration = personalQrRegistration();
     $manager = qrStaff($registration);

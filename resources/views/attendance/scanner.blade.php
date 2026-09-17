@@ -36,6 +36,9 @@
             const showResult = (message, successful) => {
                 result.textContent = message;
                 result.className = `mt-5 rounded-2xl p-5 font-bold ${successful ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`;
+                window.dispatchEvent(new CustomEvent('notify', {
+                    detail: { message, type: successful ? 'success' : 'error' },
+                }));
             };
 
             const checkIn = async (value) => {
