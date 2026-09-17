@@ -79,24 +79,6 @@
                                             wire:confirm="Are you sure you want to permanently remove this member from the event?"
                                             class="text-xs font-bold text-red-500 hover:text-red-700">Delete</button>
                                 </div>
-                                @if($mode === 'staff' && $editingStaffId === $user->id)
-                                    <form wire:submit="saveStaff" class="mt-4 grid min-w-72 gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 sm:grid-cols-2">
-                                        <div>
-                                            <label for="staff-name-{{ $user->id }}" class="text-[10px] font-black uppercase tracking-wider text-slate-500">Staff name</label>
-                                            <input id="staff-name-{{ $user->id }}" type="text" wire:model="editName" class="mt-1 w-full rounded-lg border-slate-300 text-sm" required>
-                                            @error('editName')<p class="mt-1 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-                                        </div>
-                                        <div>
-                                            <label for="staff-category-{{ $user->id }}" class="text-[10px] font-black uppercase tracking-wider text-slate-500">Category</label>
-                                            <input id="staff-category-{{ $user->id }}" type="text" wire:model="editCategory" class="mt-1 w-full rounded-lg border-slate-300 text-sm" placeholder="e.g. Usher" required>
-                                            @error('editCategory')<p class="mt-1 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-                                        </div>
-                                        <div class="flex gap-2 sm:col-span-2">
-                                            <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-black text-white" wire:loading.attr="disabled" wire:target="saveStaff">Save changes</button>
-                                            <button type="button" wire:click="cancelEditingStaff" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-black text-slate-600">Cancel</button>
-                                        </div>
-                                    </form>
-                                @endif
                                 @endcan
                             </td>
 
@@ -143,6 +125,28 @@
                                 @endcan
                             </td>
                         </tr>
+                        @if($mode === 'staff' && $editingStaffId === $user->id)
+                            <tr wire:key="staff-editor-{{ $user->id }}" class="bg-blue-50/70">
+                                <td colspan="3" class="px-4 py-4 sm:px-8">
+                                    <form wire:submit="saveStaff" class="grid min-w-0 gap-3 rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:grid-cols-2">
+                                        <div class="min-w-0">
+                                            <label for="staff-name-{{ $user->id }}" class="text-[10px] font-black uppercase tracking-wider text-slate-500">Staff name</label>
+                                            <input id="staff-name-{{ $user->id }}" type="text" wire:model="editName" class="mt-1 block w-full min-w-0 rounded-lg border-slate-300 text-sm" required>
+                                            @error('editName')<p class="mt-1 whitespace-normal text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                                        </div>
+                                        <div class="min-w-0">
+                                            <label for="staff-category-{{ $user->id }}" class="text-[10px] font-black uppercase tracking-wider text-slate-500">Category</label>
+                                            <input id="staff-category-{{ $user->id }}" type="text" wire:model="editCategory" class="mt-1 block w-full min-w-0 rounded-lg border-slate-300 text-sm" placeholder="e.g. Usher" required>
+                                            @error('editCategory')<p class="mt-1 whitespace-normal text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                                        </div>
+                                        <div class="flex flex-wrap gap-2 sm:col-span-2">
+                                            <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2 text-xs font-black text-white" wire:loading.attr="disabled" wire:target="saveStaff">Save changes</button>
+                                            <button type="button" wire:click="cancelEditingStaff" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-black text-slate-600">Cancel</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endif
                     @empty
                         <tr>
                             <td colspan="3" class="px-8 py-20 text-center bg-gray-50/30">

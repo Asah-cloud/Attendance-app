@@ -100,6 +100,8 @@ it('lets a manager edit a staff name and category from the staff check-in page',
         ->call('startEditingStaff', $staff->id)
         ->assertSet('editName', 'Kofi Staff')
         ->assertSet('editCategory', 'Staff')
+        ->assertSee('staff-editor-'.$staff->id, false)
+        ->assertDontSee('min-w-72', false)
         ->set('editName', 'Kofi Mensah')
         ->set('editCategory', 'Lead Usher')
         ->call('saveStaff')
