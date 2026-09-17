@@ -52,7 +52,7 @@ class ParticipantRegistrationService
         // Scoped to this event's company: the same person attending events run by two
         // different companies gets an independent participant record in each, rather
         // than being treated as one shared identity (or blocked outright).
-        $user = $this->findExistingUser($lookupEmails, $phone, $memberId, $event->company_id);
+        $user = $this->findExistingUser($lookupEmails, $phone, $memberId, $event->company_id, $trusted);
 
         if (! $user) {
             return Participant::create([
@@ -102,21 +102,38 @@ class ParticipantRegistrationService
         return $phone !== '' ? $phone : null;
     }
 
-    private function findExistingUser(array $emails, ?string $phone, ?string $memberId, ?int $companyId): ?Participant
+    private function findExistingUser(array $emails, ?string $phone, ?string $memberId, ?int $companyId, bool $trusted): ?Participant
     {
-        $matches = collect([
+        $contactMatches = collect([
             $emails !== [] ? Participant::query()->where('company_id', $companyId)->whereIn('email', $emails)->first() : null,
             $phone ? Participant::query()->where('company_id', $companyId)->where('phone', $phone)->first() : null,
-            $memberId ? Participant::query()->where('company_id', $companyId)->where('member_id', $memberId)->first() : null,
         ])->filter()->unique('id')->values();
 
-        if ($matches->count() > 1) {
+        if ($contactMatches->count() > 1) {
             throw ValidationException::withMessages([
                 'email' => 'The supplied email and phone belong to different participant records. Contact the organizer.',
             ]);
         }
 
-        return $matches->first();
+        $contactMatch = $contactMatches->first();
+        $memberMatch = $memberId
+            ? Participant::query()->where('company_id', $companyId)->where('member_id', $memberId)->first()
+            : null;
+
+        // Spreadsheet/PDF IDs are often row numbers local to one list, not permanent
+        // organization-wide identities. For a trusted manager import, a matching email
+        // or phone is therefore stronger evidence than a colliding imported member ID.
+        if ($trusted && $contactMatch) {
+            return $contactMatch;
+        }
+
+        if ($contactMatch && $memberMatch && $contactMatch->id !== $memberMatch->id) {
+            throw ValidationException::withMessages([
+                'email' => 'The supplied contact details and member ID belong to different participant records. Contact the organizer.',
+            ]);
+        }
+
+        return $contactMatch ?? $memberMatch;
     }
 
     private function usableEmail(?string $email): ?string

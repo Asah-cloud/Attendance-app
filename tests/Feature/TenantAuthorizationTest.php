@@ -168,6 +168,36 @@ it('does not notify a participant when the same import row is processed again', 
     Notification::assertNothingSent();
 });
 
+it('prefers a contact match when a trusted import row id collides with another participant', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create([
+        'company_id' => $company->id,
+        'title' => 'Import Event',
+        'event_date' => now(),
+    ]);
+    $wrongIdOwner = Participant::create([
+        'company_id' => $company->id,
+        'name' => 'Existing Member 41',
+        'member_id' => $company->id.':41',
+        'phone' => '201111111',
+    ]);
+    $contactOwner = Participant::create([
+        'company_id' => $company->id,
+        'name' => 'Existing Esther',
+        'member_id' => $company->id.':282',
+        'phone' => '504343053',
+    ]);
+
+    $import = new UsersImport($event);
+    $import->importRow(['41', 'Esther Nyarko Agyemang', 'Female', 'Koforidua', 'Participant', '0504343053'], 2);
+
+    expect($event->registrations()->where('participant_id', $contactOwner->id)->exists())->toBeTrue()
+        ->and($contactOwner->fresh()->name)->toBe('Esther Nyarko Agyemang')
+        ->and($contactOwner->fresh()->member_id)->toBe($company->id.':282')
+        ->and($wrongIdOwner->fresh()->name)->toBe('Existing Member 41')
+        ->and($wrongIdOwner->registrations()->exists())->toBeFalse();
+});
+
 it('imports every row as a distinct participant when the id column is blank, and skips only the header', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create([
