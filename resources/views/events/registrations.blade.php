@@ -10,7 +10,7 @@
                     <div x-data="{ open: false, title: '' }" class="inline-flex">
                         <button type="button" @click="open = true" class="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-wider text-red-700">Clear all attendees</button>
                         <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="open = false">
-                            <div class="w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-xl" @click.outside="open = false">
+                            <div role="dialog" aria-modal="true" class="w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-xl" @click.outside="open = false">
                                 <h3 class="text-lg font-black text-slate-900">Delete all attendees?</h3>
                                 <p class="mt-2 text-sm text-slate-600">This permanently removes every registration for <strong>{{ $event->title }}</strong>, plus their room assignments and meal records. Attendees who have already checked in are kept. Participant accounts and their registrations for other events are not affected. This cannot be undone.</p>
                                 <form method="POST" action="{{ route('events.registrations.destroy-all', $event) }}" class="mt-4">@csrf @method('DELETE')
