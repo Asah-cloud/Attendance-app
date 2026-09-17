@@ -72,6 +72,7 @@ class Event extends Model
         'badge_fields',
         'badge_font',
         'badge_name_format',
+        'staff_badge_settings',
     ];
 
     protected $casts = [
@@ -91,6 +92,7 @@ class Event extends Model
         'cancelled_at' => 'datetime',
         'badge_category_colors' => 'array',
         'badge_fields' => 'array',
+        'staff_badge_settings' => 'array',
     ];
 
     public function attendances(): HasMany

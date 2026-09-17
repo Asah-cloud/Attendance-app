@@ -201,6 +201,10 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.badges.qr');
         Route::get('/events/{event}/badges/fonts/{font}', [EventRegistrationFormController::class, 'badgeFont'])->name('events.badges.font');
         Route::patch('/events/{event}/badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.badges.settings');
+        Route::get('/events/{event}/staff-badges', [EventRegistrationFormController::class, 'badges'])->name('events.staff-badges');
+        Route::match(['get', 'post'], '/events/{event}/staff-badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.staff-badges.pdf');
+        Route::get('/events/{event}/staff-badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.staff-badges.qr');
+        Route::patch('/events/{event}/staff-badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.staff-badges.settings');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');
         Route::get('/events/{event}/registration-form/print-qr', [EventRegistrationFormController::class, 'printQr'])->name('events.registration-form.print-qr');
         Route::get('/events/{event}/registration-form/download-qr', [EventRegistrationFormController::class, 'downloadQr'])->name('events.registration-form.download-qr');

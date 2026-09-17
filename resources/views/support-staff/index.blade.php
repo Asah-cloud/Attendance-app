@@ -44,7 +44,7 @@
                         <div class="flex flex-wrap gap-2">
                             <a href="{{ route('support-staff.checkin', $event) }}" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">Staff check-in</a>
                             <a href="{{ route('support-staff.report', $event) }}" class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">Report</a>
-                            <a href="{{ route('events.badges', ['event' => $event, 'category' => 'Staff']) }}" class="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">Print staff badges</a>
+                            <a href="{{ route('events.staff-badges', $event) }}" class="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">Staff badge studio</a>
                         </div>
                     </div>
                 @empty
@@ -56,7 +56,7 @@
         <section class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
             <div class="border-b border-slate-200 p-6"><h2 class="text-xl font-black text-slate-900">Company staff roster</h2><p class="mt-1 text-sm text-slate-500">{{ $staff->total() }} staff member(s)</p></div>
             <div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm"><thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500"><tr><th class="px-6 py-4">Staff</th><th class="px-6 py-4">Department</th><th class="px-6 py-4">Category</th><th class="px-6 py-4">Gender</th><th class="px-6 py-4">Assigned events</th></tr></thead><tbody class="divide-y divide-slate-100">
-                @forelse($staff as $person)<tr><td class="px-6 py-4"><strong class="text-slate-900">{{ $person->name }}</strong><div class="font-mono text-xs text-slate-500">{{ $person->staff_code }}</div></td><td class="px-6 py-4">{{ $person->department ?: '—' }}</td><td class="px-6 py-4">{{ $person->category }}</td><td class="px-6 py-4">{{ $person->gender ?: '—' }}</td><td class="px-6 py-4"><div class="flex flex-wrap gap-2">@foreach($person->registrations as $registration)<a class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800" href="{{ route('events.badges', ['event' => $registration->event, 'category' => $person->category]) }}">{{ $registration->event->title }}</a>@endforeach</div></td></tr>
+                @forelse($staff as $person)<tr><td class="px-6 py-4"><strong class="text-slate-900">{{ $person->name }}</strong><div class="font-mono text-xs text-slate-500">{{ $person->staff_code }}</div></td><td class="px-6 py-4">{{ $person->department ?: '—' }}</td><td class="px-6 py-4">{{ $person->category }}</td><td class="px-6 py-4">{{ $person->gender ?: '—' }}</td><td class="px-6 py-4"><div class="flex flex-wrap gap-2">@foreach($person->registrations as $registration)<a class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800" href="{{ route('events.staff-badges', $registration->event) }}">{{ $registration->event->title }}</a>@endforeach</div></td></tr>
                 @empty<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No event support staff imported yet.</td></tr>@endforelse
             </tbody></table></div><div class="p-5">{{ $staff->links() }}</div>
         </section>

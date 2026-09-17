@@ -15,7 +15,7 @@
                             <a href="{{ route('support-staff.checkin.scanner', $event) }}" class="rounded-xl bg-white px-5 py-3 text-sm font-black text-slate-900">Open Staff scanner</a>
                         @endcan
                         <a href="{{ route('support-staff.report', $event) }}" class="rounded-xl border border-white/30 px-5 py-3 text-sm font-black text-white">Staff report</a>
-                        <a href="{{ route('events.badges', ['event' => $event, 'category' => 'Staff']) }}" class="rounded-xl border border-white/30 px-5 py-3 text-sm font-black text-white">Print staff badges</a>
+                        <a href="{{ route('events.staff-badges', $event) }}" class="rounded-xl border border-white/30 px-5 py-3 text-sm font-black text-white">Staff badge studio</a>
                     </div>
                 </div>
             </section>

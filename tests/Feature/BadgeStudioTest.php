@@ -22,12 +22,60 @@ function badgeStudioFixture(): array
     return [$event, $manager];
 }
 
-function badgeRegistration(Event $event, string $name = 'Alex Morgan', string $category = 'Delegate', string $status = 'confirmed')
+function badgeRegistration(Event $event, string $name = 'Alex Morgan', string $category = 'Delegate', string $status = 'confirmed', bool $staff = false)
 {
-    $participant = Participant::create(['company_id' => $event->company_id, 'name' => $name, 'category' => $category]);
+    $participant = Participant::create([
+        'company_id' => $event->company_id,
+        'name' => $name,
+        'category' => $category,
+        'is_support_staff' => $staff,
+        'staff_code' => $staff ? 'STF-'.fake()->unique()->numerify('######') : null,
+        'staff_qr_token' => $staff ? str_repeat('s', 40).fake()->unique()->numerify('########') : null,
+    ]);
 
     return $event->registrations()->create(['participant_id' => $participant->id, 'status' => $status]);
 }
+
+it('keeps attendee and event staff badge studios, people, designs, and qr previews separate', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $attendee = badgeRegistration($event, 'Kojo Attendee', 'Delegate');
+    $staff = badgeRegistration($event, 'Ama Staff', 'Usher', 'confirmed', true);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))
+        ->assertOk()
+        ->assertSee('Attendee badge studio')
+        ->assertSee('Kojo Attendee')
+        ->assertDontSee('Ama Staff');
+
+    $this->get(route('events.staff-badges', $event))
+        ->assertOk()
+        ->assertSee('Event staff badge studio')
+        ->assertSee('Ama Staff')
+        ->assertDontSee('Kojo Attendee');
+
+    $this->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6',
+        'badge_design' => 'default',
+        'badge_primary_color' => '#AA0000',
+    ])->assertSessionHasNoErrors();
+
+    $this->patch(route('events.staff-badges.settings', $event), [
+        'badge_size' => 'A5',
+        'badge_design' => 'category',
+        'badge_primary_color' => '#0000AA',
+    ])->assertSessionHasNoErrors();
+
+    $event->refresh();
+    expect($event->badge_size)->toBe('A6')
+        ->and($event->badge_primary_color)->toBe('#AA0000')
+        ->and($event->staff_badge_settings['badge_size'])->toBe('A5')
+        ->and($event->staff_badge_settings['badge_primary_color'])->toBe('#0000AA');
+
+    $this->get(route('events.badges.qr', [$event, $attendee]))->assertOk();
+    $this->get(route('events.badges.qr', [$event, $staff]))->assertNotFound();
+    $this->get(route('events.staff-badges.qr', [$event, $staff]))->assertOk();
+    $this->get(route('events.staff-badges.qr', [$event, $attendee]))->assertNotFound();
+});
 
 it('saves a full background design and movable fields with optional name initials', function () {
     Storage::fake('public');
