@@ -55,6 +55,28 @@ it('imports one company staff identity and assigns its reusable qr to selected e
         ->and(BadgeDesign::qrPayload($first->registrations()->first()))->toBe($payload);
 });
 
+it('imports gender so staff can be assigned rooms if needed', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = supportStaffManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Event', 'event_date' => today()]);
+    $file = UploadedFile::fake()->createWithContent('staff.csv', "Name,Department,Category,Gender\nAma Mensah,Protocol,Staff,Female\n");
+
+    $this->actingAs($manager)->post(route('support-staff.import'), [
+        'file' => $file,
+        'event_ids' => [$event->id],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $staff = Participant::where('is_support_staff', true)->firstOrFail();
+    expect($staff->gender)->toBe('Female');
+
+    $this->actingAs($manager)->post(route('support-staff.import'), [
+        'file' => UploadedFile::fake()->createWithContent('staff-again.csv', "Name,Department,Category,Gender\nAma Mensah,Protocol,Staff,\n"),
+        'event_ids' => [$event->id],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($staff->fresh()->gender)->toBe('Female');
+});
+
 it('lets the super admin choose a company and import its event staff', function () {
     $firstCompany = Company::create(['name' => 'First Company']);
     $secondCompany = Company::create(['name' => 'Second Company']);

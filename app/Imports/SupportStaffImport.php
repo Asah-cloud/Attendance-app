@@ -26,12 +26,13 @@ class SupportStaffImport implements OnEachRow
         $name = trim((string) ($values[0] ?? ''));
         $department = trim((string) ($values[1] ?? ''));
         $category = trim((string) ($values[2] ?? '')) ?: 'Staff';
+        $gender = trim((string) ($values[3] ?? '')) ?: null;
 
         if ($name === '' || ($row->getIndex() === 1 && in_array(Str::lower($name), ['name', 'staff name', 'full name'], true))) {
             return;
         }
 
-        DB::transaction(function () use ($name, $department, $category): void {
+        DB::transaction(function () use ($name, $department, $category, $gender): void {
             $participant = Participant::query()
                 ->where('company_id', $this->companyId)
                 ->where('is_support_staff', true)
@@ -45,6 +46,7 @@ class SupportStaffImport implements OnEachRow
                     'name' => $name,
                     'department' => $department ?: null,
                     'category' => $category,
+                    'gender' => $gender,
                     'is_support_staff' => true,
                     'staff_qr_token' => Str::random(48),
                 ]);
@@ -54,7 +56,7 @@ class SupportStaffImport implements OnEachRow
                 ]);
                 $this->created++;
             } else {
-                $participant->update(['name' => $name, 'department' => $department ?: null, 'category' => $category]);
+                $participant->update(['name' => $name, 'department' => $department ?: null, 'category' => $category, 'gender' => $gender ?? $participant->gender]);
                 $this->updated++;
             }
 
