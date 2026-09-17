@@ -28,6 +28,12 @@ class AttendanceSearch extends Component
 
     public string $mode = 'attendance';
 
+    public ?int $editingStaffId = null;
+
+    public string $editName = '';
+
+    public string $editCategory = '';
+
     protected $queryString = [
         'selectedDay' => ['except' => 1],
         'search' => ['except' => ''],
@@ -148,6 +154,46 @@ class AttendanceSearch extends Component
         $this->participantsQuery()->findOrFail($participantId);
         $this->event->registrations()->where('participant_id', $participantId)->delete();
         $this->dispatch('notify', message: 'Member removed successfully.', type: 'success');
+    }
+
+    public function startEditingStaff(int $participantId): void
+    {
+        Gate::authorize('update', $this->event);
+        abort_unless($this->mode === 'staff', 404);
+        $staff = $this->participantsQuery()->findOrFail($participantId);
+
+        $this->editingStaffId = $staff->id;
+        $this->editName = $staff->name;
+        $this->editCategory = $staff->category ?? '';
+        $this->resetValidation(['editName', 'editCategory']);
+    }
+
+    public function cancelEditingStaff(): void
+    {
+        $this->reset(['editingStaffId', 'editName', 'editCategory']);
+        $this->resetValidation(['editName', 'editCategory']);
+    }
+
+    public function saveStaff(): void
+    {
+        Gate::authorize('update', $this->event);
+        abort_unless($this->mode === 'staff' && $this->editingStaffId, 404);
+        $staff = $this->participantsQuery()->findOrFail($this->editingStaffId);
+        $validated = $this->validate([
+            'editName' => ['required', 'string', 'max:255'],
+            'editCategory' => ['required', 'string', 'max:255'],
+        ], [], [
+            'editName' => 'staff name',
+            'editCategory' => 'staff category',
+        ]);
+
+        $staff->update([
+            'name' => trim($validated['editName']),
+            'category' => trim($validated['editCategory']),
+        ]);
+
+        $this->cancelEditingStaff();
+        $this->dispatch('notify', message: 'Staff details updated successfully.', type: 'success');
     }
 
     public function render()

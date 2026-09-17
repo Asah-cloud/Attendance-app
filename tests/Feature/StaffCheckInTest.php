@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -88,6 +89,37 @@ it('checks a staff member in from the manual list via the Livewire toggle', func
         ->assertSet('attendedUserIds', [$staff->id]);
 
     $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => -1]);
+});
+
+it('lets a manager edit a staff name and category from the staff check-in page', function () {
+    [, $event, $manager, $staff] = staffCheckInFixture();
+
+    $this->actingAs($manager);
+    Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
+        ->assertSee('Edit')
+        ->call('startEditingStaff', $staff->id)
+        ->assertSet('editName', 'Kofi Staff')
+        ->assertSet('editCategory', 'Staff')
+        ->set('editName', 'Kofi Mensah')
+        ->set('editCategory', 'Lead Usher')
+        ->call('saveStaff')
+        ->assertHasNoErrors()
+        ->assertDispatched('notify', message: 'Staff details updated successfully.', type: 'success')
+        ->assertSee('Kofi Mensah')
+        ->assertSee('Lead Usher');
+
+    expect($staff->fresh())
+        ->name->toBe('Kofi Mensah')
+        ->category->toBe('Lead Usher');
+});
+
+it('does not allow the staff editor to modify someone outside the event staff roster', function () {
+    [, $event, $manager, , $attendee] = staffCheckInFixture();
+
+    $this->actingAs($manager);
+    expect(fn () => Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
+        ->call('startEditingStaff', $attendee->id))
+        ->toThrow(ModelNotFoundException::class);
 });
 
 it('notifies through the shared toast bubble instead of a silent session flash', function () {
