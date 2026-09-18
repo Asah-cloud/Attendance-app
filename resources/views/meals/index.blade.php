@@ -3,12 +3,12 @@
 
     <x-event-closed-banner :event="$event" />
 
-    <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and use attendee QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) for this event.</p></div>@can('manageMeals', $event)<div class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
+    <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and scan attendee or staff badge QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) and staff member(s) for this event.</p></div>@can('manageMeals', $event)<div class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
 
     <div class="mb-6 flex flex-wrap gap-4 rounded-xl bg-blue-50 p-5">
         <span><strong>{{ $confirmedCount }}</strong> confirmed participants</span>
         <span><strong>{{ $checkedInCount }}</strong> checked-in participants</span>
-        <span>Every confirmed participant is eligible for meals.</span>
+        <span>Every confirmed participant is eligible for meals, including confirmed event staff.</span>
         <a class="font-bold text-blue-700" href="{{ route('audit.approvals.index', $event) }}">Approval codes / restricted sections</a>
     </div>
     @if($errors->any())<p class="mb-5 rounded-xl bg-red-50 p-4 text-red-700">{{ $errors->first() }}</p>@endif

@@ -36,7 +36,9 @@ class MealDistributionController extends Controller
             ->latest('opens_at')
             ->get();
         $stations = $event->mealStations()->orderBy('name')->get();
-        $confirmedCount = $event->confirmedParticipants()->count();
+        $confirmedCount = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->count();
         $checkedInCount = $event->attendances()->distinct()->count('participant_id');
         $auditStaff = $event->staff()->where('company_id', $event->company_id)->role('audit_staff')->get();
         $stations->load('staff');
@@ -228,7 +230,7 @@ class MealDistributionController extends Controller
         $registration?->load('participant');
 
         if (! $registration || $registration->status !== EventRegistration::STATUS_CONFIRMED) {
-            return $this->issueResponse($request, false, 'This QR code does not belong to a confirmed attendee for this event.', 422);
+            return $this->issueResponse($request, false, 'This QR code does not belong to a confirmed attendee or staff member for this event.', 422);
         }
 
         $override = $request->boolean('override');

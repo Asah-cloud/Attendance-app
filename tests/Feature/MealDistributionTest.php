@@ -80,6 +80,38 @@ it('issues one portion from the existing attendee QR and blocks a duplicate', fu
     expect($meal->fresh()->remainingPortions())->toBe(1);
 });
 
+it('lets a manager issue a meal by scanning an event staff badge', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    $staff = Participant::create([
+        'company_id' => $company->id,
+        'name' => 'Event Usher',
+        'category' => 'Staff',
+        'is_support_staff' => true,
+        'staff_code' => 'STF-000001',
+        'staff_qr_token' => str_repeat('s', 48),
+    ]);
+    $registration = EventRegistration::create([
+        'event_id' => $event->id,
+        'participant_id' => $staff->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'source' => 'support_staff',
+    ]);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 2]);
+
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), [
+        'registration_code' => 'ASAH-STAFF:'.$staff->staff_qr_token,
+    ])->assertOk()->assertJsonPath('successful', true);
+
+    $this->assertDatabaseHas('meal_collections', [
+        'meal_distribution_id' => $meal->id,
+        'event_registration_id' => $registration->id,
+        'participant_id' => $staff->id,
+        'issued_by' => $manager->id,
+    ]);
+});
+
 it('enforces stock and confirmed registration requirements', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
