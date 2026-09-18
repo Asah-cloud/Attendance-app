@@ -8,6 +8,7 @@ use App\Models\EventRegistration;
 use App\Services\ApplicationCache;
 use App\Services\EventRegistrationResolver;
 use App\Services\ParticipantRegistrationService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -50,6 +51,14 @@ class AttendanceController extends Controller
         return view('events.attendance', compact(
             'event', 'totalMembers', 'presentCount', 'currentDay'
         ));
+    }
+
+    public function clearCache(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $this->cache->invalidateEvent($event->id, $event->company_id);
+
+        return back()->with('success', 'Event cache cleared. Attendance totals have been refreshed.');
     }
 
     public function arrival(Event $event)

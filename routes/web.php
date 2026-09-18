@@ -125,6 +125,9 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     // --- SHARED ROUTES (Admins, Managers & Markers) ---
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
     Route::get('/events/{event}/attendance', [AttendanceController::class, 'show'])->name('events.attendance');
+    Route::post('/events/{event}/cache/clear', [AttendanceController::class, 'clearCache'])
+        ->middleware('throttle:10,1')
+        ->name('events.cache.clear');
     Route::get('/events/{event}/arrival', [AttendanceController::class, 'arrival'])->name('events.arrival');
     Route::get('/events/{event}/arrival/scanner', [AttendanceController::class, 'arrivalScanner'])->name('events.arrival.scanner');
     Route::post('/events/{event}/arrival/scanner/check-in', [AttendanceController::class, 'scanArrival'])

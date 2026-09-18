@@ -55,6 +55,15 @@
                                 <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12" /></svg>Import
                             </button>
                         @endcan
+                        @can('update', $event)
+                            <form method="POST" action="{{ route('events.cache.clear', $event) }}">
+                                @csrf
+                                <button class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100" onclick="return confirm('Clear cached totals for this event?')">
+                                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5.5 15a7 7 0 0 0 11.7 2.5L20 14M4 10l2.8-3.5A7 7 0 0 1 18.5 9" /></svg>
+                                    Clear cache
+                                </button>
+                            </form>
+                        @endcan
                     </div>
                 </div>
             </section>
