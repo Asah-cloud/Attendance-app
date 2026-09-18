@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\BadgeExport;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventRegistration;
@@ -13,6 +14,7 @@ use App\Services\RoomAllocationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Storage;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -94,3 +96,10 @@ Schedule::command('health:weekly')
     ->weeklyOn(1, '07:00')
     ->name('weekly-production-health-check')
     ->withoutOverlapping();
+
+Schedule::call(function (): void {
+    BadgeExport::query()->where('expires_at', '<', now())->eachById(function (BadgeExport $export): void {
+        Storage::disk('local')->deleteDirectory("badge-exports/{$export->id}");
+        $export->delete();
+    });
+})->daily()->name('prune-badge-exports')->withoutOverlapping();

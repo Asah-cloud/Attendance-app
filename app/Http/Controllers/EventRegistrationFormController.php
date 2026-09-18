@@ -2,19 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\FinalizeBadgeExport;
+use App\Jobs\GenerateBadgeExportBatch;
+use App\Models\BadgeExport;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationField;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
+use App\Services\BadgePdfService;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
 use App\Support\BadgeDesign;
 use App\Support\Pdf\PdfQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -270,6 +276,63 @@ class EventRegistrationFormController extends Controller
         $pdf->setPaper($paper === 'a4' ? 'a4' : ($event->badge_size === 'A5' ? 'a5' : 'a6'), $paper === 'a4' && $event->badge_size !== 'A5' ? 'landscape' : 'portrait');
 
         return $pdf->download('badges-'.$event->slug.'.pdf');
+    }
+
+    public function startBadgeExport(Request $request, Event $event): JsonResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+        $staffMode = $request->routeIs('events.staff-badges.exports.store');
+        if ($staffMode) {
+            $this->applyStaffBadgeSettings($event);
+        }
+        $options = $request->validate([
+            'attendees' => ['sometimes', 'array', 'min:1'],
+            'attendees.*' => ['integer', 'distinct'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'paper' => ['sometimes', 'in:badge,a4'],
+            'cut_guides' => ['sometimes', 'boolean'],
+        ]);
+        $options['staff'] = $staffMode;
+        $ids = app(BadgePdfService::class)->registrations($event, $options, $staffMode)->pluck('id');
+        abort_if($ids->isEmpty(), 422, $staffMode ? 'No confirmed event staff match your print selection.' : 'No confirmed attendees match your print selection.');
+
+        $chunks = $ids->chunk(75)->values();
+        $export = BadgeExport::create([
+            'event_id' => $event->id,
+            'user_id' => $request->user()->id,
+            'status' => 'queued',
+            'total_batches' => $chunks->count(),
+            'options' => $options,
+            'expires_at' => now()->addDay(),
+        ]);
+        $jobs = $chunks->map(fn ($chunk, $index) => new GenerateBadgeExportBatch($export->id, $chunk->all(), $index + 1))->all();
+        $jobs[] = new FinalizeBadgeExport($export->id);
+        Bus::chain($jobs)->dispatch();
+
+        return response()->json(['status_url' => route('badge-exports.show', $export), 'message' => "Queued {$ids->count()} badges in {$chunks->count()} batches."], 202);
+    }
+
+    public function badgeExportStatus(Request $request, BadgeExport $badgeExport): JsonResponse
+    {
+        abort_unless($badgeExport->user_id === $request->user()->id, 403);
+        abort_if($badgeExport->expires_at->isPast(), 410, 'This badge export has expired.');
+
+        return response()->json([
+            'status' => $badgeExport->status,
+            'completed' => $badgeExport->completed_batches,
+            'total' => $badgeExport->total_batches,
+            'error' => $badgeExport->error,
+            'download_url' => $badgeExport->status === 'ready' ? route('badge-exports.download', $badgeExport) : null,
+        ]);
+    }
+
+    public function downloadBadgeExport(Request $request, BadgeExport $badgeExport): BinaryFileResponse
+    {
+        abort_unless($badgeExport->user_id === $request->user()->id, 403);
+        abort_if($badgeExport->expires_at->isPast(), 410, 'This badge export has expired.');
+        abort_unless($badgeExport->status === 'ready' && $badgeExport->file_path && Storage::disk('local')->exists($badgeExport->file_path), 404);
+
+        return response()->download(Storage::disk('local')->path($badgeExport->file_path), 'badges-'.$badgeExport->event->slug.'.zip');
     }
 
     public function badgeQr(Event $event, EventRegistration $registration): Response

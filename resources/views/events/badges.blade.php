@@ -82,6 +82,7 @@ window.badgeStudio = {
     attendees: @json($previewData),
     artwork: @json($event->badge_image_path ? Storage::url($event->badge_image_path) : null),
     pdfUrl: @json(route($pdfRoute,$event)),
+    exportUrl: @json(route($staffMode ? 'events.staff-badges.exports.store' : 'events.badges.exports.store', $event)),
     hasErrors: @json($errors->any())
 };
 window.setTimeout(() => {

@@ -1,5 +1,8 @@
 <?php
 
+use App\Jobs\FinalizeBadgeExport;
+use App\Jobs\GenerateBadgeExportBatch;
+use App\Models\BadgeExport;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
@@ -8,6 +11,7 @@ use App\Support\BadgeDesign;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\FontMetrics;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 
@@ -286,4 +290,29 @@ it('serves QR previews only for confirmed attendees of the authorized event', fu
     $this->get(route('events.badges.qr', [$event, $foreign]))->assertNotFound();
     $this->get(route('events.badges.qr', [$event, $pending]))->assertNotFound();
     $this->get(route('events.badges.qr', [$other, $foreign]))->assertForbidden();
+});
+
+it('queues large badge exports in bounded batches and protects their progress', function () {
+    Bus::fake();
+    [$event, $manager] = badgeStudioFixture();
+    $ids = collect(range(1, 101))->map(fn ($number) => badgeRegistration($event, "Person {$number}")->id)->all();
+
+    $response = $this->actingAs($manager)->postJson(route('events.badges.exports.store', $event), [
+        'attendees' => $ids,
+        'paper' => 'a4',
+        'cut_guides' => true,
+    ])->assertAccepted();
+
+    $export = BadgeExport::firstOrFail();
+    expect($export->total_batches)->toBe(2)
+        ->and($export->options['paper'])->toBe('a4');
+    Bus::assertChained([
+        GenerateBadgeExportBatch::class,
+        GenerateBadgeExportBatch::class,
+        FinalizeBadgeExport::class,
+    ]);
+    $this->getJson($response->json('status_url'))->assertOk()->assertJson(['status' => 'queued', 'completed' => 0, 'total' => 2]);
+
+    [, $otherManager] = badgeStudioFixture();
+    $this->actingAs($otherManager)->getJson(route('badge-exports.show', $export))->assertForbidden();
 });

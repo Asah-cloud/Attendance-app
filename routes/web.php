@@ -201,11 +201,15 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/registrations/{registration}/history', [EventRegistrationFormController::class, 'participantHistory'])->name('events.registrations.participant.history');
         Route::get('/events/{event}/badges', [EventRegistrationFormController::class, 'badges'])->name('events.badges');
         Route::match(['get', 'post'], '/events/{event}/badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.badges.pdf');
+        Route::post('/events/{event}/badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.badges.exports.store');
         Route::get('/events/{event}/badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.badges.qr');
         Route::get('/events/{event}/badges/fonts/{font}', [EventRegistrationFormController::class, 'badgeFont'])->name('events.badges.font');
         Route::patch('/events/{event}/badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.badges.settings');
         Route::get('/events/{event}/staff-badges', [EventRegistrationFormController::class, 'badges'])->name('events.staff-badges');
         Route::match(['get', 'post'], '/events/{event}/staff-badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.staff-badges.pdf');
+        Route::post('/events/{event}/staff-badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.staff-badges.exports.store');
+        Route::get('/badge-exports/{badgeExport}', [EventRegistrationFormController::class, 'badgeExportStatus'])->name('badge-exports.show');
+        Route::get('/badge-exports/{badgeExport}/download', [EventRegistrationFormController::class, 'downloadBadgeExport'])->name('badge-exports.download');
         Route::get('/events/{event}/staff-badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.staff-badges.qr');
         Route::patch('/events/{event}/staff-badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.staff-badges.settings');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');

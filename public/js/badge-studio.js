@@ -523,15 +523,35 @@
         $(sample ? "sample-pdf" : "download-pdf").disabled = true;
         $("print-error").textContent = "Preparing PDF…";
         try {
-            const response = await fetch(c.pdfUrl, {
+            const queued = !sample && chosen.length > 100;
+            const response = await fetch(queued ? c.exportUrl : c.pdfUrl, {
                 method: "POST",
                 headers: {
                     "X-CSRF-TOKEN": form.querySelector("[name=_token]").value,
-                    Accept: "application/pdf",
+                    Accept: queued ? "application/json" : "application/pdf",
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(query),
             });
+            if (queued) {
+                if (!response.ok) throw new Error("Could not start the badge export.");
+                const started = await response.json();
+                $("print-error").textContent = started.message;
+                let result;
+                do {
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                    const statusResponse = await fetch(started.status_url, { headers: { Accept: "application/json" } });
+                    if (!statusResponse.ok) throw new Error("Could not check badge export progress.");
+                    result = await statusResponse.json();
+                    $("print-error").textContent = result.status === "queued"
+                        ? "Badge export is waiting for the queue worker…"
+                        : `Preparing badge batch ${result.completed} of ${result.total}…`;
+                    if (result.status === "failed") throw new Error(result.error || "Badge export failed.");
+                } while (result.status !== "ready");
+                window.location.assign(result.download_url);
+                $("print-error").textContent = "Badge ZIP is ready and downloading.";
+                return;
+            }
             if (
                 !response.ok ||
                 !response.headers
