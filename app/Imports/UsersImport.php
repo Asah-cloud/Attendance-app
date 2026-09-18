@@ -54,8 +54,11 @@ class UsersImport implements OnEachRow
         // top row kept) must not collide multiple attendees onto the same member_id — fall
         // back to the row number, which still keeps re-imports of the same file idempotent.
         $id = $id !== '' ? $id : 'row'.$rowIndex;
-        $companyMemberId = $this->event->company_id.':'.$id;
-        $companyEmail = 'company'.$this->event->company_id.'_member'.$id.'@example.invalid';
+        // Spreadsheet IDs are commonly row numbers that restart in every event list.
+        // Keep them stable for re-imports of this event without allowing row "1" from
+        // a later event to reuse and overwrite row "1" from an earlier event.
+        $companyMemberId = $this->event->company_id.':event'.$this->event->id.':'.$id;
+        $companyEmail = 'company'.$this->event->company_id.'_event'.$this->event->id.'_member'.$id.'@example.invalid';
 
         [, $registration] = app(ParticipantRegistrationService::class)->register($this->event, [
             'name' => $name,

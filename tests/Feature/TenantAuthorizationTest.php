@@ -139,7 +139,7 @@ it('imports participants into the event company with normalized phones without s
 
     Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
 
-    $user = Participant::where('member_id', $company->id.':42')->firstOrFail();
+    $user = Participant::where('member_id', $company->id.':event'.$event->id.':42')->firstOrFail();
     expect($user->company_id)->toBe($company->id)
         ->and($user->phone)->toBe('201234567')
         ->and($user->email)->toBe('jane@example.com')
@@ -164,7 +164,7 @@ it('does not notify a participant when the same import row is processed again', 
     Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
     Excel::import(new UsersImport($event), base_path('tests/Fixtures/participants.csv'));
 
-    Participant::where('member_id', $company->id.':42')->firstOrFail();
+    Participant::where('member_id', $company->id.':event'.$event->id.':42')->firstOrFail();
     Notification::assertNothingSent();
 });
 
@@ -213,6 +213,19 @@ it('imports every row as a distinct participant when the id column is blank, and
         ->toBe(['Siloam 1', 'Siloam 2', 'Siloam 3']);
 });
 
+it('does not merge unrelated people when row ids repeat in different event lists', function () {
+    $company = Company::create(['name' => 'One']);
+    $firstEvent = Event::create(['company_id' => $company->id, 'title' => 'First Event', 'event_date' => now()]);
+    $secondEvent = Event::create(['company_id' => $company->id, 'title' => 'Second Event', 'event_date' => now()->addDay()]);
+
+    (new UsersImport($firstEvent))->importRow(['1', 'First List Person', 'Female', 'Accra', 'Participant', ''], 2);
+    (new UsersImport($secondEvent))->importRow(['1', 'Second List Person', 'Female', 'Kumasi', 'Participant', ''], 2);
+
+    expect(Participant::where('company_id', $company->id)->count())->toBe(2)
+        ->and($firstEvent->registrations()->whereHas('participant', fn ($query) => $query->where('name', 'First List Person'))->exists())->toBeTrue()
+        ->and($secondEvent->registrations()->whereHas('participant', fn ($query) => $query->where('name', 'Second List Person'))->exists())->toBeTrue();
+});
+
 it('sends notifications after a registered participant import when requested', function () {
     Notification::fake();
 
@@ -237,7 +250,7 @@ it('sends notifications after a registered participant import when requested', f
         ])
         ->assertSessionHas('success', 'Participants imported successfully! Email and SMS notifications are being sent.');
 
-    $participant = Participant::where('member_id', $company->id.':42')->firstOrFail();
+    $participant = Participant::where('member_id', $company->id.':event'.$event->id.':42')->firstOrFail();
     Notification::assertSentTo($participant, EventRegistrationSubmitted::class);
 });
 
@@ -265,7 +278,7 @@ it('imports participants from a text-based PDF table', function () {
         ->post(route('events.import.store', $event), ['file' => $file])
         ->assertSessionHas('success');
 
-    $participant = Participant::where('member_id', $company->id.':77')->firstOrFail();
+    $participant = Participant::where('member_id', $company->id.':event'.$event->id.':77')->firstOrFail();
     expect($participant->name)->toBe('PDF Guest')
         ->and($participant->gender)->toBe('Female')
         ->and($participant->room_group)->toBe('Kumasi North')

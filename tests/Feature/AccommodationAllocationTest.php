@@ -621,7 +621,7 @@ it('marks freshly imported attendees as needing a room and allocates one when se
 
     Excel::import(new UsersImport($event, true), base_path('tests/Fixtures/participants.csv'));
 
-    $registration = EventRegistration::whereHas('participant', fn ($q) => $q->where('member_id', $company->id.':42'))->firstOrFail();
+    $registration = EventRegistration::whereHas('participant', fn ($q) => $q->where('member_id', $company->id.':event'.$event->id.':42'))->firstOrFail();
     expect($registration->accommodation_required)->toBeTrue()
         ->and($registration->roomAssignment)->not->toBeNull();
 });
@@ -640,7 +640,7 @@ it('sends imported attendees a room-picker link when notified while self-selecti
         'needs_room' => '1',
     ])->assertSessionHas('success');
 
-    $registration = EventRegistration::whereHas('participant', fn ($q) => $q->where('member_id', $company->id.':42'))->firstOrFail();
+    $registration = EventRegistration::whereHas('participant', fn ($q) => $q->where('member_id', $company->id.':event'.$event->id.':42'))->firstOrFail();
     expect($registration->accommodation_required)->toBeTrue()
         ->and($registration->roomAssignment)->toBeNull();
 
