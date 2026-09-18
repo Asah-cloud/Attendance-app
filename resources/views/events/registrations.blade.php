@@ -50,7 +50,7 @@
                 <button class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white md:col-span-2">Register attendee</button>
             </form>
         </details>
-        <form method="GET" action="{{ route('events.registrations.index', $event) }}" class="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
+        <form id="attendee-filter" method="GET" action="{{ route('events.registrations.index', $event) }}" class="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
             <div class="flex-1">
                 <label for="attendee-search" class="mb-1 block text-xs font-black uppercase tracking-wider text-slate-500">Search attendees</label>
                 <input id="attendee-search" type="search" name="search" value="{{ $search }}" placeholder="Name, phone, email, member ID, type, gender, or code" class="w-full rounded-xl border-slate-200 text-sm" autocomplete="off">
@@ -60,11 +60,12 @@
                 <select id="attendee-status" name="status" class="w-full rounded-xl border-slate-200 text-sm font-bold sm:w-auto"><option value="">All statuses</option>@foreach(['confirmed','pending','waitlisted','cancelled','rejected'] as $option)<option value="{{ $option }}" @selected($status === $option)>{{ ucfirst($option) }}</option>@endforeach</select>
             </div>
             <button type="submit" class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Search</button>
+            <span id="attendee-filter-status" class="hidden self-center text-xs font-bold text-blue-700" role="status" aria-live="polite">Searching…</span>
             @if($search !== '' || $status !== '')
                 <a href="{{ route('events.registrations.index', $event) }}" class="rounded-xl border border-slate-200 px-5 py-3 text-center text-xs font-black uppercase tracking-wider text-slate-600">Clear</a>
             @endif
         </form>
-        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
+        <div id="attendee-results"><div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-4">Attendee</th><th class="px-5 py-4">Contact</th><th class="px-5 py-4">Type</th><th class="px-5 py-4">Gender</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Registered</th><th class="px-5 py-4">Actions</th></tr></thead>
             <tbody class="divide-y divide-slate-100">@forelse($registrations as $registration)
                 <tr><td class="px-5 py-4 font-bold text-slate-900">{{ $registration->participant->name }}</td><td class="px-5 py-4 text-slate-600">{{ $registration->participant->email ?: '—' }}<br>{{ $registration->participant->phone ?: '' }}</td><td class="px-5 py-4">{{ $registration->participant->category }}</td><td class="px-5 py-4">{{ $registration->participant->gender ?: '—' }}</td><td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">{{ ucfirst($registration->status) }}</span></td><td class="px-5 py-4 text-slate-500">{{ $registration->registered_at?->format('M j, Y g:i A') }}</td>
@@ -102,6 +103,51 @@
                     </td>
                 </tr>
             @empty<tr><td colspan="7" class="px-5 py-12 text-center text-slate-500">No registrations found.</td></tr>@endforelse</tbody>
-        </table></div></div><div class="mt-5">{{ $registrations->links() }}</div>
+        </table></div></div><div class="mt-5">{{ $registrations->links() }}</div></div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('attendee-filter');
+            const search = document.getElementById('attendee-search');
+            const status = document.getElementById('attendee-status');
+            const loading = document.getElementById('attendee-filter-status');
+            let timer;
+            let request;
+
+            const filter = async (target = null) => {
+                request?.abort();
+                request = new AbortController();
+                const url = new URL(target || form.action);
+                if (!target) {
+                    const data = new FormData(form);
+                    for (const [key, value] of data.entries()) if (value) url.searchParams.set(key, value);
+                }
+                loading.classList.remove('hidden');
+                try {
+                    const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: request.signal });
+                    if (!response.ok) throw new Error('Search failed');
+                    const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    document.getElementById('attendee-results').replaceChildren(...page.getElementById('attendee-results').childNodes);
+                    history.replaceState({}, '', url);
+                } catch (error) {
+                    if (error.name !== 'AbortError') form.submit();
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            };
+
+            form.addEventListener('submit', event => { event.preventDefault(); filter(); });
+            search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(filter, 300); });
+            status.addEventListener('change', filter);
+            document.getElementById('attendee-results').addEventListener('click', event => {
+                const link = event.target.closest('a[href]');
+                if (!link) return;
+                event.preventDefault();
+                filter(link.href);
+            });
+        });
+    </script>
+    @endpush
 </x-app-layout>

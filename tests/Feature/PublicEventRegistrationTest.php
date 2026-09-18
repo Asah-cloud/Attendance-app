@@ -282,7 +282,10 @@ it('lets a manager search the attendee list and combine it with the status filte
         ->assertOk()
         ->assertSee('Ama Mensah')
         ->assertDontSee('Kojo Owusu')
-        ->assertSee('value="Ama Female"', false);
+        ->assertSee('value="Ama Female"', false)
+        ->assertSee('id="attendee-filter"', false)
+        ->assertSee("search.addEventListener('input'", false)
+        ->assertSee('filter(link.href)', false);
 
     $this->actingAs($manager)->get(route('events.registrations.index', [$event, 'search' => $otherRegistration->registration_code]))
         ->assertOk()
