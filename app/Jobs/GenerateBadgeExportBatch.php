@@ -17,7 +17,10 @@ class GenerateBadgeExportBatch implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public string $exportId, public array $registrationIds, public int $batchNumber) {}
+    public function __construct(public string $exportId, public array $registrationIds, public int $batchNumber)
+    {
+        $this->onQueue('badges');
+    }
 
     public function handle(BadgePdfService $badges): void
     {

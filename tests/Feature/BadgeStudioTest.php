@@ -142,6 +142,16 @@ it('prints only the bare room name on the badge, without block or floor', functi
     expect(BadgeDesign::values($event, $registration->fresh())['room'])->toBe('OB-105');
 });
 
+it('makes the imported area or group available as an optional badge field', function () {
+    [$event] = badgeStudioFixture();
+    $registration = badgeRegistration($event);
+    $registration->participant->update(['room_group' => 'Area 7 / Young Adults']);
+
+    expect(BadgeDesign::LABELS['group'])->toBe('Area / Group')
+        ->and(BadgeDesign::defaults()['group']['visible'])->toBeFalse()
+        ->and(BadgeDesign::values($event, $registration->fresh())['group'])->toBe('Area 7 / Young Adults');
+});
+
 it('lets a manager select Poppins and prints a working PDF with it', function () {
     [$event, $manager] = badgeStudioFixture();
     badgeRegistration($event);
@@ -311,6 +321,8 @@ it('queues large badge exports in bounded batches and protects their progress', 
         GenerateBadgeExportBatch::class,
         FinalizeBadgeExport::class,
     ]);
+    expect((new GenerateBadgeExportBatch($export->id, [$ids[0]], 1))->queue)->toBe('badges')
+        ->and((new FinalizeBadgeExport($export->id))->queue)->toBe('badges');
     $this->getJson($response->json('status_url'))->assertOk()->assertJson(['status' => 'queued', 'completed' => 0, 'total' => 2]);
 
     [, $otherManager] = badgeStudioFixture();

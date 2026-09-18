@@ -17,7 +17,10 @@ class FinalizeBadgeExport implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public string $exportId) {}
+    public function __construct(public string $exportId)
+    {
+        $this->onQueue('badges');
+    }
 
     public function handle(): void
     {

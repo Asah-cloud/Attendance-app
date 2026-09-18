@@ -35,6 +35,13 @@ sudo find "$APP_DIR/storage" -type f -exec chmod 664 {} \;
 sudo chmod -R 775 "$APP_DIR/bootstrap/cache"
 
 echo "==> Restarting queue workers so they pick up the new code/config"
+# Badge PDFs are time-sensitive interactive exports. Keep them ahead of the
+# notification backlog while still allowing the same workers to drain default.
+if ! sudo grep -q -- '--queue=badges,default' /etc/supervisor/conf.d/attendance-worker.conf; then
+    sudo sed -i 's/queue:work /queue:work --queue=badges,default /' /etc/supervisor/conf.d/attendance-worker.conf
+    sudo supervisorctl reread
+    sudo supervisorctl update
+fi
 sudo supervisorctl restart "$WORKER_GROUP"
 
 echo "==> Reloading PHP-FPM to clear opcache"
