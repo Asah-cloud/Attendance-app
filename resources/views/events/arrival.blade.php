@@ -21,11 +21,7 @@
                 </div>
             </section>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-summary-card title="Confirmed" :value="$confirmedCount" color="blue" />
-                <x-summary-card title="Arrived" :value="$arrivedCount" color="green" />
-                <x-summary-card title="Yet to arrive" :value="max(0, $confirmedCount - $arrivedCount)" color="red" />
-            </div>
+            <livewire:arrival-stats :event="$event" />
 
             <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-100 bg-slate-50/70 p-6">

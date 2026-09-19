@@ -1,4 +1,4 @@
-<div>
+<div wire:poll.5s>
     {{-- Search & Walk-in Action Section --}}
     <div class="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div class="relative group w-full md:flex-1">

@@ -28,6 +28,7 @@
             </div>
         </div>
         <x-event-closed-banner :event="$event" />
+        <livewire:registration-stats :event="$event" />
         @if($errors->any())<div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
         <details class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','category'])) open @endif>
             <summary class="cursor-pointer font-black text-slate-900">Manually register an attendee</summary>

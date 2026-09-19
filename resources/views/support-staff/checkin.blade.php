@@ -20,6 +20,8 @@
                 </div>
             </section>
 
+            <livewire:staff-check-in-stats :event="$event" />
+
             <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-100 bg-slate-50/70 p-6">
                     <h2 class="text-xs font-black uppercase tracking-widest text-slate-700">Staff assigned to this event</h2>

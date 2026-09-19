@@ -14,12 +14,7 @@
             </div>
         </section>
 
-        <div class="grid gap-4 sm:grid-cols-4">
-            <x-summary-card title="Beds" :value="$rooms->sum('capacity')" color="blue" />
-            <x-summary-card title="Rooms" :value="$rooms->count()" color="green" />
-            <x-summary-card title="Need rooms" :value="$requiredCount" color="amber" />
-            <x-summary-card title="Allocated" :value="$assignedCount" color="purple" />
-        </div>
+        <livewire:accommodation-stats :event="$event" />
 
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ $errors->first() }}</div>@endif
 
