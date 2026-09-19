@@ -146,6 +146,7 @@ class AttendanceSearch extends Component
 
         app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
         $this->loadAttendedUserIds();
+        $this->dispatch('attendanceStatsChanged');
     }
 
     public function deleteUser(int $participantId)
@@ -153,6 +154,8 @@ class AttendanceSearch extends Component
         Gate::authorize('update', $this->event);
         $this->participantsQuery()->findOrFail($participantId);
         $this->event->registrations()->where('participant_id', $participantId)->delete();
+        app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
+        $this->dispatch('attendanceStatsChanged');
         $this->dispatch('notify', message: 'Member removed successfully.', type: 'success');
     }
 

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Event;
+use App\Services\ApplicationCache;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
 use Illuminate\Support\Facades\Gate;
@@ -52,10 +53,13 @@ class AddWalkInModal extends Component
 
         app(RegistrationLifecycleService::class)->notify($registration, 'confirmed');
 
+        app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
+
         $this->reset(['name', 'email', 'phone', 'category', 'showModal']);
 
         // Tell the parent page to refresh its attendee list grid
         $this->dispatch('refreshAttendeeList');
+        $this->dispatch('attendanceStatsChanged');
 
         $this->dispatch('notify', message: 'Walk-in member registered successfully!', type: 'success');
     }

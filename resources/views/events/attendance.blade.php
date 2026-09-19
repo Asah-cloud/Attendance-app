@@ -105,19 +105,7 @@
                         <p class="mt-3 text-sm leading-6 text-slate-600">{{ $event->has_arrival_session ? 'Only members who completed Arrival check-in appear here. Mark their attendance separately for each program day.' : 'Members can use phone or QR check-in, while staff can use the scanner or manual registry.' }}</p>
                     </div>
 
-                    <div class="group bg-blue-900 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-300">
-                        <h3 class="font-bold text-blue-300 mb-6 text-xs uppercase tracking-widest">Current Stats</h3>
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-end border-b border-white/10 pb-2">
-                                <span class="text-blue-100/70 text-sm">Eligible attendees</span>
-                                <span class="text-2xl font-black">{{ number_format($totalMembers) }}</span>
-                            </div>
-                            <div class="flex justify-between items-end">
-                                <span class="text-blue-100/70 text-sm">Present Today</span>
-                                <span class="text-2xl font-black text-green-400">{{ number_format($presentCount) }}</span>
-                            </div>
-                        </div>
-                    </div>
+                    <livewire:attendance-stats :event="$event" :day="$currentDay" :key="'attendance-stats-'.$currentDay" />
                 </div>
 
                 {{-- Right Side Search --}}

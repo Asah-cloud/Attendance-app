@@ -1,0 +1,51 @@
+<?php
+
+use App\Livewire\AddWalkInModal;
+use App\Livewire\AttendanceSearch;
+use App\Livewire\AttendanceStats;
+use App\Models\Company;
+use App\Models\Event;
+use App\Models\EventRegistration;
+use App\Models\Participant;
+use App\Models\User;
+use Illuminate\Support\Facades\Notification;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+
+beforeEach(function () {
+    Notification::fake();
+    Role::findOrCreate('manager');
+});
+
+it('refreshes attendance totals after attendance and walk-in changes', function () {
+    $company = Company::create(['name' => 'Live Stats Company']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Live Event', 'event_date' => now()]);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'First Guest']);
+    EventRegistration::create([
+        'event_id' => $event->id,
+        'participant_id' => $participant->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+
+    $this->actingAs($manager);
+
+    Livewire::test(AttendanceStats::class, ['event' => $event, 'day' => 1])
+        ->assertSee('Eligible attendees')
+        ->assertSeeHtml('>1<');
+
+    Livewire::test(AttendanceSearch::class, ['event' => $event, 'day' => 1])
+        ->call('toggleAttendance', $participant->id)
+        ->assertDispatched('attendanceStatsChanged');
+
+    Livewire::test(AttendanceStats::class, ['event' => $event, 'day' => 1])
+        ->assertSeeHtml('>1<');
+
+    Livewire::test(AddWalkInModal::class, ['event' => $event])
+        ->set('name', 'Walk In Guest')
+        ->call('registerWalkIn')
+        ->assertDispatched('attendanceStatsChanged');
+
+    expect($event->attendanceEligibleParticipants()->count())->toBe(2);
+});
