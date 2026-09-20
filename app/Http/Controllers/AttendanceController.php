@@ -308,6 +308,17 @@ class AttendanceController extends Controller
             'marked_by' => Auth::id(),
         ]);
 
+        if ($day === 1 && $registration->participant->isNumberedParticipantStaff()) {
+            Attendance::query()->createOrFirst([
+                'event_id' => $event->id,
+                'participant_id' => $registration->participant_id,
+                'day' => -1,
+            ], [
+                'status' => 'present',
+                'marked_by' => Auth::id(),
+            ]);
+        }
+
         $message = $attendance->wasRecentlyCreated
             ? "Welcome, {$registration->participant->name}! Your {$event->attendanceSessionLabel($day)} check-in is complete. We are happy to have you here."
             : "Welcome back, {$registration->participant->name}! You are already checked in for {$event->attendanceSessionLabel($day)}. Enjoy the event.";

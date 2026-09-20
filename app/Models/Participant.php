@@ -26,6 +26,12 @@ class Participant extends Model
         return '233'.ltrim($phone, '0');
     }
 
+    public function isNumberedParticipantStaff(): bool
+    {
+        return $this->is_support_staff
+            && preg_match('/^participant\s+\d+$/i', trim($this->name)) === 1;
+    }
+
     protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group'];
 
     protected function casts(): array

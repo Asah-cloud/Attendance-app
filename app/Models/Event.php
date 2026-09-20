@@ -222,8 +222,8 @@ class Event extends Model
                 ->where('event_id', $this->id)
                 ->whereIn('day', [-1, 1]))
             ->whereRaw('LOWER(TRIM(participants.name)) LIKE ?', ['participant %'])
-            ->get(['participants.id', 'participants.name'])
-            ->filter(fn (Participant $participant) => preg_match('/^participant\s+\d+$/i', trim($participant->name)) === 1)
+            ->get(['participants.id', 'participants.name', 'participants.is_support_staff'])
+            ->filter(fn (Participant $participant) => $participant->isNumberedParticipantStaff())
             ->pluck('id');
     }
 

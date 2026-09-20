@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\AttendanceSearch;
+use App\Livewire\StaffCheckInStats;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
@@ -156,6 +157,24 @@ it('checks a staff member in via their staff QR and keeps it separate from daily
         ->assertJsonPath('message', 'Kofi Staff is already checked in.');
 
     expect(Attendance::where('event_id', $event->id)->where('participant_id', $staff->id)->count())->toBe(1);
+});
+
+it('reflects a numbered staff member scanned for day one in the staff check-in area', function () {
+    [, $event, $manager, $staff] = staffCheckInFixture();
+    $staff->update(['name' => 'Participant 42']);
+
+    $this->actingAs($manager)
+        ->postJson(route('events.scanner.check-in', $event), ['registration_code' => 'ASAH-STAFF:'.$staff->staff_qr_token])
+        ->assertOk()
+        ->assertJsonPath('successful', true);
+
+    $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => 1]);
+    $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => -1]);
+
+    Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
+        ->assertSet('attendedUserIds', [$staff->id]);
+    Livewire::test(StaffCheckInStats::class, ['event' => $event])
+        ->assertViewHas('checkedIn', 1);
 });
 
 it('rejects a normal attendee QR code at the staff scanner', function () {
