@@ -27,6 +27,12 @@
                         <input type="text" wire:model="category" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Defaults to 'Member' if blank">
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-1">Area / Group (Optional)</label>
+                        <input type="text" wire:model="room_group" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Kumasi Area">
+                        @error('room_group') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+                    </div>
+
                     <div class="flex items-center justify-end gap-3 pt-2">
                         <button type="button" wire:click="$set('showModal', false)" class="px-4 py-2 text-xs font-black uppercase text-gray-400 hover:text-gray-600 transition">
                             Cancel

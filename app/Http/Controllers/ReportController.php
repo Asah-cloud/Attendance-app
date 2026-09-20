@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AreaAttendanceSummaryExport;
 use App\Exports\AttendanceExport;
 use App\Models\Event;
 use App\Services\ApplicationCache;
@@ -75,6 +76,15 @@ class ReportController extends Controller
         $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.csv';
 
         return Excel::download(new AttendanceExport($event, $day), $fileName, \Maatwebsite\Excel\Excel::CSV);
+    }
+
+    public function exportAreaSummary(Event $event, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        $fileName = 'Area_Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.xlsx';
+
+        return Excel::download(new AreaAttendanceSummaryExport($event, $day), $fileName);
     }
 
     public function exportPdf(Event $event, $day = 'all')

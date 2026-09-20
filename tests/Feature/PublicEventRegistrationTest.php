@@ -261,7 +261,7 @@ it('lets a manager search the attendee list and combine it with the status filte
     $manager->assignRole('manager');
     $match = Participant::create([
         'company_id' => $event->company_id,
-        'name' => 'Ama Mensah',
+        'name' => 'Ama Serwaa Mensah',
         'email' => 'ama@example.com',
         'phone' => '0244000111',
         'member_id' => 'RET-104',
@@ -280,7 +280,7 @@ it('lets a manager search the attendee list and combine it with the status filte
 
     $this->actingAs($manager)->get(route('events.registrations.index', [$event, 'search' => 'Ama Female', 'status' => 'confirmed']))
         ->assertOk()
-        ->assertSee('Ama Mensah')
+        ->assertSee('Ama Serwaa Mensah')
         ->assertDontSee('Kojo Owusu')
         ->assertSee('value="Ama Female"', false)
         ->assertSee('id="attendee-filter"', false)
@@ -290,7 +290,12 @@ it('lets a manager search the attendee list and combine it with the status filte
     $this->actingAs($manager)->get(route('events.registrations.index', [$event, 'search' => $otherRegistration->registration_code]))
         ->assertOk()
         ->assertSee('Kojo Owusu')
-        ->assertDontSee('Ama Mensah');
+        ->assertDontSee('Ama Serwaa Mensah');
+
+    $this->actingAs($manager)->get(route('events.registrations.index', [$event, 'search' => 'mEnSaH serw']))
+        ->assertOk()
+        ->assertSee('Ama Serwaa Mensah')
+        ->assertDontSee('Kojo Owusu');
 });
 
 it('lets a manager turn the category field into a dropdown and enforces its options', function () {
@@ -334,13 +339,15 @@ it('lets a manager edit an attendee\'s details', function () {
         'gender' => 'Male',
         'category' => 'VIP',
         'member_id' => 'M-100',
+        'room_group' => 'Kumasi Area',
     ])->assertSessionHas('success');
 
     expect($participant->fresh())
         ->name->toBe('New Name')
         ->email->toBe('new@example.com')
         ->category->toBe('VIP')
-        ->member_id->toBe('M-100');
+        ->member_id->toBe('M-100')
+        ->room_group->toBe('Kumasi Area');
 });
 
 it('logs an audit entry for each changed field when a manager edits an attendee', function () {

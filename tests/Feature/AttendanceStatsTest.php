@@ -48,10 +48,12 @@ it('refreshes attendance totals after attendance and walk-in changes', function 
 
     Livewire::test(AddWalkInModal::class, ['event' => $event])
         ->set('name', 'Walk In Guest')
+        ->set('room_group', 'Accra Area')
         ->call('registerWalkIn')
         ->assertDispatched('attendanceStatsChanged');
 
-    expect($event->attendanceEligibleParticipants()->count())->toBe(2);
+    expect($event->attendanceEligibleParticipants()->count())->toBe(2)
+        ->and(Participant::where('name', 'Walk In Guest')->firstOrFail()->room_group)->toBe('Accra Area');
 });
 
 it('counts checked-in numbered participant staff throughout the event', function () {

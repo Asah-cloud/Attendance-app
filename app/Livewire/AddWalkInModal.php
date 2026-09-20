@@ -24,6 +24,8 @@ class AddWalkInModal extends Component
 
     public $category = '';
 
+    public $room_group = '';
+
     // Listen for custom open events from the parent view
     protected $listeners = ['openWalkInModal' => 'openModal'];
 
@@ -40,6 +42,7 @@ class AddWalkInModal extends Component
             'name' => 'required|string|max:255',
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:30',
+            'room_group' => 'nullable|string|max:255',
         ]);
 
         $category = ! empty(trim($this->category)) ? trim($this->category) : 'Member';
@@ -49,13 +52,14 @@ class AddWalkInModal extends Component
             'email' => $this->email,
             'phone' => $this->phone,
             'category' => $category,
+            'room_group' => $this->room_group,
         ], 'walk_in');
 
         app(RegistrationLifecycleService::class)->notify($registration, 'confirmed');
 
         app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
 
-        $this->reset(['name', 'email', 'phone', 'category', 'showModal']);
+        $this->reset(['name', 'email', 'phone', 'category', 'room_group', 'showModal']);
 
         // Tell the parent page to refresh its attendee list grid
         $this->dispatch('refreshAttendeeList');

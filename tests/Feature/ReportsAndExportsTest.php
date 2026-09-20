@@ -119,6 +119,22 @@ it('allows a manager to export event attendance as csv', function () {
     expect($response->headers->get('Content-Disposition'))->toContain('.csv');
 });
 
+it('downloads a grouped area attendance summary for the selected period', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Area Event', 'event_date' => now()]);
+    foreach (['Kumasi Area', 'Kumasi Area', 'Accra Area'] as $index => $area) {
+        $participant = Participant::create(['company_id' => $company->id, 'name' => 'Guest '.$index, 'room_group' => $area]);
+        $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+        Attendance::create(['event_id' => $event->id, 'participant_id' => $participant->id, 'day' => 1, 'status' => 'present']);
+    }
+
+    $response = $this->actingAs($manager)->get(route('reports.area-summary', ['event' => $event, 'day' => 1]));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('Area_Attendance_')->toContain('.xlsx');
+});
+
 it('prevents a manager from exporting another company event attendance', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $otherCompany = Company::create(['name' => 'Other Co']);

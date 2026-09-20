@@ -45,15 +45,16 @@ class EventRegistrationFormController extends Controller
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search): void {
                 foreach (preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $term) {
-                    $query->where(function ($query) use ($term): void {
-                        $query->where('registration_code', 'like', "%{$term}%")
-                            ->orWhereHas('participant', function ($query) use ($term): void {
-                                $query->where('name', 'like', "%{$term}%")
-                                    ->orWhere('email', 'like', "%{$term}%")
-                                    ->orWhere('phone', 'like', "%{$term}%")
-                                    ->orWhere('member_id', 'like', "%{$term}%")
-                                    ->orWhere('category', 'like', "%{$term}%")
-                                    ->orWhere('gender', 'like', "%{$term}%");
+                    $like = '%'.mb_strtolower($term).'%';
+                    $query->where(function ($query) use ($like): void {
+                        $query->whereRaw('LOWER(registration_code) LIKE ?', [$like])
+                            ->orWhereHas('participant', function ($query) use ($like): void {
+                                $query->whereRaw('LOWER(name) LIKE ?', [$like])
+                                    ->orWhereRaw('LOWER(email) LIKE ?', [$like])
+                                    ->orWhere('phone', 'like', $like)
+                                    ->orWhereRaw('LOWER(member_id) LIKE ?', [$like])
+                                    ->orWhereRaw('LOWER(category) LIKE ?', [$like])
+                                    ->orWhereRaw('LOWER(gender) LIKE ?', [$like]);
                             });
                     });
                 }
@@ -166,6 +167,7 @@ class EventRegistrationFormController extends Controller
             'category' => $this->categoryRule($event),
             'member_id' => ['nullable', 'string', 'max:255'],
             'dietary_notes' => ['nullable', 'string', 'max:500'],
+            'room_group' => ['nullable', 'string', 'max:255'],
         ]);
         $participant = $registration->participant;
         $changes = collect($validated)

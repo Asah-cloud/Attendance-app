@@ -97,7 +97,7 @@
             </div>
 
             <div class="mb-12 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-                <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-blue-700">Present participants by area</h3>
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="text-xs font-black uppercase tracking-widest text-blue-700">Present participants by area</h3><a href="{{ route('reports.area-summary', ['event' => $event, 'day' => $selectedDay]) }}" class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white">Download area summary</a></div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($areaBreakdown as $label => $count)
                         <div class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></div>
