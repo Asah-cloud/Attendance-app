@@ -38,18 +38,23 @@ class AttendanceController extends Controller
         $this->authorize('view', $event);
 
         $currentDay = $this->getEventDay($request, $event);
-        $stats = $this->cache->rememberEvent($event->id, "attendance-stats:v2:day:{$currentDay}", fn () => [
-            'totalMembers' => $event->attendanceEligibleParticipants()->count(),
-            'presentCount' => Attendance::query()
-                ->where('event_id', '=', $event->id)
-                ->where('day', '=', $currentDay)
-                ->count('id'),
-        ]);
+        $stats = $this->cache->rememberEvent($event->id, "attendance-stats:v3:day:{$currentDay}", function () use ($event, $currentDay) {
+            $participantStaffCount = $event->persistentParticipantStaffCount();
 
-        ['totalMembers' => $totalMembers, 'presentCount' => $presentCount] = $stats;
+            return [
+                'totalMembers' => $event->attendanceEligibleParticipants()->count(),
+                'participantStaffCount' => $participantStaffCount,
+                'presentCount' => Attendance::query()
+                    ->where('event_id', '=', $event->id)
+                    ->where('day', '=', $currentDay)
+                    ->count('id') + $participantStaffCount,
+            ];
+        });
+
+        ['totalMembers' => $totalMembers, 'presentCount' => $presentCount, 'participantStaffCount' => $participantStaffCount] = $stats;
 
         return view('events.attendance', compact(
-            'event', 'totalMembers', 'presentCount', 'currentDay'
+            'event', 'totalMembers', 'presentCount', 'participantStaffCount', 'currentDay'
         ));
     }
 

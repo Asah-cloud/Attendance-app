@@ -206,6 +206,24 @@ class Event extends Model
             : $this->confirmedParticipants();
     }
 
+    /**
+     * Count checked-in support staff whose names follow "Participant <number>".
+     *
+     * Staff check-in uses day -1, so these participants remain present for every
+     * numbered attendance day in the event after their single check-in.
+     */
+    public function persistentParticipantStaffCount(): int
+    {
+        return $this->confirmedStaff()
+            ->whereHas('attendances', fn ($query) => $query
+                ->where('event_id', $this->id)
+                ->where('day', -1))
+            ->whereRaw('LOWER(TRIM(participants.name)) LIKE ?', ['participant %'])
+            ->get(['participants.id', 'participants.name'])
+            ->filter(fn (Participant $participant) => preg_match('/^participant\s+\d+$/i', trim($participant->name)) === 1)
+            ->count();
+    }
+
     public function participantHasArrived(int $participantId): bool
     {
         return ! $this->has_arrival_session || $this->attendances()
