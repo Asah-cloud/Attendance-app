@@ -23,7 +23,7 @@ it('refreshes attendance totals after attendance and walk-in changes', function 
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
     $manager->assignRole('manager');
     $event = Event::create(['company_id' => $company->id, 'title' => 'Live Event', 'event_date' => now()]);
-    $participant = Participant::create(['company_id' => $company->id, 'name' => 'First Guest']);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'First Guest', 'room_group' => 'Kumasi Area']);
     EventRegistration::create([
         'event_id' => $event->id,
         'participant_id' => $participant->id,
@@ -37,6 +37,9 @@ it('refreshes attendance totals after attendance and walk-in changes', function 
         ->assertSeeHtml('>1<');
 
     Livewire::test(AttendanceSearch::class, ['event' => $event, 'day' => 1])
+        ->assertSee('Area: Kumasi Area')
+        ->set('search', 'Kumasi Area')
+        ->assertSee('First Guest')
         ->call('toggleAttendance', $participant->id)
         ->assertDispatched('attendanceStatsChanged');
 

@@ -212,7 +212,9 @@ class AttendanceSearch extends Component
                         $q->where(function ($sub) use ($wordLower) {
                             $sub->whereRaw('LOWER(name) LIKE ?', [$wordLower])
                                 ->orWhere('phone', 'like', $wordLower)
-                                ->orWhereRaw('LOWER(category) LIKE ?', [$wordLower]);
+                                ->orWhereRaw('LOWER(category) LIKE ?', [$wordLower])
+                                ->orWhereRaw('LOWER(room_group) LIKE ?', [$wordLower])
+                                ->orWhereRaw('LOWER(department) LIKE ?', [$wordLower]);
                         });
                     }
                 }

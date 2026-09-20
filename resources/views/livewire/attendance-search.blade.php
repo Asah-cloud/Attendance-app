@@ -63,6 +63,9 @@
                                     </div>
                                     <div>
                                         <div class="text-sm font-black text-gray-900">{{ $user->name }}</div>
+                                        @if($user->room_group || $user->department)
+                                            <div class="mt-0.5 text-xs font-bold text-blue-700">Area: {{ $user->room_group ?: $user->department }}</div>
+                                        @endif
                                         <div class="mt-0.5">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black bg-white border border-gray-100 text-gray-500 uppercase tracking-wider">
                                                 {{ $user->category ?? 'General Member' }}

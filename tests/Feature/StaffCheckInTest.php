@@ -86,6 +86,7 @@ it('checks a staff member in from the manual list via the Livewire toggle', func
     $this->actingAs($manager);
     Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
         ->assertSee('Kofi Staff')
+        ->assertSee('Area: Ushering')
         ->call('toggleAttendance', $staff->id)
         ->assertSet('attendedUserIds', [$staff->id]);
 
