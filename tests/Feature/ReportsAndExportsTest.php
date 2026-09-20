@@ -135,8 +135,8 @@ it('shows category and gender breakdowns and supports filtering the attendance r
     $manager = reportsManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Reported Event', 'event_date' => now()]);
 
-    $male = Participant::create(['company_id' => $company->id, 'name' => 'Male Guest', 'category' => 'Guest', 'gender' => 'Male']);
-    $female = Participant::create(['company_id' => $company->id, 'name' => 'Female Member', 'category' => 'Member', 'gender' => 'Female']);
+    $male = Participant::create(['company_id' => $company->id, 'name' => 'Male Guest', 'phone' => '0201111111', 'category' => 'Guest', 'gender' => 'Male', 'room_group' => 'Kumasi Area']);
+    $female = Participant::create(['company_id' => $company->id, 'name' => 'Female Member', 'phone' => '0202222222', 'category' => 'Member', 'gender' => 'Female', 'room_group' => 'Kumasi Area']);
     $event->registrations()->create(['participant_id' => $male->id, 'status' => 'confirmed']);
     $event->registrations()->create(['participant_id' => $female->id, 'status' => 'confirmed']);
     Attendance::create(['event_id' => $event->id, 'participant_id' => $male->id, 'day' => 1, 'status' => 'present']);
@@ -163,6 +163,15 @@ it('shows category and gender breakdowns and supports filtering the attendance r
         ->assertOk()
         ->assertSee('Female Member')
         ->assertDontSee('Male Guest');
+
+    $this->actingAs($manager)
+        ->get(route('reports.event', ['event' => $event, 'day' => 'all', 'area' => 'Kumasi Area']))
+        ->assertOk()
+        ->assertSee('Present participants by area')
+        ->assertSee('Kumasi Area')
+        ->assertSee('0201111111')
+        ->assertSee('Male Guest')
+        ->assertSee('Female Member');
 });
 
 it('rejects an out of range day for the attendance export', function () {

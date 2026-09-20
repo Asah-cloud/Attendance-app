@@ -48,7 +48,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         // 3. Match your headings to your map data
-        return ['Name', 'Phone', 'Category', 'Gender', 'Email', 'Date/Time Marked', 'Attendance Session'];
+        return ['Name', 'Phone', 'Area', 'Category', 'Gender', 'Email', 'Date/Time Marked', 'Attendance Session'];
     }
 
     public function map($user): array
@@ -59,6 +59,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
         return [
             $user->name,
             $user->phone,
+            $user->room_group ?: ($user->department ?: 'Area not specified'),
             $user->category,
             $user->gender,
             $user->email, // <-- added email to the export

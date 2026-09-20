@@ -26,10 +26,12 @@ class ReportController extends Controller
             'totalExpected' => $totalExpected,
             'categoryBreakdown' => $categoryBreakdown,
             'genderBreakdown' => $genderBreakdown,
+            'areaBreakdown' => $areaBreakdown,
         ] = $this->reportData($event, $selectedDay);
 
         $filterCategory = request()->string('category')->toString();
         $filterGender = request()->string('gender')->toString();
+        $filterArea = request()->string('area')->toString();
         if ($filterCategory !== '') {
             $presentUsers = $presentUsers->where('category', $filterCategory)->values();
             $absentUsers = $absentUsers->where('category', $filterCategory)->values();
@@ -38,13 +40,20 @@ class ReportController extends Controller
             $presentUsers = $presentUsers->where('gender', $filterGender)->values();
             $absentUsers = $absentUsers->where('gender', $filterGender)->values();
         }
+        if ($filterArea !== '') {
+            $presentUsers = $presentUsers->filter(fn ($participant) => $this->participantArea($participant) === $filterArea)->values();
+            $absentUsers = $absentUsers->filter(fn ($participant) => $this->participantArea($participant) === $filterArea)->values();
+        }
 
         $availableCategories = $event->confirmedParticipants()->distinct()->pluck('category')->filter()->sort()->values();
         $availableGenders = $event->confirmedParticipants()->distinct()->pluck('gender')->filter()->sort()->values();
+        $availableAreas = $event->confirmedParticipants()->get()
+            ->map(fn ($participant) => $this->participantArea($participant))->unique()->sort()->values();
 
         return view('reports.attendance', compact(
             'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay',
-            'categoryBreakdown', 'genderBreakdown', 'filterCategory', 'filterGender', 'availableCategories', 'availableGenders'
+            'categoryBreakdown', 'genderBreakdown', 'areaBreakdown', 'filterCategory', 'filterGender', 'filterArea',
+            'availableCategories', 'availableGenders', 'availableAreas'
         ));
     }
 
@@ -138,8 +147,14 @@ class ReportController extends Controller
 
         $data['categoryBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
         $data['genderBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
+        $data['areaBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $this->participantArea($user))->sortDesc();
 
         return $data;
+    }
+
+    private function participantArea($participant): string
+    {
+        return $participant->room_group ?: ($participant->department ?: 'Area not specified');
     }
 
     private function validatedDay(Event $event, mixed $day): int|string

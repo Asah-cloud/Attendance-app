@@ -80,7 +80,11 @@
                     <option value="">All genders</option>
                     @foreach($availableGenders as $option)<option value="{{ $option }}" @selected($filterGender === $option)>{{ $option }}</option>@endforeach
                 </select>
-                @if($filterCategory !== '' || $filterGender !== '')
+                <select name="area" onchange="this.form.submit()" class="rounded-xl border-gray-200 text-xs font-bold">
+                    <option value="">All areas</option>
+                    @foreach($availableAreas as $option)<option value="{{ $option }}" @selected($filterArea === $option)>{{ $option }}</option>@endforeach
+                </select>
+                @if($filterCategory !== '' || $filterGender !== '' || $filterArea !== '')
                     <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $selectedDay]) }}" class="text-xs font-bold text-slate-500 underline">Clear filters</a>
                 @endif
             </form>
@@ -90,6 +94,17 @@
                 <x-summary-card title="Total Registered" :value="$totalExpected" color="blue" />
                 <x-summary-card title="Present Members" :value="$presentUsers->count()" color="green" />
                 <x-summary-card title="Absent Members" :value="$absentUsers->count()" color="red" />
+            </div>
+
+            <div class="mb-12 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+                <h3 class="mb-4 text-xs font-black uppercase tracking-widest text-blue-700">Present participants by area</h3>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    @forelse($areaBreakdown as $label => $count)
+                        <div class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></div>
+                    @empty
+                        <p class="text-sm text-gray-400">No attendance yet.</p>
+                    @endforelse
+                </div>
             </div>
 
             {{-- Category / Gender Breakdown --}}
@@ -131,6 +146,7 @@
                                 <tr class="bg-gray-50/50 text-[10px] uppercase text-gray-400 font-black border-b border-gray-50">
                                     <th class="px-6 py-4 w-12 text-center">#</th>
                                     <th class="px-6 py-4">Name</th>
+                                    <th class="px-6 py-4">Area</th>
                                     <th class="px-6 py-4 text-center">{{ $selectedDay === 'all' ? 'Freq.' : 'Time' }}</th>
                                 </tr>
                             </thead>
@@ -142,6 +158,7 @@
                                         <div class="font-bold text-gray-800">{{ $user->name }}</div>
                                         <div class="text-[10px] text-gray-400 font-mono tracking-tighter">{{ $user->phone }}</div>
                                     </td>
+                                    <td class="px-6 py-4 text-xs font-bold text-blue-700">{{ $user->room_group ?: ($user->department ?: 'Area not specified') }}</td>
                                     <td class="px-6 py-4 text-center">
                                         @if($selectedDay === 'all')
                                             <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[9px] font-black uppercase">
@@ -155,7 +172,7 @@
                                     </td>
                                 </tr>
                                 @empty
-                                <tr><td colspan="3" class="p-12 text-center text-gray-400 font-medium italic">No attendance records found.</td></tr>
+                                <tr><td colspan="4" class="p-12 text-center text-gray-400 font-medium italic">No attendance records found.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>

@@ -49,14 +49,23 @@
         @endforelse
     </div>
 
-    <h2>Present registry ({{ $presentUsers->count() }})</h2>
+    <h2>Present by area</h2>
+    <div>
+        @forelse($areaBreakdown as $label => $count)
+            <span class="badge">{{ $label }} &middot; {{ $count }}</span>
+        @empty
+            <span>No attendance recorded.</span>
+        @endforelse
+    </div>
+
+    <h2>Present registry details ({{ $presentUsers->count() }})</h2>
     <table class="list">
-        <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Category</th><th>Gender</th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Area</th><th>Category</th><th>Gender</th></tr></thead>
         <tbody>
             @forelse($presentUsers as $index => $user)
-                <tr><td>{{ $index + 1 }}</td><td>{{ $user->name }}</td><td>{{ $user->phone }}</td><td>{{ $user->category }}</td><td>{{ $user->gender ?: '—' }}</td></tr>
+                <tr><td>{{ $index + 1 }}</td><td>{{ $user->name }}</td><td>{{ $user->phone }}</td><td>{{ $user->room_group ?: ($user->department ?: 'Area not specified') }}</td><td>{{ $user->category }}</td><td>{{ $user->gender ?: '—' }}</td></tr>
             @empty
-                <tr><td colspan="5">No attendance records found.</td></tr>
+                <tr><td colspan="6">No attendance records found.</td></tr>
             @endforelse
         </tbody>
     </table>
