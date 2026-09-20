@@ -67,10 +67,10 @@ it('counts checked-in numbered participant staff throughout the event', function
     EventRegistration::create(['event_id' => $event->id, 'participant_id' => $attendee->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
     Attendance::create(['event_id' => $event->id, 'participant_id' => $attendee->id, 'day' => 2, 'status' => 'present']);
 
-    foreach (['Participant 1', 'participant 2', 'Participant Coordinator'] as $name) {
+    foreach (['Participant 1' => 1, 'participant 2' => -1, 'Participant Coordinator' => 1] as $name => $checkInDay) {
         $staff = Participant::create(['company_id' => $company->id, 'name' => $name, 'is_support_staff' => true]);
         EventRegistration::create(['event_id' => $event->id, 'participant_id' => $staff->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
-        Attendance::create(['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => -1, 'status' => 'present']);
+        Attendance::create(['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => $checkInDay, 'status' => 'present']);
     }
 
     $this->actingAs($manager);

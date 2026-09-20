@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class Event extends Model
@@ -209,19 +210,26 @@ class Event extends Model
     /**
      * Count checked-in support staff whose names follow "Participant <number>".
      *
-     * Staff check-in uses day -1, so these participants remain present for every
-     * numbered attendance day in the event after their single check-in.
+     * A staff scan may use the dedicated check-in marker (-1) or the regular
+     * attendance scanner on Day 1. Either makes presence persist for the event.
+     *
+     * @return Collection<int, int>
      */
-    public function persistentParticipantStaffCount(): int
+    public function persistentParticipantStaffIds(): Collection
     {
         return $this->confirmedStaff()
             ->whereHas('attendances', fn ($query) => $query
                 ->where('event_id', $this->id)
-                ->where('day', -1))
+                ->whereIn('day', [-1, 1]))
             ->whereRaw('LOWER(TRIM(participants.name)) LIKE ?', ['participant %'])
             ->get(['participants.id', 'participants.name'])
             ->filter(fn (Participant $participant) => preg_match('/^participant\s+\d+$/i', trim($participant->name)) === 1)
-            ->count();
+            ->pluck('id');
+    }
+
+    public function persistentParticipantStaffCount(): int
+    {
+        return $this->persistentParticipantStaffIds()->count();
     }
 
     public function participantHasArrived(int $participantId): bool

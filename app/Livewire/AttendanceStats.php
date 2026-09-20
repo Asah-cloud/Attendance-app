@@ -29,10 +29,12 @@ class AttendanceStats extends Component
     {
         Gate::authorize('view', $this->event);
 
-        $participantStaffCount = $this->event->persistentParticipantStaffCount();
+        $participantStaffIds = $this->event->persistentParticipantStaffIds();
+        $participantStaffCount = $participantStaffIds->count();
         $dailyAttendeeCount = Attendance::query()
             ->where('event_id', $this->event->id)
             ->where('day', $this->day)
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->count();
 
         return view('livewire.attendance-stats', [
