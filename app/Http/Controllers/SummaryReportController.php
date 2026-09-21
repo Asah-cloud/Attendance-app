@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Exports\AttendanceExport;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use App\Services\AttendanceReportData;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 
 class SummaryReportController extends Controller
 {
-    public function __construct(private readonly ApplicationCache $cache) {}
+    public function __construct(private readonly ApplicationCache $cache, private readonly AttendanceReportData $attendanceReport) {}
 
     public function index(Event $event)
     {
@@ -51,7 +52,7 @@ class SummaryReportController extends Controller
 
     private function summaryData(Event $event): array
     {
-        $data = $this->cache->rememberEvent($event->id, 'summary-report:v2', function () use ($event): array {
+        $data = $this->cache->rememberEvent($event->id, 'summary-report:v3', function () use ($event): array {
             $start = Carbon::parse($event->event_date);
             $end = $event->end_date ? Carbon::parse($event->end_date) : $start;
             $totalEventDays = $start->diffInDays($end) + 1;
@@ -59,29 +60,16 @@ class SummaryReportController extends Controller
             $confirmedCount = $event->confirmedParticipants()->count();
             $arrivedCount = $event->has_arrival_session ? $event->arrivedParticipants()->count() : $confirmedCount;
 
-            // Get users who attended at least once
-            $presentUsers = $event->attendanceEligibleParticipants()
-                ->whereHas('attendances', function ($q) use ($event) {
-                    $q->where('event_id', $event->id)->where('day', '>=', 1);
-                })
-                ->with(['attendances' => function ($q) use ($event) {
-                    $q->where('event_id', $event->id)->where('day', '>=', 1);
-                }])
-                ->get()
-                ->map(function ($user) use ($totalEventDays) {
-                    // Add a "score" to each user for easy display
-                    $user->days_attended = $user->attendances->count();
+            ['presentUsers' => $presentUsers, 'absentUsers' => $absentUsers] = $this->attendanceReport->forPeriod($event, 'all');
+            $presentUsers = $presentUsers
+                ->map(function ($user) use ($event, $totalEventDays) {
+                    $user->days_attended = $user->isNumberedParticipantStaff()
+                        ? ($event->status === 'upcoming' ? 0 : ($event->status === 'active' ? $event->currentDay() : $totalEventDays))
+                        : $user->attendances->where('day', '>=', 1)->count();
                     $user->attendance_rate = ($user->days_attended / $totalEventDays) * 100;
 
                     return $user;
                 });
-
-            // Get users who never showed up
-            $absentUsers = $event->attendanceEligibleParticipants()
-                ->whereDoesntHave('attendances', function ($q) use ($event) {
-                    $q->where('event_id', $event->id)->where('day', '>=', 1);
-                })
-                ->get();
 
             return compact('presentUsers', 'absentUsers', 'totalEventDays', 'registeredCount', 'confirmedCount', 'arrivedCount');
         }, ApplicationCache::REPORT_TTL);

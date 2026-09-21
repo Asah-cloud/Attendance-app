@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Event;
+use App\Services\AttendanceReportData;
 use Illuminate\Support\Enumerable;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -14,18 +15,7 @@ class AreaAttendanceSummaryExport implements FromCollection, WithHeadings, WithM
 
     public function collection(): Enumerable
     {
-        $participants = $this->day === 'all' || (int) $this->day === 0
-            ? $this->event->confirmedParticipants()
-            : $this->event->attendanceEligibleParticipants();
-
-        return $participants
-            ->whereHas('attendances', function ($query): void {
-                $query->where('event_id', $this->event->id);
-                if ($this->day !== 'all') {
-                    $query->where('day', $this->day);
-                }
-            })
-            ->get()
+        return app(AttendanceReportData::class)->forPeriod($this->event, $this->day)['presentUsers']
             ->countBy(fn ($participant) => $participant->room_group ?: ($participant->department ?: 'Area not specified'))
             ->sortDesc()
             ->map(fn ($count, $area) => ['area' => $area, 'present' => $count])
@@ -34,7 +24,7 @@ class AreaAttendanceSummaryExport implements FromCollection, WithHeadings, WithM
 
     public function headings(): array
     {
-        return ['Area', 'Participants Present'];
+        return ['Area', 'People Present'];
     }
 
     public function map($row): array

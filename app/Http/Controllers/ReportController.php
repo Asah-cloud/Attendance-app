@@ -6,6 +6,7 @@ use App\Exports\AreaAttendanceSummaryExport;
 use App\Exports\AttendanceExport;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use App\Services\AttendanceReportData;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -13,7 +14,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
-    public function __construct(private readonly ApplicationCache $cache) {}
+    public function __construct(private readonly ApplicationCache $cache, private readonly AttendanceReportData $attendanceReport) {}
 
     public function show(Event $event, $day = 1)
     {
@@ -29,6 +30,8 @@ class ReportController extends Controller
             'genderBreakdown' => $genderBreakdown,
             'areaBreakdown' => $areaBreakdown,
         ] = $this->reportData($event, $selectedDay);
+
+        $reportParticipants = $presentUsers->merge($absentUsers);
 
         $filterCategory = request()->string('category')->toString();
         $filterGender = request()->string('gender')->toString();
@@ -46,10 +49,16 @@ class ReportController extends Controller
             $absentUsers = $absentUsers->filter(fn ($participant) => $this->participantArea($participant) === $filterArea)->values();
         }
 
-        $availableCategories = $event->confirmedParticipants()->distinct()->pluck('category')->filter()->sort()->values();
-        $availableGenders = $event->confirmedParticipants()->distinct()->pluck('gender')->filter()->sort()->values();
-        $availableAreas = $event->confirmedParticipants()->get()
+        $availableCategories = $reportParticipants->pluck('category')->filter()->unique()->sort()->values();
+        $availableGenders = $reportParticipants->pluck('gender')->filter()->unique()->sort()->values();
+        $availableAreas = $reportParticipants
             ->map(fn ($participant) => $this->participantArea($participant))->unique()->sort()->values();
+        if ($filterCategory !== '' || $filterGender !== '' || $filterArea !== '') {
+            $totalExpected = $presentUsers->count() + $absentUsers->count();
+            $categoryBreakdown = $presentUsers->countBy(fn ($participant) => $participant->category ?: 'Unspecified')->sortDesc();
+            $genderBreakdown = $presentUsers->countBy(fn ($participant) => $participant->gender ?: 'Unspecified')->sortDesc();
+            $areaBreakdown = $presentUsers->countBy(fn ($participant) => $this->participantArea($participant))->sortDesc();
+        }
 
         return view('reports.attendance', compact(
             'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay',
@@ -105,55 +114,7 @@ class ReportController extends Controller
 
     private function reportData(Event $event, int|string $selectedDay): array
     {
-        $data = $this->cache->rememberEvent($event->id, "attendance-report:v2:{$selectedDay}", function () use ($event, $selectedDay): array {
-            if ($selectedDay === 'all') {
-                // 1. Get users who attended at least ONCE during the entire event
-                $presentUsers = $event->confirmedParticipants()
-                    ->whereHas('attendances', function ($query) use ($event) {
-                        $query->where('event_id', $event->id);
-                    })
-                    ->with(['attendances' => function ($q) use ($event) {
-                        $q->where('event_id', $event->id)->orderBy('day', 'asc');
-                    }])
-                    ->get();
-
-                // 2. Absent users are those who never showed up on ANY day
-                $presentIds = $presentUsers->pluck('id');
-                $absentUsers = $event->confirmedParticipants()
-                    ->whereNotIn('participants.id', $presentIds)
-                    ->get();
-
-            } else {
-                $participants = (int) $selectedDay === 0
-                    ? $event->confirmedParticipants()
-                    : $event->attendanceEligibleParticipants();
-                // Standard single-day logic (Fixed for PostgreSQL ambiguity)
-                $presentUsers = $participants
-                    ->whereHas('attendances', function ($query) use ($event, $selectedDay) {
-                        $query->where('event_id', $event->id)
-                            ->where('day', $selectedDay);
-                    })
-                    ->with(['attendances' => function ($q) use ($event, $selectedDay) {
-                        $q->where('event_id', $event->id)->where('day', $selectedDay);
-                    }])
-                    ->get();
-
-                $presentIds = $presentUsers->pluck('id');
-                $absentUsers = ((int) $selectedDay === 0
-                    ? $event->confirmedParticipants()
-                    : $event->attendanceEligibleParticipants())
-                    ->whereNotIn('participants.id', $presentIds)
-                    ->get();
-            }
-
-            return [
-                'presentUsers' => $presentUsers,
-                'absentUsers' => $absentUsers,
-                'totalExpected' => $selectedDay === 'all' || (int) $selectedDay === 0
-                    ? $event->confirmedParticipants()->count()
-                    : $event->attendanceEligibleParticipants()->count(),
-            ];
-        }, ApplicationCache::REPORT_TTL);
+        $data = $this->cache->rememberEvent($event->id, "attendance-report:v3:{$selectedDay}", fn (): array => $this->attendanceReport->forPeriod($event, $selectedDay), ApplicationCache::REPORT_TTL);
 
         $data['categoryBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
         $data['genderBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();

@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -184,6 +185,31 @@ it('shares an existing staff check-in when a later event assignment is confirmed
     $other->registrations()->create(['participant_id' => $staff->id, 'status' => 'confirmed']);
 
     $this->assertDatabaseHas('attendances', ['event_id' => $other->id, 'participant_id' => $staff->id, 'day' => -1]);
+});
+
+it('accepts an older staff QR alias after duplicate staff records are merged', function () {
+    [, $event, $manager, $staff] = staffCheckInFixture();
+    DB::table('staff_qr_aliases')->insert([
+        'company_id' => $event->company_id,
+        'participant_id' => $staff->id,
+        'token' => str_repeat('z', 48),
+        'legacy_staff_code' => 'STF-OLD',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($manager)
+        ->postJson(route('support-staff.checkin.scan', $event), ['registration_code' => 'ASAH-STAFF:'.str_repeat('z', 48)])
+        ->assertOk();
+    $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $staff->id, 'day' => -1]);
+
+    $otherCompany = Company::create(['name' => 'Other Staff Co']);
+    $otherEvent = Event::create(['company_id' => $otherCompany->id, 'title' => 'Other Event', 'event_date' => now()]);
+    $admin = User::factory()->create(['company_id' => $otherCompany->id, 'role' => 'manager']);
+    $admin->assignRole('manager');
+    $this->actingAs($admin)
+        ->postJson(route('support-staff.checkin.scan', $otherEvent), ['registration_code' => 'ASAH-STAFF:'.str_repeat('z', 48)])
+        ->assertUnprocessable();
 });
 
 it('reflects a numbered staff member scanned for day one in the staff check-in area', function () {

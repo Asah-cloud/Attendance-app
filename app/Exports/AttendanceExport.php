@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Event;
+use App\Services\AttendanceReportData;
 use Illuminate\Support\Enumerable;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -23,26 +24,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection(): Enumerable
     {
-        $participants = $this->day === 'all' || (int) $this->day === 0
-            ? $this->event->confirmedParticipants()
-            : $this->event->attendanceEligibleParticipants();
-
-        return $participants
-            ->whereHas('attendances', function ($query) {
-                $query->where('event_id', $this->event->id);
-
-                // 2. Filter by day if it's not 'all'
-                if ($this->day !== 'all') {
-                    $query->where('day', $this->day);
-                }
-            })
-            ->with(['attendances' => function ($q) {
-                $q->where('event_id', $this->event->id);
-                if ($this->day !== 'all') {
-                    $q->where('day', $this->day);
-                }
-            }])
-            ->get();
+        return app(AttendanceReportData::class)->forPeriod($this->event, $this->day)['presentUsers'];
     }
 
     public function headings(): array
@@ -64,7 +46,9 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
             $user->gender,
             $user->email, // <-- added email to the export
             $attendance ? $attendance->created_at->format('d-m-Y h:i A') : 'N/A',
-            $this->event->attendanceSessionLabel($attendance ? $attendance->day : $this->day),
+            $user->isNumberedParticipantStaff()
+                ? 'Staff check-in (all event days)'
+                : $this->event->attendanceSessionLabel($attendance ? $attendance->day : $this->day),
         ];
     }
 }

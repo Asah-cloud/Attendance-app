@@ -24,7 +24,7 @@
                 <div>
                     <span class="text-[10px] font-black text-purple-600 uppercase tracking-[0.3em] block mb-2">Final Report</span>
                     <h1 class="text-3xl font-black text-gray-900 leading-tight uppercase tracking-tighter">{{ $event->title }}</h1>
-                    <p class="text-sm text-gray-500 font-medium mt-1">Completion Summary for all scheduled days</p>
+                    <p class="text-sm text-gray-500 font-medium mt-1">Each person is counted once across all program days. Numbered participant staff are included; other staff have a separate report.</p>
                 </div>
                 <div class="flex gap-3 print:hidden">
                     <a href="{{ route('reports.summary.export', $event->id) }}" class="inline-flex items-center px-5 py-2.5 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition-all shadow-lg shadow-green-100">
@@ -41,9 +41,9 @@
 
             {{-- 2. Performance Stats --}}
             <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <x-summary-card title="Registered" :value="$registeredCount" color="blue" />
-                <x-summary-card title="Confirmed" :value="$confirmedCount" color="blue" />
-                <x-summary-card title="Arrived" :value="$arrivedCount" color="green" />
+                <x-summary-card title="Registrations (incl. staff)" :value="$registeredCount" color="blue" />
+                <x-summary-card title="Confirmed attendees" :value="$confirmedCount" color="blue" />
+                <x-summary-card title="Attendees arrived" :value="$arrivedCount" color="green" />
                 <x-summary-card title="Present at least once" :value="$presentUsers->count()" color="green" />
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
@@ -51,7 +51,7 @@
                     <div>
                         <p class="text-gray-400 text-[10px] uppercase font-black tracking-widest">Active Engagement</p>
                         <p class="text-5xl font-black text-gray-900 mt-2 tracking-tighter">{{ $presentUsers->count() }}</p>
-                        <p class="text-xs font-bold text-green-600 uppercase mt-1">Unique Attendees</p>
+                        <p class="text-xs font-bold text-green-600 uppercase mt-1">Unique people</p>
                     </div>
                     <div class="h-16 w-16 bg-green-50 rounded-2xl flex items-center justify-center text-green-600">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -96,7 +96,7 @@
             {{-- 3. Detailed Attendance Table --}}
             <div x-data="{ open: false }" class="bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100">
                 <button type="button" @click="open = !open" :aria-expanded="open.toString()" class="flex w-full items-center justify-between px-8 py-6 bg-gray-50/50 border-b border-gray-100 text-left hover:bg-blue-50">
-                    <span><span class="block font-black text-gray-900 uppercase text-xs tracking-widest">Member Consistency Rankings</span><span class="mt-1 block text-xs text-slate-500">{{ $presentUsers->count() }} attendees · click to open or close</span></span>
+                    <span><span class="block font-black text-gray-900 uppercase text-xs tracking-widest">Days present so far</span><span class="mt-1 block text-xs text-slate-500">{{ $presentUsers->count() }} people · numbered staff stay present across event days</span></span>
                     <svg class="h-5 w-5 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg>
                 </button>
                 <div x-cloak x-show="open" x-transition class="overflow-x-auto">

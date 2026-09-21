@@ -36,7 +36,7 @@
     <div class="py-12 bg-gray-50/50 min-h-screen">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="mb-6 flex flex-col justify-between gap-4 print:hidden sm:flex-row sm:items-center">
-                <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance analytics</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">Detailed attendance breakdown and registry logs.</p></div>
+                <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance report</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">{{ $selectedDay === 'all' ? 'All days: each person is counted once, even if they attended several days.' : 'Showing attendance for '.$event->attendanceSessionLabel($selectedDay).'.' }} Numbered participant staff are included; other staff are in the staff report.</p></div>
                 <div class="flex flex-wrap gap-2"><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
             </div>
             
@@ -89,15 +89,19 @@
                 @endif
             </form>
 
+            @if($filterCategory !== '' || $filterGender !== '' || $filterArea !== '')
+                <p class="mb-5 text-xs font-semibold text-slate-600 print:hidden">Cards and area counts reflect the selected filters. Downloads include the whole {{ $event->attendanceSessionLabel($selectedDay) }} report.</p>
+            @endif
+
             {{-- 2. Summary Cards --}}
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <x-summary-card title="Total Registered" :value="$totalExpected" color="blue" />
-                <x-summary-card title="Present Members" :value="$presentUsers->count()" color="green" />
-                <x-summary-card title="Absent Members" :value="$absentUsers->count()" color="red" />
+                <x-summary-card title="Expected in selection" :value="$totalExpected" color="blue" />
+                <x-summary-card title="Present people" :value="$presentUsers->count()" color="green" />
+                <x-summary-card title="Not yet present" :value="$absentUsers->count()" color="red" />
             </div>
 
             <div class="mb-12 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="text-xs font-black uppercase tracking-widest text-blue-700">Present participants by area</h3><a href="{{ route('reports.area-summary', ['event' => $event, 'day' => $selectedDay]) }}" class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white">Download area summary</a></div>
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="text-xs font-black uppercase tracking-widest text-blue-700">Present people by area</h3><a href="{{ route('reports.area-summary', ['event' => $event, 'day' => $selectedDay]) }}" class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white">Download area summary</a></div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($areaBreakdown as $label => $count)
                         <div class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></div>
@@ -155,12 +159,14 @@
                                 <tr class="text-sm group hover:bg-green-50/30 transition-colors">
                                     <td class="px-6 py-4 text-gray-400 text-center font-mono text-xs">{{ $index + 1 }}</td>
                                     <td class="px-6 py-4">
-                                        <div class="font-bold text-gray-800">{{ $user->name }}</div>
+                                        <div class="font-bold text-gray-800">{{ $user->name }} @if($user->isNumberedParticipantStaff())<span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-800">Staff · all days</span>@endif</div>
                                         <div class="text-[10px] text-gray-400 font-mono tracking-tighter">{{ $user->phone }}</div>
                                     </td>
                                     <td class="px-6 py-4 text-xs font-bold text-blue-700">{{ $user->room_group ?: ($user->department ?: 'Area not specified') }}</td>
                                     <td class="px-6 py-4 text-center">
-                                        @if($selectedDay === 'all')
+                                        @if($user->isNumberedParticipantStaff())
+                                            <span class="text-amber-700 font-black text-[10px] uppercase">All days</span>
+                                        @elseif($selectedDay === 'all')
                                             <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[9px] font-black uppercase">
                                                 {{ $user->attendances->count() }}x
                                             </span>

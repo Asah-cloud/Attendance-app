@@ -28,10 +28,10 @@
         </tr>
         <tr>
             <td><span class="label">Arrived</span><span class="value">{{ $arrivedCount }}</span></td>
-            <td><span class="label">Present at least once</span><span class="value">{{ $presentUsers->count() }}</span></td>
+            <td><span class="label">People present at least once</span><span class="value">{{ $presentUsers->count() }}</span></td>
         </tr>
         <tr>
-            <td><span class="label">Unique Attendees</span><span class="value">{{ $presentUsers->count() }}</span></td>
+            <td><span class="label">Unique people (incl. numbered staff)</span><span class="value">{{ $presentUsers->count() }}</span></td>
             <td><span class="label">Never Attended</span><span class="value">{{ $absentUsers->count() }}</span></td>
         </tr>
     </table>

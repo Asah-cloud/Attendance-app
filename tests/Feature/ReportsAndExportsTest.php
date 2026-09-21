@@ -5,6 +5,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
+use App\Services\AttendanceReportData;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -172,7 +173,9 @@ it('shows category and gender breakdowns and supports filtering the attendance r
         ->get(route('reports.event', ['event' => $event, 'day' => 1, 'gender' => 'Male']))
         ->assertOk()
         ->assertSee('Male Guest')
-        ->assertDontSee('Female Member');
+        ->assertDontSee('Female Member')
+        ->assertViewHas('totalExpected', 1)
+        ->assertViewHas('areaBreakdown', fn ($areas) => $areas->all() === ['Kumasi Area' => 1]);
 
     $this->actingAs($manager)
         ->get(route('reports.event', ['event' => $event, 'day' => 1, 'category' => 'Member']))
@@ -183,7 +186,7 @@ it('shows category and gender breakdowns and supports filtering the attendance r
     $this->actingAs($manager)
         ->get(route('reports.event', ['event' => $event, 'day' => 'all', 'area' => 'Kumasi Area']))
         ->assertOk()
-        ->assertSee('Present participants by area')
+        ->assertSee('Present people by area')
         ->assertSee('Kumasi Area')
         ->assertSee('0201111111')
         ->assertSee('Male Guest')
@@ -198,4 +201,36 @@ it('rejects an out of range day for the attendance export', function () {
     $this->actingAs($manager)
         ->get(route('reports.csv', ['event' => $event, 'day' => 99]))
         ->assertSessionHasErrors('day');
+});
+
+it('uses the same numbered staff and unique-person counts in reports and area exports', function () {
+    $company = Company::create(['name' => 'Area Co']);
+    $manager = reportsManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Two Day Event', 'event_date' => now()->subDay(), 'end_date' => now()]);
+    $guest = Participant::create(['company_id' => $company->id, 'name' => 'Guest', 'room_group' => 'Kumasi']);
+    $numbered = Participant::create(['company_id' => $company->id, 'name' => 'Participant 7', 'is_support_staff' => true, 'department' => 'Accra']);
+    $otherStaff = Participant::create(['company_id' => $company->id, 'name' => 'Usher', 'is_support_staff' => true, 'department' => 'Accra']);
+    foreach ([$guest, $numbered, $otherStaff] as $person) {
+        $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    }
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $guest->id, 'day' => 1]);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $guest->id, 'day' => 2]);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $numbered->id, 'day' => -1]);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $otherStaff->id, 'day' => -1]);
+
+    $report = app(AttendanceReportData::class)->forPeriod($event, 'all');
+    expect($report['presentUsers']->pluck('name')->all())->toBe(['Guest', 'Participant 7'])
+        ->and($report['totalExpected'])->toBe(2)
+        ->and($report['absentUsers'])->toBeEmpty();
+    expect(app(AttendanceReportData::class)->forPeriod($event, 2)['presentUsers']->pluck('name')->all())->toBe(['Guest', 'Participant 7']);
+    expect((new \App\Exports\AreaAttendanceSummaryExport($event, 'all'))->collection()->pluck('present', 'area')->all())
+        ->toBe(['Kumasi' => 1, 'Accra' => 1]);
+    expect((new \App\Exports\AttendanceExport($event, 'all'))->collection()->count())->toBe(2);
+
+    $this->actingAs($manager)
+        ->get(route('reports.event', ['event' => $event, 'day' => 'all']))
+        ->assertOk()
+        ->assertSee('Participant 7')
+        ->assertSee('Staff · all days')
+        ->assertDontSee('Usher');
 });

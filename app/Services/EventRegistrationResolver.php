@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Participant;
+use Illuminate\Support\Facades\DB;
 
 class EventRegistrationResolver
 {
@@ -19,6 +20,16 @@ class EventRegistrationResolver
                 ->where('is_support_staff', true)
                 ->where('staff_qr_token', $token)
                 ->first();
+
+            if (! $participant) {
+                $aliasParticipantId = DB::table('staff_qr_aliases')
+                    ->where('company_id', $event->company_id)
+                    ->where('token', $token)
+                    ->value('participant_id');
+                $participant = $aliasParticipantId
+                    ? Participant::query()->where('company_id', $event->company_id)->where('is_support_staff', true)->find($aliasParticipantId)
+                    : null;
+            }
 
             return $participant ? $event->registrations()
                 ->where('participant_id', $participant->id)->first() : null;
