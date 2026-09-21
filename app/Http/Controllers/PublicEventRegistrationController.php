@@ -79,7 +79,7 @@ class PublicEventRegistrationController extends Controller
 
         $registration->load(['event.company', 'participant']);
         $lifecycle->allocateAccommodation($registration);
-        NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration));
+        NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration), $registration->event->attendeeNotificationChannels());
 
         return $this->afterRegistration($registration);
     }
@@ -124,7 +124,7 @@ class PublicEventRegistrationController extends Controller
                 ->with(['registration.participant', 'registration.event.company', 'room.floor.block.site'])
                 ->first();
             if ($assignment && ! $assignment->notification_sent_at) {
-                NotifiesPerChannel::send($registration->participant, new RoomAssigned($assignment));
+                NotifiesPerChannel::send($registration->participant, new RoomAssigned($assignment), $registration->event->attendeeNotificationChannels());
                 $assignment->update(['notification_sent_at' => now()]);
             }
         }

@@ -2,7 +2,9 @@
 
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\Participant;
 use App\Models\User;
+use App\Notifications\RegistrationLifecycleNotification;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -131,6 +133,43 @@ it('allows a manager to update their own event', function () {
         ->assertRedirect('/events');
 
     expect($event->fresh()->title)->toBe('New Title');
+});
+
+it('sends event-change messages only through the selected channels', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventManagementManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addDays(3)]);
+    $person = Participant::create(['company_id' => $company->id, 'name' => 'Attendee', 'email' => 'attendee@example.com']);
+    $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->put(route('events.update', $event), [
+        'title' => 'Conference', 'event_date' => now()->addDays(4)->toDateString(),
+    ])->assertRedirect('/events');
+    Notification::assertNothingSent();
+
+    $this->actingAs($manager)->put(route('events.update', $event), [
+        'title' => 'Conference', 'event_date' => now()->addDays(5)->toDateString(), 'send_update_email' => '1',
+    ])->assertRedirect('/events');
+    Notification::assertSentTo($person, RegistrationLifecycleNotification::class, fn ($notification) => $notification->type === 'event_changed' && $notification->via($person) === ['mail']);
+});
+
+it('keeps automatic attendee messages off until an event channel is selected', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = eventManagementManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addDays(3)]);
+    $person = Participant::create(['company_id' => $company->id, 'name' => 'Attendee', 'email' => 'attendee@example.com']);
+    $registration = $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+
+    app(\App\Services\RegistrationLifecycleService::class)->notify($registration, 'confirmed');
+    Notification::assertNothingSent();
+
+    $this->actingAs($manager)->put(route('events.update', $event), [
+        'title' => 'Conference', 'event_date' => $event->event_date->toDateString(), 'automatic_attendee_email' => '1',
+    ])->assertRedirect('/events');
+    app(\App\Services\RegistrationLifecycleService::class)->notify($registration->fresh(), 'confirmed');
+    Notification::assertSentTo($person, RegistrationLifecycleNotification::class);
 });
 
 it('prevents a manager from updating another company event', function () {

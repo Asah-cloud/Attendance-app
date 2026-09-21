@@ -129,7 +129,7 @@ it('removes a participant from one event without deleting their account or other
 it('reuses an existing participant when a manager adds a walk in', function () {
     Notification::fake();
     $company = Company::create(['name' => 'One']);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Today', 'event_date' => now()]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Today', 'event_date' => now(), 'automatic_attendee_email' => true]);
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
     $manager->assignRole('manager');
     $participant = Participant::create([

@@ -91,14 +91,17 @@ class RegistrationLifecycleService
         $this->fillAvailablePlaces($event->id);
     }
 
-    public function eventChanged(Event $event): void
+    public function eventChanged(Event $event, ?array $channels = null): void
     {
+        if ($channels === []) {
+            return;
+        }
         $event->registrations()
             ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_PENDING, EventRegistration::STATUS_WAITLISTED])
             ->with('participant')
-            ->chunkById(100, function ($registrations): void {
+            ->chunkById(100, function ($registrations) use ($channels): void {
                 foreach ($registrations as $registration) {
-                    $this->notify($registration, 'event_changed');
+                    $this->notify($registration, 'event_changed', $channels);
                 }
             });
     }
@@ -178,14 +181,14 @@ class RegistrationLifecycleService
 
         if ($assignment && ! $assignment->notification_sent_at && $registration->event->accommodation_published) {
             $assignment->loadMissing(['registration.participant', 'registration.event.company', 'room.floor.block.site']);
-            NotifiesPerChannel::send($assignment->registration->participant, new RoomAssigned($assignment));
+            NotifiesPerChannel::send($assignment->registration->participant, new RoomAssigned($assignment), $registration->event->attendeeNotificationChannels());
             $assignment->update(['notification_sent_at' => now()]);
         }
     }
 
-    public function notify(EventRegistration $registration, string $type): void
+    public function notify(EventRegistration $registration, string $type, ?array $channels = null): void
     {
         $registration->loadMissing(['event.company', 'participant']);
-        NotifiesPerChannel::send($registration->participant, new RegistrationLifecycleNotification($registration, $type));
+        NotifiesPerChannel::send($registration->participant, new RegistrationLifecycleNotification($registration, $type), $channels ?? $registration->event->attendeeNotificationChannels());
     }
 }

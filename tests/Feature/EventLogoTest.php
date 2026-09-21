@@ -159,6 +159,7 @@ it('includes the company and event logo URLs in the registration confirmation em
         'title' => 'Annual Meetup',
         'event_date' => now()->addWeek(),
         'registration_enabled' => true,
+        'automatic_attendee_email' => true,
         'logo_path' => 'event-logos/meetup.png',
     ]);
 
@@ -196,6 +197,7 @@ it('shows the company name and event title as visible text in the email, not jus
         'title' => 'Annual Meetup',
         'event_date' => now()->addWeek(),
         'registration_enabled' => true,
+        'automatic_attendee_email' => true,
         'logo_path' => 'event-logos/meetup.png',
     ]);
 
@@ -234,6 +236,7 @@ it('always sends absolute logo URLs in emails, since relative URLs never load in
         'title' => 'Annual Meetup',
         'event_date' => now()->addWeek(),
         'registration_enabled' => true,
+        'automatic_attendee_email' => true,
         'logo_path' => 'event-logos/meetup.png',
     ]);
 

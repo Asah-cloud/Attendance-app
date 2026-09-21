@@ -21,13 +21,14 @@ class ConfirmationReminderSender
             ->whereNotNull('confirmation_sent_at')
             ->where('confirmation_sent_at', '<=', now()->subDays(3))
             ->whereNull('confirmation_reminder_sent_at')
+            ->whereHas('event', fn ($query) => $query->where(fn ($query) => $query->where('automatic_attendee_email', true)->orWhere('automatic_attendee_sms', true)))
             ->with(['event', 'participant'])
             ->chunkById(100, function ($registrations) use (&$sent): void {
                 foreach ($registrations as $registration) {
                     if (! $registration->participant->email && ! $registration->participant->phone) {
                         continue;
                     }
-                    NotifiesPerChannel::send($registration->participant, new AttendanceConfirmationRequest($registration));
+                    NotifiesPerChannel::send($registration->participant, new AttendanceConfirmationRequest($registration), $registration->event->attendeeNotificationChannels());
                     $registration->update(['confirmation_reminder_sent_at' => now()]);
                     $sent++;
                 }

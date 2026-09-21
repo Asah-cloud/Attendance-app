@@ -74,6 +74,8 @@ class Event extends Model
         'badge_font',
         'badge_name_format',
         'staff_badge_settings',
+        'automatic_attendee_email',
+        'automatic_attendee_sms',
     ];
 
     protected $casts = [
@@ -94,6 +96,8 @@ class Event extends Model
         'badge_category_colors' => 'array',
         'badge_fields' => 'array',
         'staff_badge_settings' => 'array',
+        'automatic_attendee_email' => 'boolean',
+        'automatic_attendee_sms' => 'boolean',
     ];
 
     public function attendances(): HasMany
@@ -109,6 +113,14 @@ class Event extends Model
     public function registrations(): HasMany
     {
         return $this->hasMany(EventRegistration::class);
+    }
+
+    public function attendeeNotificationChannels(): array
+    {
+        return array_values(array_filter([
+            $this->automatic_attendee_email ? 'mail' : null,
+            $this->automatic_attendee_sms ? \App\Notifications\Channels\ArkeselChannel::class : null,
+        ]));
     }
 
     public function forms(): HasMany

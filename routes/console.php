@@ -26,6 +26,7 @@ Schedule::call(function (): void {
         ->whereNull('reminder_sent_at')
         ->whereHas('event', fn ($query) => $query
             ->whereNull('cancelled_at')
+            ->where(fn ($query) => $query->where('automatic_attendee_email', true)->orWhere('automatic_attendee_sms', true))
             ->whereDate('event_date', now()->addDay()->toDateString()))
         ->with(['event', 'participant'])
         ->chunkById(100, function ($registrations): void {

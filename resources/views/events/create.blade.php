@@ -57,6 +57,15 @@
                         </div>
                     </div>
 
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-6">
+                        <p class="text-sm font-black text-amber-950">Automatic attendee notifications</p>
+                        <p class="mt-1 text-xs text-amber-800">Optional for registration, reminders, confirmation and accommodation messages. Both are off by default.</p>
+                        <div class="mt-4 flex flex-wrap gap-6">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-amber-950"><input type="checkbox" name="automatic_attendee_email" value="1" @checked(old('automatic_attendee_email')) class="rounded border-amber-300"> Send automatic emails</label>
+                            <label class="flex items-center gap-2 text-sm font-semibold text-amber-950"><input type="checkbox" name="automatic_attendee_sms" value="1" @checked(old('automatic_attendee_sms')) class="rounded border-amber-300"> Send automatic SMS</label>
+                        </div>
+                    </div>
+
                     {{-- Conference Day --}}
                     <div class="inline-block p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
                         <label class="block text-xs font-black uppercase tracking-widest text-blue-800 mb-2">Conference Day</label>

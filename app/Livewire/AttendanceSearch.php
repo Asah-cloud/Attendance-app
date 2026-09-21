@@ -142,6 +142,9 @@ class AttendanceSearch extends Component
                 'participant_id' => $participantId,
                 'day' => $currentDay,
             ]);
+            if ($this->mode === 'staff' || ((int) $currentDay === 1 && $this->participantsQuery()->findOrFail($participantId)->isNumberedParticipantStaff())) {
+                app(\App\Services\StaffCheckInService::class)->checkIn($participantId, auth()->id());
+            }
         }
 
         app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);

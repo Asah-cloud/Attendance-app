@@ -13,9 +13,12 @@ class NotifiesPerChannel
      * one channel can't mark a channel that already succeeded as failed,
      * and can't cause it to be resent on retry.
      */
-    public static function send(object $notifiable, Notification $notification): void
+    public static function send(object $notifiable, Notification $notification, ?array $allowedChannels = null): void
     {
         foreach ($notification->eligibleChannels($notifiable) as $channel) {
+            if ($allowedChannels !== null && ! in_array($channel, $allowedChannels, true)) {
+                continue;
+            }
             $notifiable->notify($notification->onChannel($channel));
         }
     }

@@ -720,7 +720,7 @@ class EventRegistrationFormController extends Controller
     {
         $registration->loadMissing(['event', 'participant']);
         if ($registration->participant->email || $registration->participant->phone) {
-            NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration));
+            NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration), $registration->event->attendeeNotificationChannels());
         }
     }
 }

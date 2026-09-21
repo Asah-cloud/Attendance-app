@@ -25,6 +25,8 @@ function lifecycleEvent(?int $capacity = 1): Event
         'event_date' => now()->addWeek(),
         'registration_capacity' => $capacity,
         'registration_enabled' => true,
+        'automatic_attendee_email' => true,
+        'automatic_attendee_sms' => true,
     ]);
 }
 

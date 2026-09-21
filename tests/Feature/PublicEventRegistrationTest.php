@@ -25,6 +25,7 @@ function publicRegistrationEvent(array $overrides = []): Event
         'title' => 'Public Registration Event',
         'event_date' => now()->addWeek(),
         'registration_enabled' => true,
+        'automatic_attendee_email' => true,
         'registration_opens_at' => now()->subHour(),
         'registration_closes_at' => now()->addDay(),
         'registration_terms' => 'I agree that my details may be used to administer this event.',

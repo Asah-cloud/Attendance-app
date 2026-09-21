@@ -554,7 +554,7 @@ it('blocks a manager from another company from previewing the room picker', func
 it('links to the room picker in the registration email when self-selection is open and a room is still needed', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-email', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2)]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-email', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2), 'automatic_attendee_email' => true]);
     accommodationRoom($event, 'A01', 4);
     $event->ensureSystemRegistrationFields();
 
@@ -578,7 +578,7 @@ it('links to the room picker in the registration email when self-selection is op
 it('keeps the normal confirmation link in the registration email when self-selection is not open', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-email-2', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-email-2', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true, 'automatic_attendee_email' => true]);
     accommodationRoom($event, 'A01', 4);
     $event->ensureSystemRegistrationFields();
 
@@ -600,7 +600,7 @@ it('keeps the normal confirmation link in the registration email when self-selec
 it('links to the room picker in the confirmed lifecycle email while self-selection is open', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2)]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2), 'automatic_attendee_email' => true]);
     accommodationRoom($event, 'A01', 4);
     $registration = accommodationRegistration($event, 'Confirmed Guest');
 

@@ -83,9 +83,40 @@ it('counts checked-in numbered participant staff throughout the event', function
     Livewire::test(AttendanceStats::class, ['event' => $event, 'day' => 1])
         ->assertViewHas('participantStaffCount', 2)
         ->assertViewHas('presentCount', 2)
+        ->assertViewHas('totalPresentCount', 2)
         ->assertSee('Participant staff present');
 
     Livewire::test(AttendanceStats::class, ['event' => $event, 'day' => 2])
         ->assertViewHas('participantStaffCount', 2)
-        ->assertViewHas('presentCount', 3);
+        ->assertViewHas('presentCount', 3)
+        ->assertViewHas('totalPresentCount', 3);
+});
+
+it('shows distinct people present through the selected day without counting repeat visits twice', function () {
+    $company = Company::create(['name' => 'Multi Day Company']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Three Days', 'event_date' => now()->subDays(2), 'end_date' => now()]);
+    foreach (['First Guest', 'Second Guest', 'Third Guest'] as $name) {
+        $person = Participant::create(['company_id' => $company->id, 'name' => $name]);
+        $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+        if ($name !== 'Third Guest') {
+            Attendance::create(['event_id' => $event->id, 'participant_id' => $person->id, 'day' => 1, 'status' => 'present']);
+        }
+        if ($name !== 'Second Guest') {
+            Attendance::create(['event_id' => $event->id, 'participant_id' => $person->id, 'day' => 2, 'status' => 'present']);
+        }
+        if ($name === 'Third Guest') {
+            Attendance::create(['event_id' => $event->id, 'participant_id' => $person->id, 'day' => 3, 'status' => 'present']);
+        }
+    }
+
+    $this->actingAs($manager);
+    Livewire::test(AttendanceStats::class, ['event' => $event, 'day' => 2])
+        ->assertViewHas('presentCount', 2)
+        ->assertViewHas('totalPresentCount', 3)
+        ->assertSee('Total present through Day 2');
+    Livewire::test(AttendanceStats::class, ['event' => $event, 'day' => 1])
+        ->assertViewHas('presentCount', 2)
+        ->assertViewHas('totalPresentCount', 2);
 });

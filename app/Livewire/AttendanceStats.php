@@ -35,12 +35,20 @@ class AttendanceStats extends Component
             ->where('event_id', $this->event->id)
             ->where('day', $this->day)
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
-            ->count();
+            ->distinct('participant_id')
+            ->count('participant_id');
+        $cumulativeAttendeeCount = $this->day < 1 ? 0 : Attendance::query()
+            ->where('event_id', $this->event->id)
+            ->whereBetween('day', [1, $this->day])
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
+            ->distinct('participant_id')
+            ->count('participant_id');
 
         return view('livewire.attendance-stats', [
             'totalMembers' => $this->event->attendanceEligibleParticipants()->count(),
             'participantStaffCount' => $participantStaffCount,
             'presentCount' => $dailyAttendeeCount + $participantStaffCount,
+            'totalPresentCount' => $this->day < 1 ? 0 : $cumulativeAttendeeCount + $participantStaffCount,
         ]);
     }
 }

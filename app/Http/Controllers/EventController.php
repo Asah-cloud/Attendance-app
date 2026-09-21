@@ -151,7 +151,11 @@ class EventController extends Controller
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'accommodation_enabled' => ['nullable', 'boolean'],
             'food_registration_required' => ['nullable', 'boolean'],
+            'automatic_attendee_email' => ['nullable', 'boolean'],
+            'automatic_attendee_sms' => ['nullable', 'boolean'],
         ]);
+        $validated['automatic_attendee_email'] = $request->boolean('automatic_attendee_email');
+        $validated['automatic_attendee_sms'] = $request->boolean('automatic_attendee_sms');
 
         // Determine which company this event belongs to
         $companyId = $user->hasRole('admin') ? $request->company_id : $user->company_id;
@@ -252,7 +256,14 @@ class EventController extends Controller
             'remove_flyer' => ['nullable', 'boolean'],
             'accommodation_enabled' => ['nullable', 'boolean'],
             'food_registration_required' => ['nullable', 'boolean'],
+            'send_update_email' => ['nullable', 'boolean'],
+            'send_update_sms' => ['nullable', 'boolean'],
+            'automatic_attendee_email' => ['nullable', 'boolean'],
+            'automatic_attendee_sms' => ['nullable', 'boolean'],
         ]);
+        unset($validated['send_update_email'], $validated['send_update_sms']);
+        $validated['automatic_attendee_email'] = $request->boolean('automatic_attendee_email');
+        $validated['automatic_attendee_sms'] = $request->boolean('automatic_attendee_sms');
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
         $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
@@ -294,7 +305,14 @@ class EventController extends Controller
 
         if ($detailsChanged) {
             $event->registrations()->update(['reminder_sent_at' => null]);
-            $lifecycle->eventChanged($event->fresh());
+            $channels = [];
+            if ($request->boolean('send_update_email')) {
+                $channels[] = 'mail';
+            }
+            if ($request->boolean('send_update_sms')) {
+                $channels[] = \App\Notifications\Channels\ArkeselChannel::class;
+            }
+            $lifecycle->eventChanged($event->fresh(), $channels);
         }
 
         return redirect('/events')->with('success', 'Event updated successfully!');

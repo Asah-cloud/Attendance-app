@@ -108,7 +108,7 @@ it('lets a manager add a confirmation question inline and preview the live form'
 it('lets an attendee confirm their attendance through the personal link', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme Co']);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now(), 'registration_terms' => 'Standard terms.']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now(), 'registration_terms' => 'Standard terms.', 'automatic_attendee_email' => true]);
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'John Hardcopy', 'email' => 'john@example.com']);
     $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'source' => 'hardcopy_import']);
 
@@ -226,7 +226,7 @@ it('prevents a manager from reaching another company confirmations section', fun
 it('sends a reminder 3 days after the first confirmation request to whoever is still unconfirmed', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme Co']);
-    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now()]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Homecoming', 'event_date' => now(), 'automatic_attendee_email' => true]);
 
     $tooSoon = Participant::create(['company_id' => $company->id, 'name' => 'Too Soon', 'email' => 'soon@example.com']);
     $regTooSoon = $event->registrations()->create(['participant_id' => $tooSoon->id, 'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION, 'confirmation_sent_at' => now()->subDay()]);

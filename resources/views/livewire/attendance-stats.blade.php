@@ -10,6 +10,10 @@
                 <span class="text-sm text-blue-100/70">Present Today</span>
                 <span class="text-2xl font-black text-green-400">{{ number_format($presentCount) }}</span>
             </div>
+            <div class="flex items-end justify-between border-t border-white/10 pt-3">
+                <span class="text-sm text-blue-100/70">{{ $day < 1 ? 'Total present on program days' : 'Total present through Day '.$day }}</span>
+                <span class="text-2xl font-black text-cyan-300">{{ number_format($totalPresentCount) }}</span>
+            </div>
         </div>
     </div>
 

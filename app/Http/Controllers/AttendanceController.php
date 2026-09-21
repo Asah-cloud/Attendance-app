@@ -309,14 +309,7 @@ class AttendanceController extends Controller
         ]);
 
         if ($day === 1 && $registration->participant->isNumberedParticipantStaff()) {
-            Attendance::query()->createOrFirst([
-                'event_id' => $event->id,
-                'participant_id' => $registration->participant_id,
-                'day' => -1,
-            ], [
-                'status' => 'present',
-                'marked_by' => Auth::id(),
-            ]);
+            app(\App\Services\StaffCheckInService::class)->checkIn($registration->participant_id, Auth::id());
         }
 
         $message = $attendance->wasRecentlyCreated

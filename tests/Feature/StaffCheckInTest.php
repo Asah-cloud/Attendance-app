@@ -160,6 +160,32 @@ it('checks a staff member in via their staff QR and keeps it separate from daily
     expect(Attendance::where('event_id', $event->id)->where('participant_id', $staff->id)->count())->toBe(1);
 });
 
+it('shares one staff check-in across every confirmed assignment without adding daily attendance', function () {
+    [, $event, $manager, $staff] = staffCheckInFixture();
+    $other = Event::create(['company_id' => $event->company_id, 'title' => 'Next Conference', 'event_date' => now()->addMonth()]);
+    $other->registrations()->create(['participant_id' => $staff->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)
+        ->postJson(route('support-staff.checkin.scan', $event), ['registration_code' => 'ASAH-STAFF:'.$staff->staff_qr_token])
+        ->assertOk();
+
+    $this->assertDatabaseHas('attendances', ['event_id' => $other->id, 'participant_id' => $staff->id, 'day' => -1]);
+    $this->assertDatabaseMissing('attendances', ['event_id' => $other->id, 'participant_id' => $staff->id, 'day' => 1]);
+    Livewire::test(StaffCheckInStats::class, ['event' => $other])->assertViewHas('checkedIn', 1);
+});
+
+it('shares an existing staff check-in when a later event assignment is confirmed', function () {
+    [, $event, $manager, $staff] = staffCheckInFixture();
+    $this->actingAs($manager)
+        ->postJson(route('support-staff.checkin.scan', $event), ['registration_code' => 'ASAH-STAFF:'.$staff->staff_qr_token])
+        ->assertOk();
+
+    $other = Event::create(['company_id' => $event->company_id, 'title' => 'Later Conference', 'event_date' => now()->addMonth()]);
+    $other->registrations()->create(['participant_id' => $staff->id, 'status' => 'confirmed']);
+
+    $this->assertDatabaseHas('attendances', ['event_id' => $other->id, 'participant_id' => $staff->id, 'day' => -1]);
+});
+
 it('reflects a numbered staff member scanned for day one in the staff check-in area', function () {
     [, $event, $manager, $staff] = staffCheckInFixture();
     $staff->update(['name' => 'Participant 42']);

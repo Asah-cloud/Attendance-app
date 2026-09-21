@@ -47,6 +47,24 @@
                         </div>
                     </div>
 
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-6">
+                        <p class="text-sm font-black text-amber-950">Automatic attendee notifications</p>
+                        <p class="mt-1 text-xs text-amber-800">Control future registration, reminder, confirmation and accommodation messages. Both are off unless selected.</p>
+                        <div class="mt-4 flex flex-wrap gap-6">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-amber-950"><input type="checkbox" name="automatic_attendee_email" value="1" @checked(old('automatic_attendee_email', $event->automatic_attendee_email)) class="rounded border-amber-300"> Send automatic emails</label>
+                            <label class="flex items-center gap-2 text-sm font-semibold text-amber-950"><input type="checkbox" name="automatic_attendee_sms" value="1" @checked(old('automatic_attendee_sms', $event->automatic_attendee_sms)) class="rounded border-amber-300"> Send automatic SMS</label>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-6">
+                        <p class="text-sm font-black text-amber-950">Notify attendees of date or location changes</p>
+                        <p class="mt-1 text-xs text-amber-800">Both options are off by default. Select a channel only when you want to send an update now.</p>
+                        <div class="mt-4 flex flex-wrap gap-6">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-amber-950"><input type="checkbox" name="send_update_email" value="1" @checked(old('send_update_email')) class="rounded border-amber-300"> Send email</label>
+                            <label class="flex items-center gap-2 text-sm font-semibold text-amber-950"><input type="checkbox" name="send_update_sms" value="1" @checked(old('send_update_sms')) class="rounded border-amber-300"> Send SMS</label>
+                        </div>
+                    </div>
+
                     <div x-data="{ enabled: {{ old('has_arrival_session', $event->has_arrival_session) ? 'true' : 'false' }} }" class="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-6">
                         <label class="flex cursor-pointer items-start gap-3">
                             <input type="checkbox" name="has_arrival_session" value="1" x-model="enabled" class="mt-1 rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500">

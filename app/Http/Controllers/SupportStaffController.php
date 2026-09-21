@@ -139,7 +139,7 @@ class SupportStaffController extends Controller
             'marked_by' => Auth::id(),
         ]);
 
-        app(ApplicationCache::class)->invalidateEvent($event->id, $event->company_id);
+        app(\App\Services\StaffCheckInService::class)->checkIn($registration->participant_id, Auth::id());
 
         $message = $attendance->wasRecentlyCreated
             ? "Welcome, {$registration->participant->name}! Badge check-in complete."

@@ -66,6 +66,16 @@ class EventRegistration extends Model
             $registration->management_token ??= Str::random(40);
             $registration->registered_at ??= now();
         });
+
+        static::saved(function (EventRegistration $registration): void {
+            if ($registration->status !== self::STATUS_CONFIRMED || ! $registration->participant?->is_support_staff) {
+                return;
+            }
+
+            if (\App\Models\Attendance::query()->where('participant_id', $registration->participant_id)->where('day', -1)->exists()) {
+                app(\App\Services\StaffCheckInService::class)->checkIn($registration->participant_id);
+            }
+        });
     }
 
     public function event(): BelongsTo
