@@ -70,13 +70,21 @@ class WeeklyHealthCheck extends Command
 
     private function checkWorkers(array &$issues, array &$notes): void
     {
-        $result = Process::timeout(15)->run(['sudo', 'supervisorctl', 'status', 'attendance-worker:*']);
+        // The scheduled check runs without a terminal, so sudo supervisorctl
+        // can fail even while the workers are healthy. Inspect the actual
+        // queue worker processes for this installation instead.
+        $result = Process::timeout(15)->run(['ps', '-eo', 'args=']);
         $output = trim($result->output().$result->errorOutput());
-        $running = substr_count($output, 'RUNNING');
+        $workerCommand = base_path('artisan').' queue:work';
+        $running = $result->successful()
+            ? collect(explode("\n", $result->output()))
+                ->filter(fn (string $line) => str_contains($line, $workerCommand))
+                ->count()
+            : 0;
         $notes[] = "Queue workers: {$running} running";
 
         if (! $result->successful() || $running < config('services.health.minimum_workers', 1)) {
-            $issues[] = 'Queue workers are not all running ('.($output ?: 'supervisor status unavailable').').';
+            $issues[] = 'Queue workers are not all running ('.($result->successful() ? "{$running} found" : ($output ?: 'process status unavailable')).').';
         }
     }
 
