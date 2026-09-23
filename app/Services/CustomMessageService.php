@@ -10,36 +10,31 @@ class CustomMessageService
 
     public const MODE_SMS_ONLY = 'sms_only';
 
-    public const MODES = [self::MODE_SMART, self::MODE_EMAIL_ONLY, self::MODE_SMS_ONLY];
+    public const MODE_BOTH = 'both';
+
+    public const MODES = [self::MODE_SMART, self::MODE_EMAIL_ONLY, self::MODE_SMS_ONLY, self::MODE_BOTH];
 
     /**
-     * Which single channel (if any) a recipient should get for the given
-     * send mode. A recipient never gets both — Ghana numbers get SMS,
-     * everyone else gets email, and "email only"/"sms only" force that
-     * choice for the whole campaign regardless of locality.
+     * Which channel(s) a recipient should get for the given send mode. In
+     * every mode but "both", a recipient gets at most one channel — Ghana
+     * numbers get SMS, everyone else gets email. "Both" sends independently
+     * to every channel the recipient has, with no locality routing at all.
+     * A channel is only ever included if its message body was actually
+     * written — an empty SMS box means nobody gets texted, regardless of
+     * their phone number.
+     *
+     * @return list<string> zero, one, or two of 'mail'/'sms'
      */
-    public function determineChannel(string $mode, ?string $email, ?string $phone): ?string
+    public function determineChannels(string $mode, ?string $email, ?string $phone, bool $hasEmailBody, bool $hasSmsBody): array
     {
-        $hasEmail = filled($email) && ! str_ends_with($email, '@example.invalid');
-        $isGhana = config('services.arkesel.enabled') && PhoneNumberService::isGhanaNumber($phone);
+        $hasEmail = $hasEmailBody && filled($email) && ! str_ends_with($email, '@example.invalid');
+        $isGhana = $hasSmsBody && config('services.arkesel.enabled') && PhoneNumberService::isGhanaNumber($phone);
 
         return match ($mode) {
-            self::MODE_EMAIL_ONLY => $hasEmail ? 'mail' : null,
-            self::MODE_SMS_ONLY => $isGhana ? 'sms' : null,
-            default => $isGhana ? 'sms' : ($hasEmail ? 'mail' : null),
+            self::MODE_EMAIL_ONLY => $hasEmail ? ['mail'] : [],
+            self::MODE_SMS_ONLY => $isGhana ? ['sms'] : [],
+            self::MODE_BOTH => array_values(array_filter([$hasEmail ? 'mail' : null, $isGhana ? 'sms' : null])),
+            default => $isGhana ? ['sms'] : ($hasEmail ? ['mail'] : []),
         };
-    }
-
-    /** @return array{mail: int, sms: int, skipped: int} */
-    public function previewCounts(string $mode, iterable $recipients): array
-    {
-        $counts = ['mail' => 0, 'sms' => 0, 'skipped' => 0];
-
-        foreach ($recipients as $recipient) {
-            $channel = $this->determineChannel($mode, $recipient['email'] ?? null, $recipient['phone'] ?? null);
-            $counts[$channel === 'sms' ? 'sms' : ($channel === 'mail' ? 'mail' : 'skipped')]++;
-        }
-
-        return $counts;
     }
 }

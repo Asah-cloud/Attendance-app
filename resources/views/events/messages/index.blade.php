@@ -22,8 +22,8 @@
                 @forelse($messages as $message)
                     <tr>
                         <td class="px-5 py-4">
-                            <div class="font-bold text-slate-900">{{ $message->subject ?: '(no subject)' }}</div>
-                            <div class="mt-1 max-w-sm truncate text-xs text-slate-400">{{ $message->body }}</div>
+                            <div class="font-bold text-slate-900">{{ $message->subject ?: ($message->email_body ? '(no subject)' : '(SMS only)') }}</div>
+                            <div class="mt-1 max-w-sm truncate text-xs text-slate-400">{{ $message->email_body ?: $message->sms_body }}</div>
                         </td>
                         <td class="px-5 py-4 text-xs font-bold uppercase text-slate-500">{{ str_replace('_', ' ', $message->mode) }}</td>
                         <td class="px-5 py-4 font-bold text-slate-700">{{ $message->recipient_count }}</td>

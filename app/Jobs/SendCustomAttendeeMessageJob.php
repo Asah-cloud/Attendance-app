@@ -30,15 +30,17 @@ class SendCustomAttendeeMessageJob implements ShouldQueue
 
         $message = $recipient->customMessage;
         $company = $message->event->company;
+        $isMail = $recipient->channel === 'mail';
 
         try {
             $recipient->notify(new CustomAttendeeMessage(
-                body: $message->body,
+                body: $isMail ? $message->email_body : $message->sms_body,
                 subject: $message->subject,
                 channel: $recipient->channel,
                 smsSenderId: $company?->approvedSmsSenderId(),
                 fromEmail: $company?->approvedEmailFromAddress(),
                 fromName: $company?->email_from_name ?: $company?->name,
+                attachments: $isMail ? ($message->attachments ?? []) : [],
             ));
             $recipient->update(['status' => CustomMessageRecipient::STATUS_SENT]);
         } catch (Throwable $exception) {

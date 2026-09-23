@@ -6,9 +6,10 @@ use App\Models\CustomMessageRecipient;
 use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
-use App\Notifications\CustomAttendeeMessage;
 use App\Notifications\Channels\ArkeselChannel;
+use App\Notifications\CustomAttendeeMessage;
 use App\Services\PhoneNumberService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -57,7 +58,8 @@ it('routes Ghana numbers to SMS and foreign numbers to email in smart mode', fun
 
     $this->actingAs($manager)->post(route('events.messages.store', $event), [
         'subject' => 'Hello',
-        'body' => "Line one\nLine two",
+        'email_body' => "Line one\nLine two",
+        'sms_body' => 'Line one',
         'mode' => 'smart',
         'participant_ids' => [$ghana->id, $foreign->id],
     ])->assertRedirect();
@@ -91,7 +93,8 @@ it('uses the company\'s approved email and SMS sender identities when set', func
 
     $this->actingAs($manager)->post(route('events.messages.store', $event), [
         'subject' => 'Hello',
-        'body' => 'Test',
+        'email_body' => 'Test',
+        'sms_body' => 'Test',
         'mode' => 'smart',
         'participant_ids' => [$ghana->id, $foreign->id],
     ])->assertRedirect();
@@ -116,7 +119,7 @@ it('skips foreign numbers entirely in sms-only mode instead of falling back to e
     $event->registrations()->create(['participant_id' => $foreign->id, 'status' => 'confirmed']);
 
     $this->actingAs($manager)->post(route('events.messages.store', $event), [
-        'body' => 'Test',
+        'sms_body' => 'Test',
         'mode' => 'sms_only',
         'participant_ids' => [$foreign->id],
     ])->assertRedirect();
@@ -136,7 +139,7 @@ it('forces email for a Ghana number when email-only mode is selected', function 
 
     $this->actingAs($manager)->post(route('events.messages.store', $event), [
         'subject' => 'Hi',
-        'body' => 'Test',
+        'email_body' => 'Test',
         'mode' => 'email_only',
         'participant_ids' => [$ghana->id],
     ])->assertRedirect();
@@ -154,10 +157,11 @@ it('merges and deduplicates recipients selected from registrants and an uploaded
     $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
 
     $csv = "Name,Email,Phone\nExisting Person,dup@example.com,0241234567\nNew Person,new@example.com,0551234567\n";
-    $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('recipients.csv', $csv);
+    $file = UploadedFile::fake()->createWithContent('recipients.csv', $csv);
 
     $this->actingAs($manager)->post(route('events.messages.store', $event), [
-        'body' => 'Test',
+        'email_body' => 'Test',
+        'sms_body' => 'Test',
         'mode' => 'smart',
         'participant_ids' => [$participant->id],
         'recipients_file' => $file,
@@ -167,6 +171,64 @@ it('merges and deduplicates recipients selected from registrants and an uploaded
     expect($message->recipient_count)->toBe(2)
         ->and($message->recipients()->count())->toBe(2)
         ->and($message->recipients()->where('email', 'new@example.com')->exists())->toBeTrue();
+});
+
+it('sends both email and SMS to a Ghana recipient with both channels in "both" mode', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Both Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $both = Participant::create(['company_id' => $company->id, 'name' => 'Reachable Person', 'email' => 'reachable@example.com', 'phone' => '0241234567']);
+    $emailOnlyForeign = Participant::create(['company_id' => $company->id, 'name' => 'Foreign Person', 'email' => 'foreign@example.com', 'phone' => '+14155552671']);
+    $event->registrations()->create(['participant_id' => $both->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $emailOnlyForeign->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'subject' => 'Hello',
+        'email_body' => 'Email text',
+        'sms_body' => 'SMS text',
+        'mode' => 'both',
+        'participant_ids' => [$both->id, $emailOnlyForeign->id],
+    ])->assertRedirect();
+
+    $bothRows = CustomMessageRecipient::where('participant_id', $both->id)->get();
+    $foreignRows = CustomMessageRecipient::where('participant_id', $emailOnlyForeign->id)->get();
+
+    expect($bothRows)->toHaveCount(2)
+        ->and($bothRows->pluck('channel')->sort()->values()->all())->toBe(['mail', 'sms'])
+        ->and($foreignRows)->toHaveCount(1)
+        ->and($foreignRows->first()->channel)->toBe('mail');
+});
+
+it('never attaches files to an SMS send, only to email', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Attach Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $both = Participant::create(['company_id' => $company->id, 'name' => 'Reachable Person', 'email' => 'reachable@example.com', 'phone' => '0241234567']);
+    $event->registrations()->create(['participant_id' => $both->id, 'status' => 'confirmed']);
+    $pdf = UploadedFile::fake()->create('flyer.pdf', 100, 'application/pdf');
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'subject' => 'Hello',
+        'email_body' => 'Email text',
+        'sms_body' => 'SMS text',
+        'mode' => 'both',
+        'participant_ids' => [$both->id],
+        'attachments' => [$pdf],
+    ])->assertRedirect();
+
+    $message = $event->customMessages()->firstOrFail();
+    expect($message->attachments)->toHaveCount(1)
+        ->and($message->attachments[0]['name'])->toBe('flyer.pdf');
+
+    $mailRow = CustomMessageRecipient::where('participant_id', $both->id)->where('channel', 'mail')->firstOrFail();
+    $smsRow = CustomMessageRecipient::where('participant_id', $both->id)->where('channel', 'sms')->firstOrFail();
+
+    Notification::assertSentTo($mailRow, CustomAttendeeMessage::class, function ($notification, $channels, $notifiable) {
+        return count($notification->toMail($notifiable)->attachments) === 1;
+    });
+    Notification::assertSentTo($smsRow, CustomAttendeeMessage::class, fn ($notification) => $notification->toArkesel($notification) === 'SMS text');
 });
 
 it('prevents an usher and a cross-company manager from composing messages', function () {
@@ -196,7 +258,7 @@ it('records a failure without retrying when the mail channel cannot send', funct
     $message = $event->customMessages()->create([
         'company_id' => $company->id,
         'subject' => 'Hi',
-        'body' => 'Test',
+        'email_body' => 'Test',
         'mode' => 'smart',
         'recipient_count' => 1,
     ]);

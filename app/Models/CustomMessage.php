@@ -13,10 +13,19 @@ class CustomMessage extends Model
         'company_id',
         'created_by',
         'subject',
-        'body',
+        'email_body',
+        'sms_body',
+        'attachments',
         'mode',
         'recipient_count',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'attachments' => 'array',
+        ];
+    }
 
     public function event(): BelongsTo
     {

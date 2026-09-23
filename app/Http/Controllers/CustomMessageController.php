@@ -12,6 +12,7 @@ use App\Services\CustomMessageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -60,11 +61,14 @@ class CustomMessageController extends Controller
 
         $validated = $request->validate([
             'subject' => ['nullable', 'string', 'max:255'],
-            'body' => ['required', 'string', 'max:5000'],
+            'email_body' => ['nullable', 'required_without:sms_body', 'string', 'max:5000'],
+            'sms_body' => ['nullable', 'required_without:email_body', 'string', 'max:1000'],
             'mode' => ['required', Rule::in(CustomMessageService::MODES)],
             'participant_ids' => ['array'],
             'participant_ids.*' => ['integer'],
             'recipients_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:5120'],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,csv,txt'],
         ]);
 
         $recipients = collect();
@@ -109,24 +113,50 @@ class CustomMessageController extends Controller
             'company_id' => $event->company_id,
             'created_by' => $request->user()->id,
             'subject' => $validated['subject'] ?? null,
-            'body' => $validated['body'],
+            'email_body' => $validated['email_body'] ?? null,
+            'sms_body' => $validated['sms_body'] ?? null,
             'mode' => $validated['mode'],
             'recipient_count' => $recipients->count(),
         ]);
 
+        if ($request->hasFile('attachments')) {
+            $stored = [];
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->storeAs("custom-message-attachments/{$message->id}", Str::uuid().'-'.$file->getClientOriginalName(), 'local');
+                $stored[] = ['path' => $path, 'name' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()];
+            }
+            $message->update(['attachments' => $stored]);
+        }
+
+        $hasEmailBody = filled($validated['email_body'] ?? null);
+        $hasSmsBody = filled($validated['sms_body'] ?? null);
+
         foreach ($recipients as $recipient) {
-            $channel = $this->messages->determineChannel($validated['mode'], $recipient['email'], $recipient['phone']);
+            $channels = $this->messages->determineChannels($validated['mode'], $recipient['email'], $recipient['phone'], $hasEmailBody, $hasSmsBody);
 
-            $row = $message->recipients()->create([
-                'participant_id' => $recipient['participant_id'],
-                'name' => $recipient['name'],
-                'email' => $recipient['email'],
-                'phone' => $recipient['phone'],
-                'channel' => $channel,
-                'status' => $channel ? CustomMessageRecipient::STATUS_PENDING : CustomMessageRecipient::STATUS_SKIPPED,
-            ]);
+            if (empty($channels)) {
+                $message->recipients()->create([
+                    'participant_id' => $recipient['participant_id'],
+                    'name' => $recipient['name'],
+                    'email' => $recipient['email'],
+                    'phone' => $recipient['phone'],
+                    'channel' => null,
+                    'status' => CustomMessageRecipient::STATUS_SKIPPED,
+                ]);
 
-            if ($channel) {
+                continue;
+            }
+
+            foreach ($channels as $channel) {
+                $row = $message->recipients()->create([
+                    'participant_id' => $recipient['participant_id'],
+                    'name' => $recipient['name'],
+                    'email' => $recipient['email'],
+                    'phone' => $recipient['phone'],
+                    'channel' => $channel,
+                    'status' => CustomMessageRecipient::STATUS_PENDING,
+                ]);
+
                 SendCustomAttendeeMessageJob::dispatch($row->id);
             }
         }

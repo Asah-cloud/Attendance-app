@@ -11,9 +11,26 @@
             <a href="{{ route('events.messages.index', $event) }}" class="text-xs font-bold text-slate-500 underline">Back to history</a>
         </div>
 
-        <div class="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p class="text-xs font-black uppercase tracking-widest text-slate-400">Message body</p>
-            <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ $message->body }}</p>
+        <div class="mb-8 grid gap-6 md:grid-cols-2">
+            @if($message->email_body)
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400">Email body</p>
+                    <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ $message->email_body }}</p>
+                    @if(!empty($message->attachments))
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @foreach($message->attachments as $attachment)
+                                <span class="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{{ $attachment['name'] }}</span>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
+            @if($message->sms_body)
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400">SMS body</p>
+                    <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ $message->sms_body }}</p>
+                </div>
+            @endif
         </div>
 
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">

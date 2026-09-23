@@ -54,24 +54,43 @@
                 <input type="file" name="recipients_file" accept=".csv,.xlsx,.xls" class="mt-4 block w-full rounded-xl border border-gray-200 bg-gray-50/30 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
             </section>
 
-            {{-- 3. Message --}}
+            {{-- 3. Email content --}}
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 class="text-sm font-black uppercase tracking-widest text-slate-500">3. Write the message</h2>
-                <div class="mt-4"><label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Subject (used for email only)</label>
+                <h2 class="text-sm font-black uppercase tracking-widest text-slate-500">3. Email content</h2>
+                <p class="mt-1 text-xs text-slate-400">Leave blank if this campaign won't send any email.</p>
+                <div class="mt-4"><label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Subject</label>
                     <input type="text" name="subject" value="{{ old('subject') }}" class="w-full rounded-xl border-gray-200 text-sm" placeholder="e.g. Important update about the event">
                 </div>
-                <div class="mt-4"><label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Body</label>
-                    <textarea name="body" rows="6" required class="w-full rounded-xl border-gray-200 text-sm" placeholder="Type your message...">{{ old('body') }}</textarea>
+                <div class="mt-4"><label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Email body</label>
+                    <textarea name="email_body" rows="6" class="w-full rounded-xl border-gray-200 text-sm" placeholder="Type the email message...">{{ old('email_body') }}</textarea>
+                </div>
+                <div class="mt-4">
+                    <label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Attachments (email only, up to 5 files)</label>
+                    <input type="file" name="attachments[]" multiple class="block w-full rounded-xl border border-gray-200 bg-gray-50/30 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
+                    <p class="mt-2 text-[10px] text-gray-400 italic">PDF, images, Office docs, or CSV/text. Max 10MB per file. Never sent with SMS.</p>
                 </div>
             </section>
 
-            {{-- 4. Channel mode --}}
+            {{-- 4. SMS content --}}
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 class="text-sm font-black uppercase tracking-widest text-slate-500">4. Choose how to send</h2>
+                <h2 class="text-sm font-black uppercase tracking-widest text-slate-500">4. SMS content</h2>
+                <p class="mt-1 text-xs text-slate-400">Leave blank if this campaign won't text anyone. Keep it short — this is separate from the email body above.</p>
+                <div class="mt-4"><label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">SMS message</label>
+                    <textarea name="sms_body" rows="3" maxlength="1000" class="w-full rounded-xl border-gray-200 text-sm" placeholder="Type the SMS message...">{{ old('sms_body') }}</textarea>
+                </div>
+            </section>
+
+            {{-- 5. Channel mode --}}
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 class="text-sm font-black uppercase tracking-widest text-slate-500">5. Choose how to send</h2>
                 <div class="mt-4 space-y-3">
                     <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
                         <input type="radio" name="mode" value="smart" checked class="mt-1">
                         <span><span class="block text-sm font-black text-slate-900">Smart routing (recommended)</span><span class="mt-1 block text-xs text-slate-600">Ghana numbers get SMS, everyone else gets email. Each person receives exactly one channel.</span></span>
+                    </label>
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <input type="radio" name="mode" value="both" class="mt-1">
+                        <span><span class="block text-sm font-black text-slate-900">Both, no routing</span><span class="mt-1 block text-xs text-slate-600">Everyone with a valid email gets the email AND everyone with a Ghana number gets the SMS — independently, not either/or.</span></span>
                     </label>
                     <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
                         <input type="radio" name="mode" value="email_only" class="mt-1">
