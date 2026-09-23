@@ -156,6 +156,20 @@
                     </div>
                 </form>
             </div>
+
+            @can('delete', $event)
+                <div class="mt-8 rounded-2xl border border-red-200 bg-red-50/60 p-8">
+                    <p class="text-sm font-black text-red-950">Danger zone</p>
+                    <p class="mt-1 text-xs text-red-800">Permanently delete this event and all its registrations, attendance, and report data. This cannot be undone.</p>
+                    <form method="POST" action="{{ route('events.destroy', $event) }}" class="mt-4" onsubmit="return confirm('Delete {{ $event->title }} and all its records? This cannot be undone.');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-red-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-red-100 hover:bg-red-700 transition-all">
+                            Delete Event
+                        </button>
+                    </form>
+                </div>
+            @endcan
         </div>
     </div>
 </x-app-layout>
