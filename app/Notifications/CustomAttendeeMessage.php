@@ -19,6 +19,8 @@ class CustomAttendeeMessage extends Notification
         public ?string $subject,
         private string $channel,
         private ?string $smsSenderId = null,
+        private ?string $fromEmail = null,
+        private ?string $fromName = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -34,7 +36,7 @@ class CustomAttendeeMessage extends Notification
             $mail->line($line);
         }
 
-        return $mail;
+        return $this->fromEmail ? $mail->from($this->fromEmail, $this->fromName) : $mail;
     }
 
     public function smsSenderId(): ?string

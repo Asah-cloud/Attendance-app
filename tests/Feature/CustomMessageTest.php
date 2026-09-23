@@ -72,6 +72,41 @@ it('routes Ghana numbers to SMS and foreign numbers to email in smart mode', fun
     Notification::assertSentTo($foreignRow, CustomAttendeeMessage::class, fn ($notification, $channels) => $channels === ['mail']);
 });
 
+it('uses the company\'s approved email and SMS sender identities when set', function () {
+    Notification::fake();
+    $company = Company::create([
+        'name' => 'Branded Co',
+        'email_from_address' => 'events@brandedco.com',
+        'email_from_name' => 'Branded Co Events',
+        'email_sender_status' => 'approved',
+        'sms_sender_id' => 'BrandedCo',
+        'sms_sender_status' => 'approved',
+    ]);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $ghana = Participant::create(['company_id' => $company->id, 'name' => 'Local Person', 'email' => 'local@example.com', 'phone' => '0241234567']);
+    $foreign = Participant::create(['company_id' => $company->id, 'name' => 'Foreign Person', 'email' => 'foreign@example.com', 'phone' => '+14155552671']);
+    $event->registrations()->create(['participant_id' => $ghana->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $foreign->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'subject' => 'Hello',
+        'body' => 'Test',
+        'mode' => 'smart',
+        'participant_ids' => [$ghana->id, $foreign->id],
+    ])->assertRedirect();
+
+    $ghanaRow = CustomMessageRecipient::where('participant_id', $ghana->id)->firstOrFail();
+    $foreignRow = CustomMessageRecipient::where('participant_id', $foreign->id)->firstOrFail();
+
+    Notification::assertSentTo($ghanaRow, CustomAttendeeMessage::class, fn ($notification) => $notification->smsSenderId() === 'BrandedCo');
+    Notification::assertSentTo($foreignRow, CustomAttendeeMessage::class, function ($notification, $channels, $notifiable) {
+        $mail = $notification->toMail($notifiable);
+
+        return $mail->from === ['events@brandedco.com', 'Branded Co Events'];
+    });
+});
+
 it('skips foreign numbers entirely in sms-only mode instead of falling back to email', function () {
     Notification::fake();
     $company = Company::create(['name' => 'SMS Only Co']);
