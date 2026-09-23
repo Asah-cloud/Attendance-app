@@ -18,7 +18,7 @@ class BillingController extends Controller
     public function index(Request $request): View
     {
         $company = $this->company($request);
-        $payments = $company->subscriptionPayments()->latest('paid_at')->paginate(10);
+        $payments = $company->subscriptionPayments()->latest('created_at')->paginate(10);
         $attendeeCharges = $company->isPayPerEvent()
             ? $company->attendeeCharges()->with('event')->latest('finalized_at')->paginate(10, ['*'], 'charges')
             : null;

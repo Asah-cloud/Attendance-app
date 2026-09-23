@@ -158,6 +158,26 @@ it('does not update the subscription when Paystack reports the payment failed', 
         ->and($company->fresh()->plan_key)->toBe('starter');
 });
 
+it('shows the billing page without error when a payment never completed', function () {
+    $company = Company::create(['name' => 'Pending Co', 'is_active' => true, 'plan_key' => 'starter', 'plan_price_minor' => 9900, 'billing_currency' => 'GHS']);
+    $manager = billingManager($company);
+    SubscriptionPayment::create([
+        'company_id' => $company->id,
+        'plan_key' => 'business',
+        'type' => 'plan_change',
+        'amount_minor' => 19900,
+        'currency' => 'GHS',
+        'payment_reference' => 'SUB-'.Str::upper(Str::random(16)),
+        'status' => SubscriptionPayment::STATUS_PENDING,
+        'paid_at' => null,
+    ]);
+
+    $this->actingAs($manager)
+        ->get(route('billing.index'))
+        ->assertOk()
+        ->assertSee('Pending');
+});
+
 it('allows a manager to update billing contact and renewal preference', function () {
     $company = Company::create([
         'name' => 'Managed Company',

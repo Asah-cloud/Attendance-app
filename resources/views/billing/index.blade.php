@@ -107,12 +107,22 @@
                     <div class="border-b border-gray-100 p-6"><h3 class="font-black text-gray-900">Payment history</h3></div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 text-xs uppercase text-gray-500"><tr><th class="p-4">Date</th><th class="p-4">Plan</th><th class="p-4">Type</th><th class="p-4">Reference</th><th class="p-4 text-right">Amount</th></tr></thead>
+                            <thead class="bg-gray-50 text-xs uppercase text-gray-500"><tr><th class="p-4">Date</th><th class="p-4">Plan</th><th class="p-4">Type</th><th class="p-4">Status</th><th class="p-4">Reference</th><th class="p-4 text-right">Amount</th></tr></thead>
                             <tbody class="divide-y divide-gray-100">
                                 @forelse($payments as $payment)
-                                    <tr><td class="p-4">{{ $payment->paid_at->format('M d, Y H:i') }}</td><td class="p-4 font-bold">{{ $plans[$payment->plan_key]['name'] ?? ucfirst($payment->plan_key) }}</td><td class="p-4 capitalize">{{ str_replace('_', ' ', $payment->type) }}</td><td class="p-4 font-mono text-xs">{{ $payment->payment_reference }}</td><td class="p-4 text-right font-black">{{ $payment->currency }} {{ number_format($payment->amount_minor / 100, 2) }}</td></tr>
+                                    <tr>
+                                        <td class="p-4">{{ $payment->paid_at?->format('M d, Y H:i') ?? '—' }}</td>
+                                        <td class="p-4 font-bold">{{ $plans[$payment->plan_key]['name'] ?? ucfirst($payment->plan_key) }}</td>
+                                        <td class="p-4 capitalize">{{ str_replace('_', ' ', $payment->type) }}</td>
+                                        <td class="p-4">
+                                            @php($statusColors = ['paid' => 'bg-green-100 text-green-700', 'pending' => 'bg-amber-100 text-amber-700', 'failed' => 'bg-red-100 text-red-700', 'abandoned' => 'bg-gray-100 text-gray-600'])
+                                            <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide {{ $statusColors[$payment->status] ?? 'bg-gray-100 text-gray-600' }}">{{ $payment->status }}</span>
+                                        </td>
+                                        <td class="p-4 font-mono text-xs">{{ $payment->payment_reference }}</td>
+                                        <td class="p-4 text-right font-black">{{ $payment->currency }} {{ number_format($payment->amount_minor / 100, 2) }}</td>
+                                    </tr>
                                 @empty
-                                    <tr><td colspan="5" class="p-8 text-center text-gray-500">No payments recorded yet.</td></tr>
+                                    <tr><td colspan="6" class="p-8 text-center text-gray-500">No payments recorded yet.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
