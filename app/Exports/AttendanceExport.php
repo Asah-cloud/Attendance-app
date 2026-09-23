@@ -15,16 +15,27 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
 
     protected $day;
 
+    protected $area;
+
     // 1. Accept BOTH the event and the day
-    public function __construct(Event $event, $day = 'all')
+    public function __construct(Event $event, $day = 'all', ?string $area = null)
     {
         $this->event = $event;
         $this->day = $day;
+        $this->area = $area;
     }
 
     public function collection(): Enumerable
     {
-        return app(AttendanceReportData::class)->forPeriod($this->event, $this->day)['presentUsers'];
+        $presentUsers = app(AttendanceReportData::class)->forPeriod($this->event, $this->day)['presentUsers'];
+
+        if ($this->area === null) {
+            return $presentUsers;
+        }
+
+        return $presentUsers
+            ->filter(fn ($user) => ($user->room_group ?: ($user->department ?: 'Area not specified')) === $this->area)
+            ->values();
     }
 
     public function headings(): array

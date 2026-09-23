@@ -136,6 +136,29 @@ it('downloads a grouped area attendance summary for the selected period', functi
     expect($response->headers->get('Content-Disposition'))->toContain('Area_Attendance_')->toContain('.xlsx');
 });
 
+it('downloads the detailed attendee list for a single area, including unspecified areas', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Area Event', 'event_date' => now()]);
+
+    $kumasi = Participant::create(['company_id' => $company->id, 'name' => 'Kumasi Guest', 'room_group' => 'Kumasi Area']);
+    $noArea = Participant::create(['company_id' => $company->id, 'name' => 'No Area Guest']);
+    foreach ([$kumasi, $noArea] as $participant) {
+        $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+        Attendance::create(['event_id' => $event->id, 'participant_id' => $participant->id, 'day' => 1, 'status' => 'present']);
+    }
+
+    $this->actingAs($manager)
+        ->get(route('reports.area-detail', ['event' => $event, 'area' => 'Kumasi Area', 'day' => 1]))
+        ->assertOk()
+        ->assertHeader('Content-Disposition');
+
+    $this->actingAs($manager)
+        ->get(route('reports.area-detail', ['event' => $event, 'area' => 'Area not specified', 'day' => 1]))
+        ->assertOk()
+        ->assertHeader('Content-Disposition');
+});
+
 it('prevents a manager from exporting another company event attendance', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $otherCompany = Company::create(['name' => 'Other Co']);

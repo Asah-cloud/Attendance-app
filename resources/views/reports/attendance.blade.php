@@ -104,11 +104,12 @@
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="text-xs font-black uppercase tracking-widest text-blue-700">Present people by area</h3><a href="{{ route('reports.area-summary', ['event' => $event, 'day' => $selectedDay]) }}" class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white">Download area summary</a></div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($areaBreakdown as $label => $count)
-                        <div class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></div>
+                        <a href="{{ route('reports.area-detail', ['event' => $event, 'area' => $label, 'day' => $selectedDay]) }}" title="Download list of people in {{ $label }}" class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3 hover:bg-blue-100 transition-colors"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></a>
                     @empty
                         <p class="text-sm text-gray-400">No attendance yet.</p>
                     @endforelse
                 </div>
+                <p class="mt-3 text-[11px] font-semibold text-slate-400 print:hidden">Click any area to download its attendee list.</p>
             </div>
 
             {{-- Category / Gender Breakdown --}}

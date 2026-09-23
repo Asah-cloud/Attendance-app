@@ -96,6 +96,15 @@ class ReportController extends Controller
         return Excel::download(new AreaAttendanceSummaryExport($event, $day), $fileName);
     }
 
+    public function exportAreaDetail(Event $event, string $area, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        $fileName = 'Area_'.str_replace(' ', '_', $area).'_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.xlsx';
+
+        return Excel::download(new AttendanceExport($event, $day, $area), $fileName);
+    }
+
     public function exportPdf(Event $event, $day = 'all')
     {
         $this->authorize('view', $event);
