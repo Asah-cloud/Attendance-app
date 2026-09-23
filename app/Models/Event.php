@@ -128,6 +128,11 @@ class Event extends Model
         return $this->hasMany(Form::class);
     }
 
+    public function customMessages(): HasMany
+    {
+        return $this->hasMany(CustomMessage::class);
+    }
+
     public function attendeeCharge(): HasOne
     {
         return $this->hasOne(EventAttendeeCharge::class);

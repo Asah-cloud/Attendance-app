@@ -36,6 +36,8 @@
         request()->routeIs('events.forms.responses') => 'Form responses',
         request()->routeIs('events.forms.*') => 'Forms',
         request()->routeIs('events.billing.*') => 'Billing',
+        request()->routeIs('events.messages.create') => 'Compose message',
+        request()->routeIs('events.messages.*') => 'Messages',
         request()->routeIs('events.registrations.participant.history') => 'Edit history',
         request()->routeIs('support-staff.checkin.scanner') => 'Staff scanner',
         request()->routeIs('support-staff.checkin') => 'Staff check-in',
@@ -74,6 +76,7 @@
         ['label' => 'Food', 'route' => route('events.meals.index', $contextEvent), 'active' => request()->routeIs('events.meals.*')],
         $user->can('update', $contextEvent) ? ['label' => 'Rooms', 'route' => route('events.accommodation.index', $contextEvent), 'active' => request()->routeIs('events.accommodation.*')] : null,
         ['label' => 'Reports', 'route' => route('reports.event', $contextEvent), 'active' => request()->routeIs('reports.*')],
+        $user->can('manageMessages', $contextEvent) ? ['label' => 'Messages', 'route' => route('events.messages.index', $contextEvent), 'active' => request()->routeIs('events.messages.*')] : null,
         $user->can('update', $contextEvent) ? ['label' => 'Billing', 'route' => route('events.billing.show', $contextEvent), 'active' => request()->routeIs('events.billing.*')] : null,
         $user->can('update', $contextEvent) ? ['label' => 'Settings', 'route' => route('events.edit', $contextEvent), 'active' => request()->routeIs('events.edit')] : null,
     ])) : [];

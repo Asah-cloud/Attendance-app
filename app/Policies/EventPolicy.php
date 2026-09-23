@@ -63,4 +63,9 @@ class EventPolicy
     {
         return $this->update($user, $event);
     }
+
+    public function manageMessages(User $user, Event $event): bool
+    {
+        return $this->update($user, $event);
+    }
 }

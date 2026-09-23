@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\PhoneNumberService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,16 +15,7 @@ class Participant extends Model
 
     public function routeNotificationForArkesel(): ?string
     {
-        $phone = preg_replace('/\D+/', '', $this->phone ?? '') ?? '';
-        if ($phone === '') {
-            return null;
-        }
-
-        if (str_starts_with($phone, '233')) {
-            return $phone;
-        }
-
-        return '233'.ltrim($phone, '0');
+        return PhoneNumberService::toArkeselFormat($this->phone);
     }
 
     public function isNumberedParticipantStaff(): bool

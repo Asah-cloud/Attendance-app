@@ -8,6 +8,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuditAccessController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CustomMessageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventBillingController;
 use App\Http\Controllers\EventController;
@@ -150,6 +151,11 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::post('/events/{event}/meals/{meal}/issue', [MealDistributionController::class, 'issue'])
         ->middleware('throttle:120,1')->name('events.meals.issue');
     Route::patch('/events/{event}/update-day', [EventController::class, 'updateDay'])->name('events.update-day');
+    // Custom attendee messages
+    Route::get('/events/{event}/messages', [CustomMessageController::class, 'index'])->name('events.messages.index');
+    Route::get('/events/{event}/messages/create', [CustomMessageController::class, 'create'])->name('events.messages.create');
+    Route::post('/events/{event}/messages', [CustomMessageController::class, 'store'])->name('events.messages.store');
+    Route::get('/events/{event}/messages/{message}', [CustomMessageController::class, 'show'])->name('events.messages.show');
     // Reporting & Exports
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
     Route::get('/reports/event/{event}/excel/{day?}', [ReportController::class, 'exportExcel'])->name('reports.excel');
