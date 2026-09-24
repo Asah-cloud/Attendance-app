@@ -2,6 +2,7 @@
 
 use App\Jobs\SendCustomAttendeeMessageJob;
 use App\Models\Company;
+use App\Models\CustomMessage;
 use App\Models\CustomMessageRecipient;
 use App\Models\Event;
 use App\Models\Participant;
@@ -356,6 +357,133 @@ it('keeps recipients from the original upload when resending and lets the manage
 
     $resent = $event->customMessages()->latest('id')->firstOrFail();
     expect($resent->recipients()->pluck('name')->all())->toBe(['Uploaded One']);
+});
+
+function inboxMessage(Event $event, array $attributes = [], array $recipientStatuses = []): CustomMessage
+{
+    $message = $event->customMessages()->create($attributes + [
+        'company_id' => $event->company_id,
+        'subject' => 'Inbox subject',
+        'email_body' => 'Inbox email body',
+        'mode' => 'smart',
+        'recipient_count' => count($recipientStatuses),
+    ]);
+
+    foreach ($recipientStatuses as $index => $status) {
+        $message->recipients()->create([
+            'name' => 'Person '.$index,
+            'email' => "person{$index}@example.com",
+            'channel' => 'mail',
+            'status' => $status,
+            'error_message' => $status === 'failed' ? 'Mailbox unavailable' : null,
+        ]);
+    }
+
+    return $message;
+}
+
+it('shows an inbox with the latest message open, its delivery breakdown and recipients', function () {
+    $company = Company::create(['name' => 'Inbox Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    inboxMessage($event, ['subject' => 'Older note'], ['sent']);
+    $latest = inboxMessage($event, ['subject' => 'Latest announcement', 'sms_body' => 'Short text'], ['sent', 'failed', 'pending']);
+
+    $this->actingAs($manager)->get(route('events.messages.index', $event))
+        ->assertOk()
+        ->assertSee('Older note')
+        ->assertSee('Latest announcement')
+        ->assertSee('Inbox email body')
+        ->assertSee('Short text')
+        ->assertSee('Mailbox unavailable')
+        ->assertSee('Retry 1 failed')
+        ->assertSee('messageProgress(', false)
+        ->assertSee('messages\/'.$latest->id.'\/progress', false);
+});
+
+it('opens a chosen message and filters and searches the message list', function () {
+    $company = Company::create(['name' => 'Filter Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $emailOnly = inboxMessage($event, ['subject' => 'Venue change'], ['sent']);
+    $smsOnly = inboxMessage($event, ['subject' => null, 'email_body' => null, 'sms_body' => 'Bring your badge'], ['sent']);
+    $failing = inboxMessage($event, ['subject' => 'Payment reminder'], ['failed']);
+
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'message' => $emailOnly->id]))
+        ->assertOk()->assertSee('Venue change');
+
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'filter' => 'sms']))
+        ->assertOk()->assertSee('Bring your badge')->assertDontSee('Venue change');
+
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'filter' => 'failed']))
+        ->assertOk()->assertSee('Payment reminder')->assertDontSee('Venue change');
+
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'q' => 'BADGE']))
+        ->assertOk()->assertSee('Bring your badge')->assertDontSee('Payment reminder');
+});
+
+it('sends people to the inbox when they open the old message detail address', function () {
+    $company = Company::create(['name' => 'Redirect Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $message = inboxMessage($event);
+
+    $this->actingAs($manager)->get(route('events.messages.show', [$event, $message]))
+        ->assertRedirect(route('events.messages.index', ['event' => $event, 'message' => $message->id]));
+});
+
+it('reports live delivery counts for a message', function () {
+    $company = Company::create(['name' => 'Progress Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $message = inboxMessage($event, [], ['sent', 'sent', 'failed', 'pending', 'skipped']);
+
+    $this->actingAs($manager)->getJson(route('events.messages.progress', [$event, $message]))
+        ->assertOk()
+        ->assertExactJson(['sent' => 2, 'failed' => 1, 'skipped' => 1, 'pending' => 1]);
+});
+
+it('retries only the failed deliveries of a message', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Retry Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $message = inboxMessage($event, [], ['sent', 'failed', 'failed']);
+
+    $this->actingAs($manager)->post(route('events.messages.retry', [$event, $message]))
+        ->assertRedirect(route('events.messages.index', ['event' => $event, 'message' => $message->id]));
+
+    $statuses = $message->recipients()->orderBy('id')->pluck('status')->all();
+    expect($statuses)->toBe(['sent', 'sent', 'sent'])
+        ->and($message->recipients()->whereNotNull('error_message')->count())->toBe(0);
+});
+
+it('keeps message progress, retry and the inbox away from other companies and ushers', function () {
+    $company = Company::create(['name' => 'Private Co']);
+    $other = Company::create(['name' => 'Snoop Co']);
+    $event = customMessageEvent($company);
+    $message = inboxMessage($event, [], ['failed']);
+    $outsider = customMessageManager($other);
+    $usher = User::factory()->create(['company_id' => $company->id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+
+    foreach ([$outsider, $usher] as $user) {
+        $this->actingAs($user)->get(route('events.messages.index', $event))->assertForbidden();
+        $this->actingAs($user)->getJson(route('events.messages.progress', [$event, $message]))->assertForbidden();
+        $this->actingAs($user)->post(route('events.messages.retry', [$event, $message]))->assertForbidden();
+    }
+});
+
+it('shows a message from another event as not found instead of leaking it', function () {
+    $company = Company::create(['name' => 'Cross Event Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $otherEvent = customMessageEvent($company);
+    $foreign = inboxMessage($otherEvent, ['subject' => 'Secret subject']);
+
+    $this->actingAs($manager)->getJson(route('events.messages.progress', [$event, $foreign]))->assertNotFound();
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'message' => $foreign->id]))
+        ->assertOk()->assertDontSee('Secret subject');
 });
 
 it('prevents an usher and a cross-company manager from composing messages', function () {
