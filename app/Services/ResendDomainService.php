@@ -13,15 +13,43 @@ class ResendDomainService
             throw new RuntimeException('Resend is not configured. Add RESEND_API_KEY before starting domain setup.');
         }
 
-        $domain = Resend::domains()->create([
-            'name' => $domainName,
-            'capabilities' => [
-                'sending' => 'enabled',
-                'receiving' => 'disabled',
-            ],
-        ]);
+        try {
+            $domain = Resend::domains()->create([
+                'name' => $domainName,
+                'capabilities' => [
+                    'sending' => 'enabled',
+                    'receiving' => 'disabled',
+                ],
+            ]);
+        } catch (\Throwable $exception) {
+            // Resend rejects a domain that already exists in our account (e.g. from an
+            // earlier attempt that was never saved locally). Adopt it instead of failing,
+            // otherwise the company is left with no domain ID and can never be verified.
+            $existing = $this->findExisting($domainName);
+            if (! $existing) {
+                throw $exception;
+            }
+
+            $domain = Resend::domains()->get($existing->id);
+        }
 
         return $this->domainData($domain);
+    }
+
+    private function findExisting(string $domainName): ?object
+    {
+        try {
+            foreach ((Resend::domains()->list()->data ?? []) as $domain) {
+                $domain = (object) $domain;
+                if (strcasecmp($domain->name, $domainName) === 0) {
+                    return $domain;
+                }
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
     }
 
     public function checkVerification(string $domainId): array
