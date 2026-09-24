@@ -60,7 +60,10 @@ class ResendDomainService
 
         $domain = Resend::domains()->get($domainId);
 
-        if ($domain->status !== 'verified') {
+        // Resend keeps re-checking a pending domain by itself. Asking it to restart
+        // verification resets records that were part-way through, so only do that once
+        // a check has actually failed (or never started).
+        if (in_array($domain->status, ['not_started', 'failed', 'partially_failed', 'temporary_failure'], true)) {
             Resend::domains()->verify($domainId);
             $domain = Resend::domains()->get($domainId);
         }

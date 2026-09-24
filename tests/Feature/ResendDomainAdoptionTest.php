@@ -29,6 +29,24 @@ it('adopts a domain that already exists in the Resend account instead of failing
         ->and($result['records'])->toHaveCount(1);
 });
 
+it('does not restart verification while Resend is still checking a pending domain', function () {
+    $domains = Mockery::mock();
+    $domains->shouldReceive('get')->with('dom_123')->once()->andReturn((object) ['id' => 'dom_123', 'name' => 'tacmail.org', 'status' => 'pending', 'records' => []]);
+    $domains->shouldReceive('verify')->never();
+    Resend::shouldReceive('domains')->andReturn($domains);
+
+    expect(app(ResendDomainService::class)->checkVerification('dom_123')['status'])->toBe('pending');
+});
+
+it('restarts verification once Resend reports a failed check', function () {
+    $domains = Mockery::mock();
+    $domains->shouldReceive('get')->with('dom_123')->twice()->andReturn((object) ['id' => 'dom_123', 'name' => 'tacmail.org', 'status' => 'failed', 'records' => []]);
+    $domains->shouldReceive('verify')->with('dom_123')->once();
+    Resend::shouldReceive('domains')->andReturn($domains);
+
+    expect(app(ResendDomainService::class)->checkVerification('dom_123')['status'])->toBe('failed');
+});
+
 it('still fails when creation fails and the domain is not in the account', function () {
     $domains = Mockery::mock();
     $domains->shouldReceive('create')->once()->andThrow(new RuntimeException('Resend is down'));
