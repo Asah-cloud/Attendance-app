@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -107,7 +108,11 @@ class CustomMessageController extends Controller
 
         $recipients = $this->deduplicate($recipients);
 
-        abort_if($recipients->isEmpty(), 422, 'Add at least one recipient before sending.');
+        if ($recipients->isEmpty()) {
+            throw ValidationException::withMessages([
+                'participant_ids' => 'No recipients found. Tick at least one registrant, or upload a file with a Name in the first column of each row.',
+            ]);
+        }
 
         $message = $event->customMessages()->create([
             'company_id' => $event->company_id,

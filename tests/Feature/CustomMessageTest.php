@@ -231,6 +231,23 @@ it('never attaches files to an SMS send, only to email', function () {
     Notification::assertSentTo($smsRow, CustomAttendeeMessage::class, fn ($notification) => $notification->toArkesel($notification) === 'SMS text');
 });
 
+it('sends the manager back to the form with a message when no recipients were chosen', function () {
+    $company = Company::create(['name' => 'Empty Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+
+    $this->actingAs($manager)
+        ->from(route('events.messages.create', $event))
+        ->post(route('events.messages.store', $event), [
+            'sms_body' => 'Hello',
+            'mode' => 'sms_only',
+        ])
+        ->assertRedirect(route('events.messages.create', $event))
+        ->assertSessionHasErrors('participant_ids');
+
+    expect($event->customMessages()->count())->toBe(0);
+});
+
 it('prevents an usher and a cross-company manager from composing messages', function () {
     $company = Company::create(['name' => 'Guarded Co']);
     $otherCompany = Company::create(['name' => 'Other Co']);
