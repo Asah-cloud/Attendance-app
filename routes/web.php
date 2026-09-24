@@ -156,6 +156,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::get('/events/{event}/messages/create', [CustomMessageController::class, 'create'])->name('events.messages.create');
     Route::post('/events/{event}/messages', [CustomMessageController::class, 'store'])->name('events.messages.store');
     Route::get('/events/{event}/messages/{message}', [CustomMessageController::class, 'show'])->name('events.messages.show');
+    Route::get('/events/{event}/messages/{message}/edit', [CustomMessageController::class, 'edit'])->name('events.messages.edit');
+    Route::post('/events/{event}/messages/{message}/resend', [CustomMessageController::class, 'resend'])->name('events.messages.resend');
     // Reporting & Exports
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
     Route::get('/reports/event/{event}/excel/{day?}', [ReportController::class, 'exportExcel'])->name('reports.excel');

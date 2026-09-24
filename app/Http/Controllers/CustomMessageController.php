@@ -43,22 +43,42 @@ class CustomMessageController extends Controller
     {
         $this->authorize('manageMessages', $event);
 
-        $registrants = $event->registrations()
-            ->whereIn('status', ['confirmed', 'pending', 'waitlisted', 'awaiting_confirmation'])
-            ->with('participant')
-            ->get()
-            ->pluck('participant')
-            ->filter()
-            ->unique('id')
-            ->sortBy('name')
-            ->values();
+        $registrants = $this->registrantsFor($event);
 
         return view('events.messages.create', compact('event', 'registrants'));
+    }
+
+    public function edit(Event $event, CustomMessage $message): View
+    {
+        $this->authorize('manageMessages', $event);
+        abort_unless($message->event_id === $event->id, 404);
+
+        $registrants = $this->registrantsFor($event);
+        $selectedParticipantIds = $message->recipients()->whereNotNull('participant_id')->distinct()->pluck('participant_id')->all();
+        $seedRecipients = $message->recipients()->whereNull('participant_id')->get()
+            ->unique(fn (CustomMessageRecipient $recipient) => strtolower(trim((string) $recipient->email)).'|'.preg_replace('/\D+/', '', (string) $recipient->phone))
+            ->map(fn (CustomMessageRecipient $recipient) => ['name' => $recipient->name, 'email' => $recipient->email, 'phone' => $recipient->phone])->values();
+
+        return view('events.messages.create', compact('event', 'registrants', 'message', 'selectedParticipantIds', 'seedRecipients'));
+    }
+
+    public function resend(Request $request, Event $event, CustomMessage $message): RedirectResponse
+    {
+        $this->authorize('manageMessages', $event);
+        abort_unless($message->event_id === $event->id, 404);
+
+        return $this->send($request, $event, $message);
     }
 
     public function store(Request $request, Event $event): RedirectResponse
     {
         $this->authorize('manageMessages', $event);
+
+        return $this->send($request, $event);
+    }
+
+    private function send(Request $request, Event $event, ?CustomMessage $source = null): RedirectResponse
+    {
 
         $validated = $request->validate([
             'subject' => ['nullable', 'string', 'max:255'],
@@ -67,6 +87,8 @@ class CustomMessageController extends Controller
             'mode' => ['required', Rule::in(CustomMessageService::MODES)],
             'participant_ids' => ['array'],
             'participant_ids.*' => ['integer'],
+            'recipient_keys' => ['array'],
+            'recipient_keys.*' => ['integer'],
             'recipients_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:5120'],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,csv,txt'],
@@ -75,6 +97,11 @@ class CustomMessageController extends Controller
         $recipients = collect();
 
         if (! empty($validated['participant_ids'])) {
+            if ($source) {
+                $allowedParticipantIds = $source->recipients()->whereNotNull('participant_id')->distinct()->pluck('participant_id')->all();
+                $requestedIds = array_map('intval', $validated['participant_ids']);
+                abort_unless(empty(array_diff($requestedIds, $allowedParticipantIds)), 422);
+            }
             Participant::query()
                 ->where('company_id', $event->company_id)
                 ->whereIn('id', $validated['participant_ids'])
@@ -106,11 +133,22 @@ class CustomMessageController extends Controller
             }
         }
 
+        if ($source && $request->has('recipient_keys')) {
+            $selectedIds = collect($validated['recipient_keys'] ?? [])->map(fn ($id) => (int) $id)->all();
+            $allowedIds = $source->recipients()->whereNull('participant_id')->pluck('id')->all();
+            abort_unless(empty(array_diff($selectedIds, $allowedIds)), 422);
+            $source->recipients()->whereNull('participant_id')->whereIn('id', $selectedIds)->get()
+                ->unique(fn (CustomMessageRecipient $recipient) => strtolower(trim((string) $recipient->email)).'|'.preg_replace('/\D+/', '', (string) $recipient->phone))
+                ->each(fn (CustomMessageRecipient $recipient) => $recipients->push([
+                    'participant_id' => null, 'name' => $recipient->name, 'email' => $recipient->email, 'phone' => $recipient->phone,
+                ]));
+        }
+
         $recipients = $this->deduplicate($recipients);
 
         if ($recipients->isEmpty()) {
             throw ValidationException::withMessages([
-                'participant_ids' => 'No recipients found. Tick at least one registrant, or upload a file with a Name in the first column of each row.',
+                'participant_ids' => $source ? 'Select at least one recipient to resend this message to.' : 'No recipients found. Tick at least one registrant, or upload a file with a Name in the first column of each row.',
             ]);
         }
 
@@ -131,6 +169,8 @@ class CustomMessageController extends Controller
                 $stored[] = ['path' => $path, 'name' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()];
             }
             $message->update(['attachments' => $stored]);
+        } elseif ($source && ! empty($source->attachments)) {
+            $message->update(['attachments' => $source->attachments]);
         }
 
         $hasEmailBody = filled($validated['email_body'] ?? null);
@@ -167,7 +207,14 @@ class CustomMessageController extends Controller
         }
 
         return redirect()->route('events.messages.show', [$event, $message])
-            ->with('success', "Message queued for {$recipients->count()} recipients.");
+            ->with('success', ($source ? 'Resend queued' : 'Message queued')." for {$recipients->count()} recipients.");
+    }
+
+    private function registrantsFor(Event $event): Collection
+    {
+        return $event->registrations()
+            ->whereIn('status', ['confirmed', 'pending', 'waitlisted', 'awaiting_confirmation'])
+            ->with('participant')->get()->pluck('participant')->filter()->unique('id')->sortBy('name')->values();
     }
 
     public function show(Event $event, CustomMessage $message): View

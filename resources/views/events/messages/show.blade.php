@@ -8,7 +8,7 @@
                 <h1 class="mt-1 text-2xl font-black text-slate-900">{{ $message->subject ?: '(no subject)' }}</h1>
                 <p class="mt-1 text-xs text-slate-400">Sent {{ $message->created_at->format('M d, Y H:i') }} by {{ $message->creator?->name ?? 'a manager' }} · {{ str_replace('_', ' ', $message->mode) }} mode</p>
             </div>
-            <a href="{{ route('events.messages.index', $event) }}" class="text-xs font-bold text-slate-500 underline">Back to history</a>
+            <div class="flex items-center gap-4"><a href="{{ route('events.messages.edit', [$event, $message]) }}" class="rounded-xl bg-blue-900 px-4 py-2 text-xs font-black uppercase tracking-wide text-white">Edit &amp; resend</a><a href="{{ route('events.messages.index', $event) }}" class="text-xs font-bold text-slate-500 underline">Back to history</a></div>
         </div>
 
         <div class="mb-8 grid gap-6 md:grid-cols-2">
@@ -38,6 +38,10 @@
             <h2 class="text-lg font-black text-slate-900">Recipients <span class="ml-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-700">{{ $recipients->count() }}</span></h2>
             <p class="text-xs text-slate-400">One card per person</p>
         </div>
+        <form id="resend-selected" method="POST" action="{{ route('events.messages.resend', [$event, $message]) }}" class="space-y-4">
+            @csrf
+            <input type="hidden" name="subject" value="{{ $message->subject }}"><input type="hidden" name="email_body" value="{{ $message->email_body }}"><input type="hidden" name="sms_body" value="{{ $message->sms_body }}"><input type="hidden" name="mode" value="{{ $message->mode }}">
+            <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-slate-500">Choose recipients to resend this message to.</p><button type="submit" class="rounded-xl bg-blue-900 px-4 py-2 text-xs font-black uppercase tracking-wide text-white">Resend selected</button></div>
         <div class="grid gap-4 sm:grid-cols-2">
             @forelse($recipients as $channels)
                 @php($person = $channels->first())
@@ -48,9 +52,13 @@
                             <p class="mt-1 break-all text-xs text-slate-500">{{ $person->email ?: '—' }}</p>
                             @if($person->phone)<p class="mt-0.5 text-xs text-slate-500">{{ $person->phone }}</p>@endif
                         </div>
+                        <div class="flex items-center gap-2">
+                            @if($person->participant_id)<label class="flex items-center gap-1 text-[10px] font-bold text-blue-700"><input type="checkbox" name="participant_ids[]" value="{{ $person->participant_id }}" class="rounded border-slate-300"> Resend</label>@endif
+                            @if(!$person->participant_id)<label class="flex items-center gap-1 text-[10px] font-bold text-blue-700"><input type="checkbox" name="recipient_keys[]" value="{{ $person->id }}" class="rounded border-slate-300"> Resend</label>@endif
                         <button type="button" @click="open = false" aria-label="Close {{ $person->name }} card" class="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700">
                             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                         </button>
+                        </div>
                     </div>
                     <div class="space-y-2 p-4">
                         @foreach($channels as $recipient)
@@ -66,5 +74,6 @@
                 <div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">No recipients.</div>
             @endforelse
         </div>
+        </form>
     </div>
 </x-app-layout>

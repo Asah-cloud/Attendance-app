@@ -36,7 +36,7 @@
                             </div>
                         </td>
                         <td class="px-5 py-4 text-xs text-slate-500">{{ $message->created_at->format('M d, Y H:i') }}</td>
-                        <td class="px-5 py-4"><a href="{{ route('events.messages.show', [$event, $message]) }}" class="text-xs font-bold text-blue-700">View</a></td>
+                        <td class="px-5 py-4"><div class="flex gap-3"><a href="{{ route('events.messages.show', [$event, $message]) }}" class="text-xs font-bold text-blue-700">View</a><a href="{{ route('events.messages.edit', [$event, $message]) }}" class="text-xs font-bold text-slate-600">Edit &amp; resend</a></div></td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="px-5 py-12 text-center text-slate-500">No custom messages sent yet.</td></tr>
