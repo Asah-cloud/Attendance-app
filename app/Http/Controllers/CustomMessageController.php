@@ -175,7 +175,16 @@ class CustomMessageController extends Controller
         $this->authorize('manageMessages', $event);
         abort_unless($message->event_id === $event->id, 404);
 
-        $recipients = $message->recipients()->orderBy('name')->paginate(50);
+        $recipients = $message->recipients()
+            ->orderBy('name')
+            ->get()
+            ->groupBy(fn (CustomMessageRecipient $recipient) => $recipient->participant_id
+                ? 'participant:'.$recipient->participant_id
+                : ($recipient->email ? 'email:'.strtolower(trim($recipient->email))
+                    : ($recipient->phone ? 'phone:'.preg_replace('/\D+/', '', $recipient->phone)
+                        : 'recipient:'.$recipient->id)))
+            ->map(fn (Collection $channels) => $channels->sortBy(fn (CustomMessageRecipient $recipient) => $recipient->channel === 'mail' ? 0 : 1)->values())
+            ->values();
 
         return view('events.messages.show', compact('event', 'message', 'recipients'));
     }

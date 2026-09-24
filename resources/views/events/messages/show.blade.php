@@ -33,28 +33,38 @@
             @endif
         </div>
 
-        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
-            <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-500">
-                <tr><th class="px-5 py-4">Name</th><th class="px-5 py-4">Contact</th><th class="px-5 py-4">Channel</th><th class="px-5 py-4">Status</th></tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                @forelse($recipients as $recipient)
-                    @php($statusColors = ['sent' => 'bg-green-100 text-green-700', 'pending' => 'bg-amber-100 text-amber-700', 'failed' => 'bg-red-100 text-red-700', 'skipped' => 'bg-slate-100 text-slate-600'])
-                    <tr>
-                        <td class="px-5 py-4 font-bold text-slate-800">{{ $recipient->name }}</td>
-                        <td class="px-5 py-4 text-xs text-slate-500">{{ $recipient->email ?: '—' }} · {{ $recipient->phone ?: '—' }}</td>
-                        <td class="px-5 py-4 text-xs font-bold uppercase text-slate-500">{{ $recipient->channel === 'sms' ? 'SMS' : ($recipient->channel === 'mail' ? 'Email' : '—') }}</td>
-                        <td class="px-5 py-4">
-                            <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide {{ $statusColors[$recipient->status] ?? 'bg-gray-100 text-gray-600' }}">{{ $recipient->status }}</span>
-                            @if($recipient->error_message)<p class="mt-1 max-w-xs text-[10px] text-red-500">{{ $recipient->error_message }}</p>@endif
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="4" class="px-5 py-12 text-center text-slate-500">No recipients.</td></tr>
-                @endforelse
-            </tbody>
-        </table></div></div>
-
-        @if($recipients->hasPages())<div class="mt-6">{{ $recipients->links() }}</div>@endif
+        @php($statusColors = ['sent' => 'bg-emerald-100 text-emerald-700', 'pending' => 'bg-amber-100 text-amber-700', 'failed' => 'bg-rose-100 text-rose-700', 'skipped' => 'bg-slate-100 text-slate-600'])
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-black text-slate-900">Recipients <span class="ml-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-700">{{ $recipients->count() }}</span></h2>
+            <p class="text-xs text-slate-400">One card per person</p>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            @forelse($recipients as $channels)
+                @php($person = $channels->first())
+                <article x-data="{ open: true }" x-show="open" x-transition class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4">
+                        <div class="min-w-0">
+                            <h3 class="truncate font-black text-slate-900">{{ $person->name }}</h3>
+                            <p class="mt-1 break-all text-xs text-slate-500">{{ $person->email ?: '—' }}</p>
+                            @if($person->phone)<p class="mt-0.5 text-xs text-slate-500">{{ $person->phone }}</p>@endif
+                        </div>
+                        <button type="button" @click="open = false" aria-label="Close {{ $person->name }} card" class="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-2 p-4">
+                        @foreach($channels as $recipient)
+                            <div class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                                <span class="text-xs font-bold text-slate-600">{{ $recipient->channel === 'sms' ? 'SMS' : ($recipient->channel === 'mail' ? 'Email' : 'No channel') }}</span>
+                                <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide {{ $statusColors[$recipient->status] ?? 'bg-gray-100 text-gray-600' }}">{{ $recipient->status }}</span>
+                            </div>
+                            @if($recipient->error_message)<p class="px-1 text-xs text-rose-600">{{ $recipient->error_message }}</p>@endif
+                        @endforeach
+                    </div>
+                </article>
+            @empty
+                <div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">No recipients.</div>
+            @endforelse
+        </div>
     </div>
 </x-app-layout>
