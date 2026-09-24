@@ -46,6 +46,17 @@ it('classifies Ghana numbers correctly and leaves everything else foreign', func
         ->and(PhoneNumberService::toArkeselFormat('+14155552671'))->toBeNull();
 });
 
+it('treats Ghana numbers whose leading zero was dropped by a spreadsheet as Ghana numbers', function () {
+    expect(PhoneNumberService::isGhanaNumber('509651270'))->toBeTrue()
+        ->and(PhoneNumberService::isGhanaNumber('556689548'))->toBeTrue()
+        ->and(PhoneNumberService::isGhanaNumber('241234567'))->toBeTrue()
+        ->and(PhoneNumberService::toArkeselFormat('509651270'))->toBe('233509651270')
+        ->and(PhoneNumberService::toArkeselFormat('00233241234567'))->toBe('233241234567')
+        ->and(PhoneNumberService::isGhanaNumber('+509651270'))->toBeFalse()
+        ->and(PhoneNumberService::isGhanaNumber('141555526'))->toBeFalse()
+        ->and(PhoneNumberService::isGhanaNumber('24123456'))->toBeFalse();
+});
+
 it('routes Ghana numbers to SMS and foreign numbers to email in smart mode', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Smart Co']);
