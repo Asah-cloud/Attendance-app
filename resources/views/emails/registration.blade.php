@@ -40,6 +40,7 @@
                             @foreach($lines as $line)
                                 <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#334155;">{{ $line }}</p>
                             @endforeach
+                            @if(!empty($actionUrl))
                             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0;">
                                 <tr>
                                     <td style="border-radius:10px;background-color:#2563eb;">
@@ -47,6 +48,7 @@
                                     </td>
                                 </tr>
                             </table>
+                            @endif
                             <p style="margin:0;font-size:13px;color:#64748b;">{{ $salutation }}</p>
                         </td>
                     </tr>

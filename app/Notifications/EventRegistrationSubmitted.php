@@ -48,9 +48,7 @@ class EventRegistrationSubmitted extends Notification implements ShouldQueue
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
-        return $company?->approvedEmailFromAddress()
-            ? $mail->from($company->approvedEmailFromAddress(), $company->email_from_name ?: $company->name)
-            : $mail;
+        return $company ? $company->applyEmailIdentity($mail) : $mail;
     }
 
     public function toArkesel(object $notifiable): string

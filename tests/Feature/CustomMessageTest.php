@@ -10,6 +10,7 @@ use App\Notifications\Channels\ArkeselChannel;
 use App\Notifications\CustomAttendeeMessage;
 use App\Services\PhoneNumberService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -119,6 +120,49 @@ it('uses the company\'s approved email and SMS sender identities when set', func
 
         return $mail->from === ['events@brandedco.com', 'Branded Co Events'];
     });
+});
+
+it('sends under the company name with replies to the company while its own address is unverified', function () {
+    Notification::fake();
+    config(['app.name' => 'Asah Apex Attendance', 'mail.from.address' => 'attendace@updates.asah-apex.com']);
+    $company = Company::create([
+        'name' => 'Pending Church',
+        'email_from_address' => 'events@pendingchurch.org',
+        'email_from_name' => 'Pending Church Events',
+        'email_sender_status' => 'pending',
+    ]);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $person = Participant::create(['company_id' => $company->id, 'name' => 'Foreign Person', 'email' => 'foreign@example.com', 'phone' => '+14155552671']);
+    $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'subject' => 'Hello',
+        'email_body' => "First paragraph\n\nSecond paragraph",
+        'mode' => 'email_only',
+        'participant_ids' => [$person->id],
+    ])->assertRedirect();
+
+    $row = CustomMessageRecipient::where('participant_id', $person->id)->firstOrFail();
+
+    Notification::assertSentTo($row, CustomAttendeeMessage::class, function ($notification, $channels, $notifiable) {
+        $mail = $notification->toMail($notifiable);
+        $html = (string) $mail->render();
+
+        return $mail->from === ['attendace@updates.asah-apex.com', 'Pending Church Events']
+            && $mail->replyTo === [['events@pendingchurch.org', 'Pending Church Events']]
+            && str_contains($html, 'Pending Church')
+            && str_contains($html, 'Second paragraph')
+            && ! str_contains($html, 'Asah Apex');
+    });
+});
+
+it('leaves the sender alone for a company that has not set an email address', function () {
+    $company = Company::create(['name' => 'Plain Co']);
+
+    $mail = $company->applyEmailIdentity(new MailMessage);
+
+    expect($mail->from)->toBe([])->and($mail->replyTo)->toBe([]);
 });
 
 it('skips foreign numbers entirely in sms-only mode instead of falling back to email', function () {

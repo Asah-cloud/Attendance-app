@@ -48,9 +48,7 @@ class RegistrationLifecycleNotification extends Notification implements ShouldQu
                 'salutation' => 'Warm regards, '.$organization,
             ]);
 
-        return $company?->approvedEmailFromAddress()
-            ? $mail->from($company->approvedEmailFromAddress(), $company->email_from_name ?: $company->name)
-            : $mail;
+        return $company ? $company->applyEmailIdentity($mail) : $mail;
     }
 
     public function smsSenderId(): ?string

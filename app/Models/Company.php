@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class Company extends Model
 {
@@ -114,6 +115,28 @@ class Company extends Model
     public function approvedEmailFromAddress(): ?string
     {
         return $this->email_sender_status === 'approved' ? $this->email_from_address : null;
+    }
+
+    /**
+     * Sender identity for an outgoing email. Once the company's own address is
+     * verified it is used directly. While it is still pending, the email goes out
+     * through the platform's verified address but is shown under the company's
+     * name, with replies routed to the company's own address, so recipients see
+     * the organisation rather than the platform.
+     */
+    public function applyEmailIdentity(MailMessage $mail): MailMessage
+    {
+        $name = $this->email_from_name ?: $this->name;
+
+        if ($approved = $this->approvedEmailFromAddress()) {
+            return $mail->from($approved, $name);
+        }
+
+        if ($this->email_from_address) {
+            $mail->from(config('mail.from.address'), $name)->replyTo($this->email_from_address, $name);
+        }
+
+        return $mail;
     }
 
     public function approvedSmsSenderId(): ?string

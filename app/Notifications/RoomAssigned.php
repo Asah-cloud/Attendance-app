@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\RoomAssignment;
 use App\Notifications\Concerns\UsesAttendanceChannels;
+use App\Services\CompanyMail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -20,17 +21,20 @@ class RoomAssigned extends Notification implements ShouldQueue
         $this->assignment->loadMissing(['registration.event.company', 'room.floor.block.site']);
         $event = $this->assignment->registration->event;
         $site = $this->assignment->room->floor->block->site;
-        $mail = (new MailMessage)->subject('Your room for '.$event->title)
-            ->greeting('Hello '.$notifiable->name.'!')
-            ->line('Your accommodation has been assigned.')
-            ->line('Room: '.$this->assignment->room->label())
-            ->when($site->address, fn ($message) => $message->line('Address: '.$site->address))
-            ->when($site->check_in_instructions, fn ($message) => $message->line('Check-in: '.$site->check_in_instructions))
-            ->action('View room and registration', route('registrations.confirmation', $this->assignment->registration->management_token));
 
-        $company = $event->company;
-
-        return $company?->approvedEmailFromAddress() ? $mail->from($company->approvedEmailFromAddress(), $company->email_from_name ?: $company->name) : $mail;
+        return CompanyMail::make(
+            $event,
+            'Your room for '.$event->title,
+            'Hello '.$notifiable->name.'!',
+            [
+                'Your accommodation has been assigned.',
+                'Room: '.$this->assignment->room->label(),
+                $site->address ? 'Address: '.$site->address : null,
+                $site->check_in_instructions ? 'Check-in: '.$site->check_in_instructions : null,
+            ],
+            'View room and registration',
+            route('registrations.confirmation', $this->assignment->registration->management_token),
+        );
     }
 
     public function toArkesel(object $notifiable): string

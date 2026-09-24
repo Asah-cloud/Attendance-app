@@ -192,7 +192,8 @@ it('notifies managers once when Resend reports a verification failure', function
     expect($company->fresh()->resend_failure_notice_sent_at)->not->toBeNull();
 });
 
-it('uses an approved company email identity and otherwise keeps the platform default', function () {
+it('uses an approved company email identity and, while pending, sends under the company name with replies to the company', function () {
+    config(['mail.from.address' => 'platform@updates.example.test']);
     $company = Company::create([
         'name' => 'Acme',
         'email_from_name' => 'Acme Events',
@@ -206,7 +207,9 @@ it('uses an approved company email identity and otherwise keeps the platform def
 
     $company->update(['email_sender_status' => 'pending']);
     [, $pendingNotification] = messagingNotification($company);
-    expect($pendingNotification->toMail($participant)->from)->toBeEmpty();
+    $pendingMail = $pendingNotification->toMail($participant);
+    expect($pendingMail->from)->toBe(['platform@updates.example.test', 'Acme Events'])
+        ->and($pendingMail->replyTo)->toBe([['events@acme.test', 'Acme Events']]);
 });
 
 it('uses an approved company SMS sender ID and falls back while pending', function () {

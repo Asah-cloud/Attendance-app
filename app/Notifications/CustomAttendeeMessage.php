@@ -2,7 +2,9 @@
 
 namespace App\Notifications;
 
+use App\Models\Event;
 use App\Notifications\Channels\ArkeselChannel;
+use App\Services\CompanyMail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -23,9 +25,8 @@ class CustomAttendeeMessage extends Notification
         public string $body,
         public ?string $subject,
         private string $channel,
+        private Event $event,
         private ?string $smsSenderId = null,
-        private ?string $fromEmail = null,
-        private ?string $fromName = null,
         private array $attachments = [],
     ) {}
 
@@ -36,11 +37,12 @@ class CustomAttendeeMessage extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $mail = (new MailMessage)->subject($this->subject ?: 'A message for you');
-
-        foreach (preg_split('/\r?\n/', trim($this->body)) as $line) {
-            $mail->line($line);
-        }
+        $mail = CompanyMail::make(
+            $this->event,
+            $this->subject ?: 'A message for you',
+            'Hello '.$notifiable->name.'!',
+            preg_split('/\r?\n/', trim($this->body)),
+        );
 
         foreach ($this->attachments as $attachment) {
             $mail->attach(Storage::disk('local')->path($attachment['path']), [
@@ -49,7 +51,7 @@ class CustomAttendeeMessage extends Notification
             ]);
         }
 
-        return $this->fromEmail ? $mail->from($this->fromEmail, $this->fromName) : $mail;
+        return $mail;
     }
 
     public function smsSenderId(): ?string
