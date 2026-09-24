@@ -5,6 +5,8 @@ namespace App\Livewire;
 use App\Models\Attendance;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use App\Services\StaffCheckInService;
+use App\Support\Search;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
@@ -143,7 +145,7 @@ class AttendanceSearch extends Component
                 'day' => $currentDay,
             ]);
             if ($this->mode === 'staff' || ((int) $currentDay === 1 && $this->participantsQuery()->findOrFail($participantId)->isNumberedParticipantStaff())) {
-                app(\App\Services\StaffCheckInService::class)->checkIn($participantId, auth()->id());
+                app(StaffCheckInService::class)->checkIn($participantId, auth()->id());
             }
         }
 
@@ -205,23 +207,8 @@ class AttendanceSearch extends Component
     public function render()
     {
         Gate::authorize('view', $this->event);
-        $words = explode(' ', trim($this->search));
-
         $users = $this->participantsQuery()
-            ->where(function ($q) use ($words) {
-                foreach ($words as $word) {
-                    if (! empty($word)) {
-                        $wordLower = '%'.strtolower($word).'%';
-                        $q->where(function ($sub) use ($wordLower) {
-                            $sub->whereRaw('LOWER(name) LIKE ?', [$wordLower])
-                                ->orWhere('phone', 'like', $wordLower)
-                                ->orWhereRaw('LOWER(category) LIKE ?', [$wordLower])
-                                ->orWhereRaw('LOWER(room_group) LIKE ?', [$wordLower])
-                                ->orWhereRaw('LOWER(department) LIKE ?', [$wordLower]);
-                        });
-                    }
-                }
-            })
+            ->tap(fn ($query) => Search::apply($query, $this->search, ['name', 'category', 'room_group', 'department'], ['phone']))
             ->paginate(15);
 
         // We automatically pass public properties to the view,

@@ -477,17 +477,22 @@
               : "All attendee fields fit without overlapping. Download a sample to check the print result.";
     });
     function filter() {
-        const search = $("attendee-search").value.toLocaleLowerCase(),
+        // Every word typed must appear in the name, in any order; stray spaces are ignored.
+        const words = $("attendee-search")
+                .value.toLocaleLowerCase()
+                .split(/\s+/)
+                .filter(Boolean),
             category = $("print-category").value;
         document
             .querySelectorAll("#attendee-list label")
-            .forEach((row) =>
+            .forEach((row) => {
+                const name = row.dataset.name.toLocaleLowerCase();
                 row.classList.toggle(
                     "hidden",
-                    !row.dataset.name.toLocaleLowerCase().includes(search) ||
+                    !words.every((word) => name.includes(word)) ||
                         (category && row.dataset.category !== category),
-                ),
-            );
+                );
+            });
         const visible = [
             ...document.querySelectorAll(
                 "#attendee-list label:not(.hidden) input",

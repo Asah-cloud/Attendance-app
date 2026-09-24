@@ -13,6 +13,7 @@ use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\MealStockLow;
 use App\Services\AuditApprovalService;
 use App\Services\EventRegistrationResolver;
+use App\Support\Search;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -178,9 +179,12 @@ class MealDistributionController extends Controller
             $search = trim($request->string('q')->toString());
             $matches = $event->registrations()
                 ->where('status', EventRegistration::STATUS_CONFIRMED)
-                ->whereHas('participant', fn ($query) => $query
-                    ->where('name', 'like', "%{$search}%")
-                    ->when(! $request->user()->isAudit(), fn ($q) => $q->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
+                ->whereHas('participant', fn ($query) => Search::apply(
+                    $query,
+                    $search,
+                    $request->user()->isAudit() ? ['name'] : ['name', 'email'],
+                    $request->user()->isAudit() ? [] : ['phone'],
+                ))
                 ->with(['participant', 'mealCollections' => fn ($query) => $query->where('meal_distribution_id', $meal->id)])
                 ->limit(10)
                 ->get();

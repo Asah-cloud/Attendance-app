@@ -44,7 +44,7 @@
 
                 <nav class="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Message filters">
                     @foreach($filters as $key => [$label, $iconPath])
-                        <a href="{{ route('events.messages.index', array_filter(['event' => $event, 'filter' => $key !== 'all' ? $key : null, 'q' => $search !== '' ? $search : null])) }}"
+                        <a href="{{ route('events.messages.index', array_filter(['event' => $event, 'filter' => $key !== 'all' ? $key : null])) }}"
                            title="{{ $label }}" @if($filter === $key) aria-current="page" @endif
                            class="relative flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-bold transition {{ $filter === $key ? 'bg-blue-100 text-blue-900' : 'text-slate-600 hover:bg-slate-100' }}"
                            :class="sidebar ? '' : 'lg:justify-center lg:px-0'">
@@ -60,16 +60,16 @@
             {{-- Messages: list and reading combined --}}
             <section class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex max-h-[calc(100vh-12rem)] min-h-[26rem] flex-col">
-                    <form method="GET" action="{{ route('events.messages.index', $event) }}" class="flex shrink-0 items-center gap-3 border-b border-slate-100 p-3">
+                    <form method="GET" action="{{ route('events.messages.index', $event) }}" data-live-search="#message-results" class="flex shrink-0 items-center gap-3 border-b border-slate-100 p-3">
                         @if($filter !== 'all')<input type="hidden" name="filter" value="{{ $filter }}">@endif
                         <div class="relative flex-1">
                             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
-                            <input type="search" name="q" value="{{ $search }}" placeholder="Search messages" class="w-full rounded-xl border-slate-200 bg-slate-50 py-2 pl-9 text-sm focus:bg-white">
+                            <input type="search" name="q" value="{{ $search }}" autocomplete="off" placeholder="Search messages" class="w-full rounded-xl border-slate-200 bg-slate-50 py-2 pl-9 text-sm focus:bg-white">
                         </div>
                         <span class="hidden shrink-0 text-xs font-bold text-slate-400 sm:block">{{ $messages->total() }} {{ \Illuminate\Support\Str::plural('message', $messages->total()) }}</span>
                     </form>
 
-                    <div class="min-h-0 flex-1 overflow-y-auto">
+                    <div id="message-results" class="min-h-0 flex-1 overflow-y-auto">
                         @if($selected && ! $selectedInList)
                             <div class="border-b border-blue-100 bg-blue-50/60">
                                 <div class="flex items-center justify-between gap-3 px-4 py-3">

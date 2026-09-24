@@ -13,8 +13,8 @@
         
         <div class="flex gap-2">
             <input type="text" 
-                   wire:model.live="search" 
-                   placeholder="Search name or email..." 
+                   wire:model.live.debounce.300ms="search"
+                   placeholder="Search name, email or phone..."
                    class="text-xs border-gray-200 rounded-xl focus:ring-blue-500 w-64 shadow-sm">
             
             <button type="button" wire:click="searchNow" wire:loading.attr="disabled" wire:target="searchNow" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:cursor-wait disabled:opacity-60">

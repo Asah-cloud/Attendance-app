@@ -7,6 +7,7 @@ use App\Models\AttendeePricingTier;
 use App\Models\Company;
 use App\Models\Event;
 use App\Services\AttendeePricingTierParser;
+use App\Support\Search;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ class CompanyPricingController extends Controller
     public function index(Request $request): View
     {
         $companies = Company::query()
-            ->when($request->string('search')->trim()->value(), fn ($query, $search) => $query->where('name', 'like', "%{$search}%"))
+            ->when($request->string('search')->trim()->value(), fn ($query, $search) => Search::apply($query, $search, ['name']))
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();

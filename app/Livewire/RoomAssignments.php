@@ -6,6 +6,7 @@ use App\Models\AccommodationRoom;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Services\RoomAllocationService;
+use App\Support\Search;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -98,12 +99,13 @@ class RoomAssignments extends Component
         $registrations = $this->event->registrations()
             ->with(['participant', 'roomAssignment.room.floor.block.site'])
             ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->when($this->search !== '', function ($query) {
-                $term = '%'.strtolower(trim($this->search)).'%';
-                $query->where(function ($sub) use ($term) {
-                    $sub->whereHas('participant', fn ($p) => $p->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(email) LIKE ?', [$term]))
-                        ->orWhereHas('roomAssignment.room', fn ($r) => $r->whereRaw('LOWER(name) LIKE ?', [$term]));
-                });
+            ->when(trim($this->search) !== '', function ($query) {
+                foreach (Search::words($this->search) as $word) {
+                    $query->where(function ($sub) use ($word) {
+                        $sub->whereHas('participant', fn ($p) => $p->where(fn ($group) => Search::matchWord($group, $word, ['name', 'email'])))
+                            ->orWhereHas('roomAssignment.room', fn ($r) => $r->where(fn ($group) => Search::matchWord($group, $word, ['name'])));
+                    });
+                }
             })
             ->when($this->unassignedOnly, fn ($q) => $q->whereDoesntHave('roomAssignment'))
             ->when($this->needsOnly, fn ($q) => $q->where('accommodation_required', true))

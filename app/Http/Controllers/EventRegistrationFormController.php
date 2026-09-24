@@ -15,6 +15,7 @@ use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
 use App\Support\BadgeDesign;
 use App\Support\Pdf\PdfQrCode;
+use App\Support\Search;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -44,18 +45,12 @@ class EventRegistrationFormController extends Controller
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search): void {
-                foreach (preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $term) {
-                    $like = '%'.mb_strtolower($term).'%';
-                    $query->where(function ($query) use ($like): void {
-                        $query->whereRaw('LOWER(registration_code) LIKE ?', [$like])
-                            ->orWhereHas('participant', function ($query) use ($like): void {
-                                $query->whereRaw('LOWER(name) LIKE ?', [$like])
-                                    ->orWhereRaw('LOWER(email) LIKE ?', [$like])
-                                    ->orWhere('phone', 'like', $like)
-                                    ->orWhereRaw('LOWER(member_id) LIKE ?', [$like])
-                                    ->orWhereRaw('LOWER(category) LIKE ?', [$like])
-                                    ->orWhereRaw('LOWER(gender) LIKE ?', [$like]);
-                            });
+                foreach (Search::words($search) as $word) {
+                    $query->where(function ($query) use ($word): void {
+                        Search::matchWord($query, $word, ['registration_code']);
+                        $query->orWhereHas('participant', fn ($participant) => $participant->where(
+                            fn ($group) => Search::matchWord($group, $word, ['name', 'email', 'member_id', 'category', 'gender'], ['phone'])
+                        ));
                     });
                 }
             })

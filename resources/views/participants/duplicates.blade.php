@@ -8,11 +8,12 @@
             <p class="mt-1 text-sm text-slate-500">Search for a name, phone, or email, select two records that are really the same person, and choose which one should survive. Their registrations, attendance history, and edit history all move to the record you keep.</p>
         </div>
 
-        <form method="GET" class="mb-6 flex gap-3">
-            <input type="text" name="q" value="{{ $query }}" placeholder="Search by name, phone, or email" class="w-full rounded-xl border-slate-200">
+        <form method="GET" data-live-search="#duplicate-results" class="mb-6 flex gap-3">
+            <input type="search" name="q" value="{{ $query }}" placeholder="Search by name, phone, or email" autocomplete="off" class="w-full rounded-xl border-slate-200">
             <button class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Search</button>
         </form>
 
+        <div id="duplicate-results">
         @if($query !== '')
             <form method="GET" action="{{ route('participants.duplicates.compare') }}">
                 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -36,6 +37,7 @@
                 @endif
             </form>
         @endif
+        </div>
 
         @if($company)
             <div class="mt-10 rounded-2xl border border-red-200 bg-red-50 p-6">

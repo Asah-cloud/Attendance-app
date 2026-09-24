@@ -18,9 +18,10 @@
             <div id="pending-badge" class="mt-3 hidden rounded-xl bg-slate-100 p-3 text-xs font-black text-slate-700">Pending sync: <span id="pending-count">0</span> <button type="button" id="sync-now" class="ml-2 underline">Sync now</button></div>
             <form id="manual-scan" class="mt-6 border-t border-slate-100 pt-6"><label for="registration-code" class="text-xs font-black uppercase text-slate-500">Registration code</label><div class="mt-3 flex flex-col gap-3 sm:flex-row"><input id="registration-code" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Scan or paste code" required><button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Issue portion</button></div></form>
 
-            <form method="GET" class="mt-7 border-t border-slate-100 pt-6"><label class="text-xs font-black uppercase text-slate-500">Find attendee manually</label><div class="mt-3 flex gap-3"><input name="q" value="{{ request('q') }}" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Participant name"><button class="rounded-xl border border-slate-200 px-5 py-3 text-sm font-extrabold">Search</button></div></form>
+            <form method="GET" data-live-search="#meal-search-results" class="mt-7 border-t border-slate-100 pt-6"><label class="text-xs font-black uppercase text-slate-500">Find attendee manually</label><div class="mt-3 flex gap-3"><input name="q" type="search" autocomplete="off" value="{{ request('q') }}" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Participant name"><button class="rounded-xl border border-slate-200 px-5 py-3 text-sm font-extrabold">Search</button></div></form>
             @if($errors->any())<p class="my-4 rounded-xl bg-red-50 p-4 text-red-700">{{ $errors->first() }}</p>@endif
             <p class="mt-4 text-sm"><a class="font-bold text-blue-700" href="{{ route('audit.approvals.index', $event) }}">Approval codes</a> — <a class="text-blue-700" href="{{ route('events.meals.index', $event) }}">Food dashboard</a></p>
+            <div id="meal-search-results">
             @if(request()->filled('q'))
             <div class="mt-4 divide-y rounded-xl border">
                 @forelse($matches as $registration)
@@ -49,6 +50,7 @@
                 @empty<p class="p-4">No confirmed participant found.</p>@endforelse
             </div>
             @endif
+            </div>
         </section>
 
         <livewire:meal-recent-collections :event="$event" :meal="$meal" />
@@ -75,9 +77,11 @@
                 stationSelect.addEventListener('change', () => localStorage.setItem(stationKey, stationSelect.value));
             }
 
-            document.querySelectorAll('.meal-action-form').forEach(form => form.addEventListener('submit', () => {
-                form.querySelector('.selected-station').value = stationSelect?.value || '';
-            }));
+            // Delegated, so it also covers result forms that a live search adds to the page later.
+            document.addEventListener('submit', event => {
+                const form = event.target.closest?.('.meal-action-form');
+                if (form) form.querySelector('.selected-station').value = stationSelect?.value || '';
+            });
 
             const showResult = (message, successful) => { result.classList.remove('hidden'); result.textContent = message; result.className = `mt-5 rounded-2xl p-5 font-bold ${successful ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`; };
 

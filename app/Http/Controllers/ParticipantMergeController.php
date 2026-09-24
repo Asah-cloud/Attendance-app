@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Participant;
 use App\Services\ParticipantMergeService;
 use App\Services\ParticipantRosterService;
+use App\Support\Search;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -20,11 +21,7 @@ class ParticipantMergeController extends Controller
         if ($query !== '') {
             $participants = Participant::query()
                 ->where('company_id', $request->user()->company_id)
-                ->where(function ($builder) use ($query) {
-                    $builder->where('name', 'like', "%{$query}%")
-                        ->orWhere('email', 'like', "%{$query}%")
-                        ->orWhere('phone', 'like', "%{$query}%");
-                })
+                ->tap(fn ($builder) => Search::apply($builder, $query, ['name', 'email'], ['phone']))
                 ->withCount(['registrations', 'attendances'])
                 ->orderBy('name')
                 ->limit(50)

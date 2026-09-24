@@ -10,6 +10,7 @@ use App\Models\Event;
 use App\Models\Participant;
 use App\Services\CustomMessageService;
 use App\Services\PhoneNumberService;
+use App\Support\Search;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,13 +34,7 @@ class CustomMessageController extends Controller
 
         $query = $event->customMessages()->withCount($this->statusCounts());
 
-        if ($search !== '') {
-            $like = '%'.mb_strtolower($search).'%';
-            $query->where(fn ($where) => $where
-                ->whereRaw('LOWER(subject) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(email_body) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(sms_body) LIKE ?', [$like]));
-        }
+        Search::apply($query, $search, ['subject', 'email_body', 'sms_body']);
 
         match ($filter) {
             'email' => $query->whereNotNull('email_body')->where('email_body', '!=', ''),
