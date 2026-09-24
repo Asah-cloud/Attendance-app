@@ -382,23 +382,55 @@ function inboxMessage(Event $event, array $attributes = [], array $recipientStat
     return $message;
 }
 
-it('shows an inbox with the latest message open, its delivery breakdown and recipients', function () {
+it('lists messages compactly with nothing expanded until one is chosen', function () {
     $company = Company::create(['name' => 'Inbox Co']);
     $manager = customMessageManager($company);
     $event = customMessageEvent($company);
     inboxMessage($event, ['subject' => 'Older note'], ['sent']);
-    $latest = inboxMessage($event, ['subject' => 'Latest announcement', 'sms_body' => 'Short text'], ['sent', 'failed', 'pending']);
+    inboxMessage($event, ['subject' => 'Latest announcement', 'sms_body' => 'Short text'], ['sent', 'failed', 'pending']);
 
     $this->actingAs($manager)->get(route('events.messages.index', $event))
         ->assertOk()
         ->assertSee('Older note')
         ->assertSee('Latest announcement')
+        ->assertSee('1 failed')
+        ->assertDontSee('Mailbox unavailable')
+        ->assertDontSee('id="message-detail"', false)
+        ->assertSee('messagesSidebar', false);
+});
+
+it('expands the chosen message in place with its delivery breakdown, content and recipients', function () {
+    $company = Company::create(['name' => 'Expand Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    inboxMessage($event, ['subject' => 'Older note'], ['sent']);
+    $latest = inboxMessage($event, ['subject' => 'Latest announcement', 'sms_body' => 'Short text'], ['sent', 'failed', 'pending']);
+
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'message' => $latest->id]))
+        ->assertOk()
+        ->assertSee('Older note')
         ->assertSee('Inbox email body')
         ->assertSee('Short text')
         ->assertSee('Mailbox unavailable')
         ->assertSee('Retry 1 failed')
+        ->assertSee('id="message-detail"', false)
         ->assertSee('messageProgress(', false)
         ->assertSee('messages\/'.$latest->id.'\/progress', false);
+});
+
+it('still shows a chosen message that is not on the current page of the list', function () {
+    $company = Company::create(['name' => 'Pinned Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $oldest = inboxMessage($event, ['subject' => 'Very first message'], ['sent']);
+    foreach (range(1, 21) as $number) {
+        inboxMessage($event, ['subject' => "Filler {$number}"], ['sent']);
+    }
+
+    $this->actingAs($manager)->get(route('events.messages.index', ['event' => $event, 'message' => $oldest->id]))
+        ->assertOk()
+        ->assertSee('Very first message')
+        ->assertSee('id="message-detail"', false);
 });
 
 it('opens a chosen message and filters and searches the message list', function () {

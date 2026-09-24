@@ -62,7 +62,6 @@ class CustomMessageController extends Controller
         $selected = $request->filled('message')
             ? $event->customMessages()->withCount($this->statusCounts())->with('creator')->find($request->query('message'))
             : null;
-        $reading = $selected ?? $messages->first();
 
         return view('events.messages.index', [
             'event' => $event,
@@ -70,9 +69,8 @@ class CustomMessageController extends Controller
             'counts' => $counts,
             'filter' => $filter,
             'search' => $search,
-            'reading' => $reading,
-            'hasSelection' => $selected !== null,
-            'recipientGroups' => $reading ? $this->groupedRecipients($reading) : collect(),
+            'selected' => $selected,
+            'recipientGroups' => $selected ? $this->groupedRecipients($selected) : collect(),
             'composeConfig' => $this->composeConfig($event, $this->registrantsFor($event)),
         ]);
     }
