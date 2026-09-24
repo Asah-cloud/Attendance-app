@@ -7,6 +7,7 @@ use App\Models\EventRegistration;
 use App\Notifications\CompanySubscriptionNotification;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Services\ConfirmationReminderSender;
+use App\Services\CustomMessageSender;
 use App\Services\EmailDomainLifecycleManager;
 use App\Services\EventBillingService;
 use App\Services\RegistrationLifecycleService;
@@ -19,6 +20,10 @@ use Illuminate\Support\Facades\Storage;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+// Custom messages a manager scheduled for later go out within a minute of their time.
+Schedule::call(fn () => app(CustomMessageSender::class)->dispatchDue())
+    ->everyMinute()->name('send-scheduled-messages')->withoutOverlapping();
 
 Schedule::call(function (): void {
     EventRegistration::query()

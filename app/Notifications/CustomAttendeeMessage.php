@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Event;
 use App\Notifications\Channels\ArkeselChannel;
 use App\Services\CompanyMail;
+use App\Support\MergeFields;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -35,13 +36,21 @@ class CustomAttendeeMessage extends Notification
         return [$this->channel === 'sms' ? ArkeselChannel::class : 'mail'];
     }
 
+    /** @return array<string, string> */
+    private function mergeValues(object $notifiable): array
+    {
+        return MergeFields::values($notifiable->name ?? null, $this->event->title, $this->event->company?->name);
+    }
+
     public function toMail(object $notifiable): MailMessage
     {
+        $values = $this->mergeValues($notifiable);
+
         $mail = CompanyMail::make(
             $this->event,
-            $this->subject ?: 'A message for you',
+            MergeFields::render($this->subject, $values) ?: 'A message for you',
             'Hello '.$notifiable->name.'!',
-            preg_split('/\r?\n/', trim($this->body)),
+            preg_split('/\r?\n/', trim(MergeFields::render($this->body, $values))),
         );
 
         foreach ($this->attachments as $attachment) {
@@ -61,6 +70,6 @@ class CustomAttendeeMessage extends Notification
 
     public function toArkesel(object $notifiable): string
     {
-        return $this->body;
+        return MergeFields::render($this->body, $this->mergeValues($notifiable));
     }
 }

@@ -15,6 +15,7 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventFormController;
 use App\Http\Controllers\EventRegistrationFormController;
 use App\Http\Controllers\MealDistributionController;
+use App\Http\Controllers\MessageTemplateController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrganizationBrandingController;
 use App\Http\Controllers\ParticipantMergeController;
@@ -158,6 +159,13 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     Route::get('/events/{event}/messages/{message}', [CustomMessageController::class, 'show'])->name('events.messages.show');
     Route::get('/events/{event}/messages/{message}/edit', [CustomMessageController::class, 'edit'])->name('events.messages.edit');
     Route::post('/events/{event}/messages/{message}/resend', [CustomMessageController::class, 'resend'])->name('events.messages.resend');
+    Route::post('/events/{event}/messages/autosave', [CustomMessageController::class, 'autosave'])->middleware('throttle:60,1')->name('events.messages.autosave');
+    Route::put('/events/{event}/messages/{message}', [CustomMessageController::class, 'update'])->name('events.messages.update');
+    Route::delete('/events/{event}/messages/{message}', [CustomMessageController::class, 'destroy'])->name('events.messages.destroy');
+    Route::post('/events/{event}/messages/{message}/send-now', [CustomMessageController::class, 'sendNow'])->name('events.messages.send-now');
+    Route::post('/events/{event}/messages/{message}/unschedule', [CustomMessageController::class, 'unschedule'])->name('events.messages.unschedule');
+    Route::post('/events/{event}/message-templates', [MessageTemplateController::class, 'store'])->name('events.message-templates.store');
+    Route::delete('/events/{event}/message-templates/{template}', [MessageTemplateController::class, 'destroy'])->name('events.message-templates.destroy');
     Route::get('/events/{event}/messages/{message}/progress', [CustomMessageController::class, 'progress'])->name('events.messages.progress');
     Route::post('/events/{event}/messages/{message}/retry', [CustomMessageController::class, 'retryFailed'])->name('events.messages.retry');
     // Reporting & Exports

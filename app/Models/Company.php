@@ -107,6 +107,11 @@ class Company extends Model
         return $this->hasMany(EventAttendeeCharge::class);
     }
 
+    public function messageTemplates(): HasMany
+    {
+        return $this->hasMany(MessageTemplate::class);
+    }
+
     public function attendeePricingTiers(): HasMany
     {
         return $this->hasMany(AttendeePricingTier::class);

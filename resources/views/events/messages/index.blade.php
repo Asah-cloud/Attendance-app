@@ -3,6 +3,8 @@
     $listQuery = fn ($extra = []) => array_filter(array_merge(['event' => $event, 'filter' => $filter !== 'all' ? $filter : null, 'q' => $search !== '' ? $search : null], $extra), fn ($value) => $value !== null);
     $filters = [
         'all' => ['All messages', 'M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z'],
+        'drafts' => ['Drafts', 'M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10'],
+        'scheduled' => ['Scheduled', 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'],
         'email' => ['Email', 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75'],
         'sms' => ['SMS', 'M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z'],
         'failed' => ['Needs attention', 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z'],
@@ -21,6 +23,9 @@
 
         @if(session('success'))
             <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{{ session('error') }}</div>
         @endif
         @if($errors->any() && ! $composeOpen)
             <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{{ $errors->first() }}</div>
@@ -92,21 +97,27 @@
                                             <svg class="mt-1 h-4 w-4 shrink-0 text-slate-400 transition-transform {{ $isOpen ? 'rotate-90' : '' }}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-baseline justify-between gap-3">
-                                                    <p class="truncate text-sm font-black text-slate-900">{{ $item->subject ?: ($item->email_body ? '(no subject)' : 'Text message') }}</p>
-                                                    <span class="shrink-0 text-[11px] text-slate-400">{{ $item->created_at->diffForHumans(null, true, true) }}</span>
+                                                    <p class="truncate text-sm font-black text-slate-900">{{ $item->subject ?: ($item->email_body ? '(no subject)' : ($item->sms_body ? 'Text message' : '(untitled draft)')) }}</p>
+                                                    <span class="shrink-0 text-[11px] {{ $item->isScheduled() ? 'font-bold text-blue-600' : 'text-slate-400' }}">
+                                                        @if($item->isScheduled()){{ $item->scheduled_at->timezone(config('app.timezone'))->format('M j, H:i') }}@else{{ $item->displayTime()->diffForHumans(null, true, true) }}@endif
+                                                    </span>
                                                 </div>
                                                 <p class="mt-0.5 truncate text-xs text-slate-500">{{ \Illuminate\Support\Str::limit(preg_replace('/\s+/', ' ', $item->email_body ?: $item->sms_body), 140) }}</p>
                                                 <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                    @if($item->isDraft())<span class="rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600">Draft</span>@endif
+                                                    @if($item->isScheduled())<span class="rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white">Scheduled</span>@endif
                                                     @if($item->email_body)<span class="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-700">Email</span>@endif
                                                     @if($item->sms_body)<span class="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-700">SMS</span>@endif
                                                     <span class="text-[11px] text-slate-400">{{ $item->recipient_count }} {{ \Illuminate\Support\Str::plural('person', $item->recipient_count) }}</span>
                                                     @if($item->failed_count)<span class="text-[11px] font-bold text-rose-600">{{ $item->failed_count }} failed</span>@endif
                                                     @if($item->pending_count)<span class="text-[11px] font-bold text-amber-600">sending…</span>@endif
+                                                    @unless($item->isPending())
                                                     <span class="ml-auto flex h-1 w-24 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                                                         <span class="bg-emerald-500" style="width: {{ $item->sent_count / $itemTotal * 100 }}%"></span>
                                                         <span class="bg-rose-500" style="width: {{ $item->failed_count / $itemTotal * 100 }}%"></span>
                                                         <span class="bg-amber-400" style="width: {{ $item->pending_count / $itemTotal * 100 }}%"></span>
                                                     </span>
+                                                    @endunless
                                                 </div>
                                             </div>
                                         </div>
@@ -117,7 +128,12 @@
                                 </li>
                             @empty
                                 <li class="px-4 py-16 text-center text-sm text-slate-400">
-                                    {{ $search !== '' || $filter !== 'all' ? 'No messages match.' : 'No messages yet. Write your first message to a group of people, as email, SMS or both.' }}
+                                    {{ $search !== '' ? 'No messages match.' : match ($filter) {
+                                        'drafts' => 'No drafts. Anything you start writing is saved here automatically.',
+                                        'scheduled' => 'Nothing scheduled. Use Schedule when composing to send a message later.',
+                                        'all' => 'No messages yet. Write your first message to a group of people, as email, SMS or both.',
+                                        default => 'No messages match.',
+                                    } }}
                                     @if($search === '' && $filter === 'all')<button type="button" @click="composeOpen = true" class="mx-auto mt-4 block rounded-xl bg-blue-900 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white hover:bg-blue-800">Compose message</button>@endif
                                 </li>
                             @endforelse
