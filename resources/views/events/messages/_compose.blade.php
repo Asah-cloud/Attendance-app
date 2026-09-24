@@ -42,8 +42,8 @@
                 </div>
             @endif
 
-            <div class="grid gap-6 lg:grid-cols-5">
-                <div class="space-y-6 lg:col-span-3">
+            <div class="grid gap-6" :class="showPreview ? 'lg:grid-cols-5' : ''">
+                <div class="space-y-6" :class="showPreview ? 'lg:col-span-3' : ''">
                     {{-- To --}}
                     <section>
                         <div class="mb-2 flex items-center justify-between">
@@ -51,41 +51,52 @@
                             <span class="text-xs font-bold text-slate-500" x-text="recipientTotal + (fileName ? ' + file' : '') + ' selected'"></span>
                         </div>
 
-                        <div class="rounded-xl border border-slate-200 p-2 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="p in list" :key="p.id">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 py-1 pl-3 pr-1.5 text-xs font-bold text-blue-800">
-                                        <span x-text="p.name"></span>
-                                        <template x-for="c in channelsFor(p)" :key="c"><span class="rounded bg-white px-1 text-[9px] font-black uppercase text-blue-700" x-text="c === 'sms' ? 'SMS' : 'Email'"></span></template>
-                                        <span x-show="channelsFor(p).length === 0" class="rounded bg-amber-100 px-1 text-[9px] font-black uppercase text-amber-700">no channel</span>
-                                        <button type="button" @click="toggle(p.id)" :aria-label="'Remove ' + p.name" class="rounded-full px-1.5 text-blue-400 hover:bg-blue-100 hover:text-blue-700">&times;</button>
-                                        <input type="hidden" name="participant_ids[]" :value="p.id">
-                                    </span>
-                                </template>
-                                <input type="text" x-model="search" @focus="pickerOpen = true" @keydown.escape.stop="pickerOpen = false"
-                                       placeholder="Add registrants — search by name, email or phone"
-                                       class="min-w-[14rem] flex-1 border-0 bg-transparent px-2 py-1 text-sm text-slate-700 placeholder-slate-400 focus:ring-0">
-                            </div>
-                        </div>
+                        {{-- Every selected id is posted, however many chips are drawn. --}}
+                        <template x-for="id in selectedIds" :key="id"><input type="hidden" name="participant_ids[]" :value="id"></template>
 
-                        <div x-show="pickerOpen" x-cloak x-transition @click.outside="pickerOpen = false" class="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                            <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs">
-                                <span class="font-bold text-slate-500" x-text="matches.length + ' of ' + participants.length + ' registrants'"></span>
-                                <span class="flex gap-3">
-                                    <button type="button" class="font-bold text-blue-700" @click="addAll()">Add all shown</button>
-                                    <button type="button" class="font-bold text-slate-500" @click="clearAll()">Clear</button>
-                                    <button type="button" class="font-bold text-slate-500" @click="pickerOpen = false">Done</button>
-                                </span>
+                        {{-- The box and its dropdown share one outside-click boundary, so clicking the box never closes the list. --}}
+                        <div @click.outside="pickerOpen = false">
+                            <div class="rounded-xl border border-slate-200 p-2 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100" @click="pickerOpen = true; $refs.search.focus()">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <template x-for="p in visibleChips" :key="p.id">
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 py-1 pl-3 pr-1.5 text-xs font-bold text-blue-800">
+                                            <span x-text="p.name"></span>
+                                            <template x-for="c in channelsFor(p)" :key="c"><span class="rounded bg-white px-1 text-[9px] font-black uppercase text-blue-700" x-text="c === 'sms' ? 'SMS' : 'Email'"></span></template>
+                                            <span x-show="channelsFor(p).length === 0" class="rounded bg-amber-100 px-1 text-[9px] font-black uppercase text-amber-700">no channel</span>
+                                            <button type="button" @click.stop="toggle(p.id)" :aria-label="'Remove ' + p.name" class="rounded-full px-1.5 text-blue-400 hover:bg-blue-100 hover:text-blue-700">&times;</button>
+                                        </span>
+                                    </template>
+                                    <button type="button" x-show="hiddenChipCount > 0" @click.stop="showAllChips = true" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200" x-text="'+ ' + hiddenChipCount + ' more'"></button>
+                                    <button type="button" x-show="showAllChips && selected.size > chipLimit" @click.stop="showAllChips = false" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200">Show fewer</button>
+                                    <input type="text" x-ref="search" x-model="search" autocomplete="off"
+                                           @focus="pickerOpen = true" @input="pickerOpen = true"
+                                           @keydown.enter.prevent="addFirst()" @keydown.escape.stop="pickerOpen = false"
+                                           @keydown.backspace="if (search === '' && list.length) toggle(list[list.length - 1].id)"
+                                           placeholder="Add registrants — search by name, email or phone"
+                                           class="min-w-[14rem] flex-1 border-0 bg-transparent px-2 py-1 text-sm text-slate-700 placeholder-slate-400 focus:ring-0">
+                                </div>
                             </div>
-                            <div class="max-h-56 divide-y divide-slate-50 overflow-y-auto">
-                                <template x-for="p in matches" :key="p.id">
-                                    <button type="button" @click="toggle(p.id)" class="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
-                                        <span class="flex h-4 w-4 items-center justify-center rounded border text-[10px] font-black" :class="selected.has(p.id) ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'"><span x-show="selected.has(p.id)">&#10003;</span></span>
-                                        <span class="min-w-0 flex-1"><span class="block truncate text-sm font-bold text-slate-800" x-text="p.name"></span><span class="block truncate text-[11px] text-slate-400" x-text="(p.email || '—') + ' · ' + (p.phone || '—')"></span></span>
-                                        <span class="rounded-full px-2 py-0.5 text-[9px] font-black uppercase" :class="p.ghana ? 'bg-emerald-50 text-emerald-700' : (p.phone ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-400')" x-text="p.ghana ? 'Ghana' : (p.phone ? 'Foreign' : 'No phone')"></span>
-                                    </button>
-                                </template>
-                                <p x-show="matches.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">No registrants match.</p>
+
+                            <div x-show="pickerOpen" x-cloak x-transition.opacity.duration.100ms class="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                                <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+                                    <span class="font-bold text-slate-500" x-text="matches.length + ' of ' + totalParticipants + ' registrants'"></span>
+                                    <span class="flex gap-3">
+                                        <button type="button" class="font-bold text-blue-700" @click="addAll()" x-text="search.trim() ? 'Add all ' + matches.length + ' matching' : 'Add everyone'"></button>
+                                        <button type="button" class="font-bold text-slate-500" @click="clearAll()">Clear</button>
+                                        <button type="button" class="font-bold text-slate-500" @click="pickerOpen = false">Done</button>
+                                    </span>
+                                </div>
+                                <div class="max-h-56 divide-y divide-slate-50 overflow-y-auto">
+                                    <template x-for="p in shown" :key="p.id">
+                                        <button type="button" @click="toggle(p.id)" class="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
+                                            <span class="flex h-4 w-4 items-center justify-center rounded border text-[10px] font-black" :class="selected.has(p.id) ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'"><span x-show="selected.has(p.id)">&#10003;</span></span>
+                                            <span class="min-w-0 flex-1"><span class="block truncate text-sm font-bold text-slate-800" x-text="p.name"></span><span class="block truncate text-[11px] text-slate-400" x-text="(p.email || '—') + ' · ' + (p.phone || '—')"></span></span>
+                                            <span class="rounded-full px-2 py-0.5 text-[9px] font-black uppercase" :class="p.ghana ? 'bg-emerald-50 text-emerald-700' : (p.phone ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-400')" x-text="p.ghana ? 'Ghana' : (p.phone ? 'Foreign' : 'No phone')"></span>
+                                        </button>
+                                    </template>
+                                    <p x-show="matches.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">No registrants match.</p>
+                                    <p x-show="matches.length > shown.length" class="bg-slate-50 px-3 py-2 text-center text-[11px] text-slate-400" x-text="'Showing the first ' + shown.length + ' of ' + matches.length + ' — keep typing to narrow it down, or use “Add all” above.'"></p>
+                                </div>
                             </div>
                         </div>
 
@@ -157,7 +168,7 @@
                 </div>
 
                 {{-- Live preview --}}
-                <aside class="space-y-4 lg:col-span-2">
+                <aside x-show="showPreview" x-cloak x-transition.opacity class="space-y-4 lg:col-span-2">
                     <div class="lg:sticky lg:top-0">
                         <p class="mb-2 text-xs font-black uppercase tracking-widest text-slate-400">Preview</p>
                         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 p-3">
@@ -195,6 +206,12 @@
                 <span x-show="fileName || seedCount > 0" class="rounded-full bg-slate-200 px-2.5 py-1 text-slate-600">+ file &amp; earlier recipients counted on send</span>
             </div>
             <div class="flex items-center gap-3">
+                <button type="button" @click="showPreview = !showPreview" :aria-pressed="showPreview.toString()"
+                        class="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black uppercase tracking-widest transition"
+                        :class="showPreview ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span x-text="showPreview ? 'Hide preview' : 'Preview'"></span>
+                </button>
                 @if($inModal)<button type="button" @click="$dispatch('close-compose')" class="text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>@endif
                 <button type="submit" :disabled="!canSend || sending" class="rounded-xl bg-blue-900 px-6 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40" x-text="sending ? 'Sending…' : '{{ $editing ? 'Resend message' : 'Send message' }}'"></button>
             </div>
@@ -207,10 +224,23 @@
     <script>
         // Mirrors CustomMessageService::determineChannels() so the panel can show, before sending,
         // which channel each person will get. Keep the two in step.
-        window.messageComposer = function (cfg, init) {
+        window.messageComposer = function (config, init) {
+            // The registrant list can be thousands long and never changes, so it lives outside
+            // Alpine's reactive state (making every read cheap), with each person's searchable
+            // text worked out once here rather than on every keystroke.
+            const participants = config.participants.map(p => Object.assign({}, p, {
+                haystack: [p.name, p.email || '', p.phone || ''].join(' ').toLowerCase(),
+                digits: (p.phone || '').replace(/\D+/g, ''),
+            }));
+            const cfg = { organization: config.organization, eventTitle: config.eventTitle, smsEnabled: config.smsEnabled };
+            const SHOWN_LIMIT = 60;
+
             return {
                 cfg: cfg,
-                participants: cfg.participants,
+                totalParticipants: participants.length,
+                chipLimit: 30,
+                showAllChips: false,
+                showPreview: false,
                 selected: new Set(init.selected),
                 search: '',
                 pickerOpen: false,
@@ -224,14 +254,22 @@
                 seedCount: init.seedCount,
                 sending: false,
 
-                get list() { return this.participants.filter(p => this.selected.has(p.id)); },
+                get list() { return participants.filter(p => this.selected.has(p.id)); },
+                get selectedIds() { return this.list.map(p => p.id); },
+                get visibleChips() { return this.showAllChips ? this.list : this.list.slice(0, this.chipLimit); },
+                get hiddenChipCount() { return this.showAllChips ? 0 : Math.max(0, this.selected.size - this.chipLimit); },
                 get matches() {
-                    const q = this.search.trim().toLowerCase();
-                    return this.participants.filter(p => !q
-                        || p.name.toLowerCase().includes(q)
-                        || (p.email || '').toLowerCase().includes(q)
-                        || (p.phone || '').includes(q));
+                    // Every word typed must appear somewhere in the name, email or phone, in any order;
+                    // a typed phone number also matches with or without spaces, dashes or a leading zero.
+                    const words = this.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+                    if (words.length === 0) return participants;
+                    return participants.filter(p => words.every(w => {
+                        if (p.haystack.includes(w)) return true;
+                        const digits = w.replace(/\D+/g, '');
+                        return digits.length >= 3 && p.digits.includes(digits.replace(/^0/, ''));
+                    }));
                 },
+                get shown() { return this.matches.slice(0, SHOWN_LIMIT); },
                 get recipientTotal() { return this.selected.size + this.seedCount; },
                 get firstName() { return this.list.length ? this.list[0].name.split(' ')[0] : 'Ama'; },
                 get emailLines() { return this.emailBody.split(/\r?\n/).filter(l => l.trim() !== ''); },
@@ -265,9 +303,22 @@
                     return (this.recipientTotal > 0 || this.fileName !== '')
                         && (this.emailBody.trim() !== '' || this.smsBody.trim() !== '');
                 },
-                toggle(id) { this.selected.has(id) ? this.selected.delete(id) : this.selected.add(id); this.selected = new Set(this.selected); },
-                addAll() { this.matches.forEach(p => this.selected.add(p.id)); this.selected = new Set(this.selected); },
-                clearAll() { this.selected = new Set(); },
+                toggle(id) {
+                    const next = new Set(this.selected);
+                    next.has(id) ? next.delete(id) : next.add(id);
+                    this.selected = next;
+                },
+                addAll() {
+                    const next = new Set(this.selected);
+                    this.matches.forEach(p => next.add(p.id));
+                    this.selected = next;
+                },
+                addFirst() {
+                    const first = this.matches[0];
+                    if (first && !this.selected.has(first.id)) this.toggle(first.id);
+                    this.search = '';
+                },
+                clearAll() { this.selected = new Set(); this.showAllChips = false; },
                 confirmSend() {
                     if (!this.canSend) return false;
                     const s = this.summary;
