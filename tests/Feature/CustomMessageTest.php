@@ -303,6 +303,61 @@ it('sends the manager back to the form with a message when no recipients were ch
     expect($event->customMessages()->count())->toBe(0);
 });
 
+it('lets a manager add new registrants when editing and resending a message', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Resend Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $first = Participant::create(['company_id' => $company->id, 'name' => 'First Person', 'email' => 'first@example.com', 'phone' => '0241234567']);
+    $added = Participant::create(['company_id' => $company->id, 'name' => 'Added Person', 'email' => 'added@example.com', 'phone' => '0551234567']);
+    $event->registrations()->create(['participant_id' => $first->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $added->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'sms_body' => 'Original', 'mode' => 'sms_only', 'participant_ids' => [$first->id],
+    ])->assertRedirect();
+    $original = $event->customMessages()->firstOrFail();
+
+    $this->actingAs($manager)->get(route('events.messages.edit', [$event, $original]))->assertOk();
+
+    $this->actingAs($manager)->post(route('events.messages.resend', [$event, $original]), [
+        'sms_body' => 'Updated', 'mode' => 'sms_only', 'participant_ids' => [$first->id, $added->id],
+    ])->assertRedirect();
+
+    $resent = $event->customMessages()->latest('id')->firstOrFail();
+    expect($resent->id)->not->toBe($original->id)
+        ->and($resent->recipient_count)->toBe(2)
+        ->and($resent->recipients()->where('participant_id', $added->id)->exists())->toBeTrue()
+        ->and($original->fresh()->recipients()->count())->toBe(1);
+});
+
+it('keeps recipients from the original upload when resending and lets the manager untick them', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Upload Resend Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $csv = "Name,Email,Phone\nUploaded One,one@example.com,0241234567\nUploaded Two,two@example.com,0551234567\n";
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'sms_body' => 'Original', 'mode' => 'sms_only',
+        'recipients_file' => UploadedFile::fake()->createWithContent('list.csv', $csv),
+    ])->assertRedirect();
+    $original = $event->customMessages()->firstOrFail();
+    $rows = $original->recipients()->orderBy('id')->get();
+
+    $this->actingAs($manager)->get(route('events.messages.edit', [$event, $original]))
+        ->assertOk()
+        ->assertSee('name="recipient_keys[]"', false)
+        ->assertSee('Uploaded One');
+
+    $this->actingAs($manager)->post(route('events.messages.resend', [$event, $original]), [
+        'sms_body' => 'Updated', 'mode' => 'sms_only', 'recipient_keys' => [$rows[0]->id],
+    ])->assertRedirect();
+
+    $resent = $event->customMessages()->latest('id')->firstOrFail();
+    expect($resent->recipients()->pluck('name')->all())->toBe(['Uploaded One']);
+});
+
 it('prevents an usher and a cross-company manager from composing messages', function () {
     $company = Company::create(['name' => 'Guarded Co']);
     $otherCompany = Company::create(['name' => 'Other Co']);

@@ -55,7 +55,7 @@
                 <input type="file" name="recipients_file" accept=".csv,.xlsx,.xls" class="mt-4 block w-full rounded-xl border border-gray-200 bg-gray-50/30 p-3 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-blue-700">
                 @if(!empty($seedRecipients))
                     <div class="mt-3 space-y-2"><p class="text-xs font-bold text-slate-500">Recipients from the original upload (included on resend):</p>
-                        @foreach($seedRecipients as $recipient)<div class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{{ $recipient['name'] }} · {{ $recipient['email'] ?: '—' }} · {{ $recipient['phone'] ?: '—' }}</div>@endforeach
+                        @foreach($seedRecipients as $recipient)<label class="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"><input type="checkbox" name="recipient_keys[]" value="{{ $recipient['id'] }}" checked class="rounded border-gray-300">{{ $recipient['name'] }} · {{ $recipient['email'] ?: '—' }} · {{ $recipient['phone'] ?: '—' }}</label>@endforeach
                     </div>
                 @endif
             </section>

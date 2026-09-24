@@ -57,7 +57,7 @@ class CustomMessageController extends Controller
         $selectedParticipantIds = $message->recipients()->whereNotNull('participant_id')->distinct()->pluck('participant_id')->all();
         $seedRecipients = $message->recipients()->whereNull('participant_id')->get()
             ->unique(fn (CustomMessageRecipient $recipient) => strtolower(trim((string) $recipient->email)).'|'.preg_replace('/\D+/', '', (string) $recipient->phone))
-            ->map(fn (CustomMessageRecipient $recipient) => ['name' => $recipient->name, 'email' => $recipient->email, 'phone' => $recipient->phone])->values();
+            ->map(fn (CustomMessageRecipient $recipient) => ['id' => $recipient->id, 'name' => $recipient->name, 'email' => $recipient->email, 'phone' => $recipient->phone])->values();
 
         return view('events.messages.create', compact('event', 'registrants', 'message', 'selectedParticipantIds', 'seedRecipients'));
     }
@@ -97,11 +97,6 @@ class CustomMessageController extends Controller
         $recipients = collect();
 
         if (! empty($validated['participant_ids'])) {
-            if ($source) {
-                $allowedParticipantIds = $source->recipients()->whereNotNull('participant_id')->distinct()->pluck('participant_id')->all();
-                $requestedIds = array_map('intval', $validated['participant_ids']);
-                abort_unless(empty(array_diff($requestedIds, $allowedParticipantIds)), 422);
-            }
             Participant::query()
                 ->where('company_id', $event->company_id)
                 ->whereIn('id', $validated['participant_ids'])
