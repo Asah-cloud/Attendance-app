@@ -32,6 +32,7 @@ function publicRegistrationEvent(array $overrides = []): Event
         'registration_terms_version' => '2026-08',
     ], $overrides));
     $event->ensureSystemRegistrationFields();
+    unlockAllEventFeatures($event);
 
     return $event;
 }

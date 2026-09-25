@@ -20,6 +20,7 @@ function badgeStudioFixture(): array
     Role::findOrCreate('manager');
     $company = Company::create(['name' => 'Badge Company']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Badge Event', 'event_date' => now()->addWeek()]);
+    unlockAllEventFeatures($event);
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
     $manager->assignRole('manager');
 

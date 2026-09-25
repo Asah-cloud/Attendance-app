@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
 use App\Models\EventRegistration;
+use App\Models\Feature;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventAttendeeChargeReady;
 use App\Notifications\EventAttendeeChargeRefundIssued;
@@ -24,13 +25,16 @@ class EventBillingService
         return array_merge($calc, ['registered_count' => $registeredCount]);
     }
 
-    public function finalize(Event $event): EventAttendeeCharge
+    /**
+     * @param  array<int, string>  $featureKeys  Advanced features the manager selected for this event.
+     */
+    public function finalize(Event $event, array $featureKeys = []): EventAttendeeCharge
     {
         if ($existing = EventAttendeeCharge::where('event_id', $event->id)->first()) {
             return $existing;
         }
 
-        $charge = DB::transaction(function () use ($event): EventAttendeeCharge {
+        $charge = DB::transaction(function () use ($event, $featureKeys): EventAttendeeCharge {
             $lockedEvent = Event::query()->lockForUpdate()->findOrFail($event->id);
 
             if ($existing = EventAttendeeCharge::where('event_id', $lockedEvent->id)->first()) {
@@ -41,16 +45,41 @@ class EventBillingService
             $registeredCount = $this->registeredCount($lockedEvent);
             $calc = $this->pricing->calculate($company, $registeredCount, $lockedEvent);
 
-            return EventAttendeeCharge::create([
+            $features = Feature::query()
+                ->where('tier', Feature::TIER_ADVANCED)
+                ->where('is_active', true)
+                ->whereIn('key', $featureKeys)
+                ->get();
+
+            $featuresAmount = (int) $features->sum('cost_minor');
+            $featureBreakdown = $features->map(fn (Feature $feature) => [
+                'key' => $feature->key,
+                'name' => $feature->name,
+                'cost_minor' => $feature->cost_minor,
+            ])->values()->all();
+
+            $charge = EventAttendeeCharge::create([
                 'event_id' => $lockedEvent->id,
                 'company_id' => $company->id,
                 'status' => EventAttendeeCharge::STATUS_PENDING_PAYMENT,
                 'registered_count' => $registeredCount,
                 'tier_breakdown' => $calc['breakdown'],
-                'amount_minor' => $calc['amount_minor'],
+                'amount_minor' => $calc['amount_minor'] + $featuresAmount,
+                'features_amount_minor' => $featuresAmount,
+                'feature_breakdown' => $featureBreakdown,
                 'currency' => config('plans.currency'),
                 'finalized_at' => now(),
             ]);
+
+            foreach ($features as $feature) {
+                $lockedEvent->features()->create([
+                    'feature_key' => $feature->key,
+                    'name' => $feature->name,
+                    'cost_minor' => $feature->cost_minor,
+                ]);
+            }
+
+            return $charge;
         });
 
         $this->notifyManagers($event, new EventAttendeeChargeReady($charge));
@@ -150,7 +179,8 @@ class EventBillingService
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->distinct('participant_id')->count('participant_id');
         $calc = $this->pricing->calculate($event->company, $checkedInCount, $event);
-        $refundAmount = max(0, $charge->amount_minor - $calc['amount_minor']);
+        $attendeePaidMinor = $charge->amount_minor - $charge->features_amount_minor;
+        $refundAmount = max(0, $attendeePaidMinor - $calc['amount_minor']);
 
         $charge->update([
             'checked_in_count' => $checkedInCount,

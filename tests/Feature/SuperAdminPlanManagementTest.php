@@ -47,8 +47,6 @@ it('lists the seeded plans and lets an admin create a new one', function () {
         ->and($plan->price_minor)->toBe(4950)
         ->and($plan->event_limit)->toBe(8)
         ->and($plan->features)->toBe(['Everything in Starter', 'Discounted per-attendee rate']);
-
-    $this->get(route('pricing'))->assertOk()->assertSee('Nonprofit')->assertSee('GHS 50');
 });
 
 it('lets an admin edit a plan\'s price, limits, and features without changing its key', function () {

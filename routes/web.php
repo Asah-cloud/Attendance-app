@@ -31,6 +31,7 @@ use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
 use App\Http\Controllers\SuperAdmin\CompanyPricingController;
 use App\Http\Controllers\SuperAdmin\EventBillingController as SuperAdminEventBillingController;
+use App\Http\Controllers\SuperAdmin\FeatureController;
 use App\Http\Controllers\SuperAdmin\IntegrationSettingsController;
 use App\Http\Controllers\SuperAdmin\PlanController;
 use App\Http\Controllers\SupportStaffController;
@@ -146,52 +147,61 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         ->name('support-staff.checkin.scan');
     Route::get('/support-staff/{event}/report', [SupportStaffController::class, 'report'])->name('support-staff.report');
     Route::get('/support-staff/{event}/report/csv', [SupportStaffController::class, 'reportCsv'])->name('support-staff.report.csv');
-    Route::get('/events/{event}/meals', [MealDistributionController::class, 'index'])->name('events.meals.index');
-    Route::get('/events/{event}/meals/{meal}/scanner', [MealDistributionController::class, 'scanner'])->name('events.meals.scanner');
-    Route::get('/events/{event}/meals/{meal}/status', [MealDistributionController::class, 'status'])->name('events.meals.status');
-    Route::post('/events/{event}/meals/{meal}/issue', [MealDistributionController::class, 'issue'])
-        ->middleware('throttle:120,1')->name('events.meals.issue');
+    Route::middleware('event.feature:food')->group(function () {
+        Route::get('/events/{event}/meals', [MealDistributionController::class, 'index'])->name('events.meals.index');
+        Route::get('/events/{event}/meals/{meal}/scanner', [MealDistributionController::class, 'scanner'])->name('events.meals.scanner');
+        Route::get('/events/{event}/meals/{meal}/status', [MealDistributionController::class, 'status'])->name('events.meals.status');
+        Route::post('/events/{event}/meals/{meal}/issue', [MealDistributionController::class, 'issue'])
+            ->middleware('throttle:120,1')->name('events.meals.issue');
+    });
     Route::patch('/events/{event}/update-day', [EventController::class, 'updateDay'])->name('events.update-day');
-    // Custom attendee messages
-    Route::get('/events/{event}/messages', [CustomMessageController::class, 'index'])->name('events.messages.index');
-    Route::get('/events/{event}/messages/create', [CustomMessageController::class, 'create'])->name('events.messages.create');
-    Route::post('/events/{event}/messages', [CustomMessageController::class, 'store'])->name('events.messages.store');
-    Route::get('/events/{event}/messages/{message}', [CustomMessageController::class, 'show'])->name('events.messages.show');
-    Route::get('/events/{event}/messages/{message}/edit', [CustomMessageController::class, 'edit'])->name('events.messages.edit');
-    Route::post('/events/{event}/messages/{message}/resend', [CustomMessageController::class, 'resend'])->name('events.messages.resend');
-    Route::post('/events/{event}/messages/autosave', [CustomMessageController::class, 'autosave'])->middleware('throttle:60,1')->name('events.messages.autosave');
-    Route::put('/events/{event}/messages/{message}', [CustomMessageController::class, 'update'])->name('events.messages.update');
-    Route::delete('/events/{event}/messages/{message}', [CustomMessageController::class, 'destroy'])->name('events.messages.destroy');
-    Route::post('/events/{event}/messages/{message}/send-now', [CustomMessageController::class, 'sendNow'])->name('events.messages.send-now');
-    Route::post('/events/{event}/messages/{message}/unschedule', [CustomMessageController::class, 'unschedule'])->name('events.messages.unschedule');
-    Route::post('/events/{event}/message-templates', [MessageTemplateController::class, 'store'])->name('events.message-templates.store');
-    Route::delete('/events/{event}/message-templates/{template}', [MessageTemplateController::class, 'destroy'])->name('events.message-templates.destroy');
-    Route::get('/events/{event}/messages/{message}/progress', [CustomMessageController::class, 'progress'])->name('events.messages.progress');
-    Route::post('/events/{event}/messages/{message}/retry', [CustomMessageController::class, 'retryFailed'])->name('events.messages.retry');
-    // Reporting & Exports
+    // Custom attendee messages — paid feature: custom_messages
+    Route::middleware('event.feature:custom_messages')->group(function () {
+        Route::get('/events/{event}/messages', [CustomMessageController::class, 'index'])->name('events.messages.index');
+        Route::get('/events/{event}/messages/create', [CustomMessageController::class, 'create'])->name('events.messages.create');
+        Route::post('/events/{event}/messages', [CustomMessageController::class, 'store'])->name('events.messages.store');
+        Route::get('/events/{event}/messages/{message}', [CustomMessageController::class, 'show'])->name('events.messages.show');
+        Route::get('/events/{event}/messages/{message}/edit', [CustomMessageController::class, 'edit'])->name('events.messages.edit');
+        Route::post('/events/{event}/messages/{message}/resend', [CustomMessageController::class, 'resend'])->name('events.messages.resend');
+        Route::post('/events/{event}/messages/autosave', [CustomMessageController::class, 'autosave'])->middleware('throttle:60,1')->name('events.messages.autosave');
+        Route::put('/events/{event}/messages/{message}', [CustomMessageController::class, 'update'])->name('events.messages.update');
+        Route::delete('/events/{event}/messages/{message}', [CustomMessageController::class, 'destroy'])->name('events.messages.destroy');
+        Route::post('/events/{event}/messages/{message}/send-now', [CustomMessageController::class, 'sendNow'])->name('events.messages.send-now');
+        Route::post('/events/{event}/messages/{message}/unschedule', [CustomMessageController::class, 'unschedule'])->name('events.messages.unschedule');
+        Route::post('/events/{event}/message-templates', [MessageTemplateController::class, 'store'])->name('events.message-templates.store');
+        Route::delete('/events/{event}/message-templates/{template}', [MessageTemplateController::class, 'destroy'])->name('events.message-templates.destroy');
+        Route::get('/events/{event}/messages/{message}/progress', [CustomMessageController::class, 'progress'])->name('events.messages.progress');
+        Route::post('/events/{event}/messages/{message}/retry', [CustomMessageController::class, 'retryFailed'])->name('events.messages.retry');
+    });
+    // Reporting & Exports — the live report view is standard, exports are the paid advanced_reports feature
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
-    Route::get('/reports/event/{event}/excel/{day?}', [ReportController::class, 'exportExcel'])->name('reports.excel');
-    Route::get('/reports/event/{event}/csv/{day?}', [ReportController::class, 'exportCsv'])->name('reports.csv');
-    Route::get('/reports/event/{event}/area-summary/{day?}', [ReportController::class, 'exportAreaSummary'])->name('reports.area-summary');
-    Route::get('/reports/event/{event}/area/{area}/excel/{day?}', [ReportController::class, 'exportAreaDetail'])->name('reports.area-detail');
-    Route::get('/reports/event/{event}/pdf/{day?}', [ReportController::class, 'exportPdf'])->name('reports.pdf');
     Route::get('/events/{event}/summary', [SummaryReportController::class, 'index'])->name('reports.summary');
-    Route::get('/events/{event}/summary/export', [SummaryReportController::class, 'download'])->name('reports.summary.export');
-    Route::get('/events/{event}/summary/pdf', [SummaryReportController::class, 'downloadPdf'])->name('reports.summary.pdf');
+    Route::middleware('event.feature:advanced_reports')->group(function () {
+        Route::get('/reports/event/{event}/excel/{day?}', [ReportController::class, 'exportExcel'])->name('reports.excel');
+        Route::get('/reports/event/{event}/csv/{day?}', [ReportController::class, 'exportCsv'])->name('reports.csv');
+        Route::get('/reports/event/{event}/area-summary/{day?}', [ReportController::class, 'exportAreaSummary'])->name('reports.area-summary');
+        Route::get('/reports/event/{event}/area/{area}/excel/{day?}', [ReportController::class, 'exportAreaDetail'])->name('reports.area-detail');
+        Route::get('/reports/event/{event}/pdf/{day?}', [ReportController::class, 'exportPdf'])->name('reports.pdf');
+        Route::get('/events/{event}/summary/export', [SummaryReportController::class, 'download'])->name('reports.summary.export');
+        Route::get('/events/{event}/summary/pdf', [SummaryReportController::class, 'downloadPdf'])->name('reports.summary.pdf');
+    });
 
-    Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
-    Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
-    Route::put('/events/{event}/meals/{meal}/stations', [MealDistributionController::class, 'updateStationAllocations'])->name('events.meals.stations.allocations.update');
-    Route::get('/events/{event}/meals/vouchers', [MealDistributionController::class, 'vouchers'])->name('events.meals.vouchers');
-    Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
-    Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
-    Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');
-    Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
-    Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
-    Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
-    Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->middleware('throttle:5,1')->name('events.meals.collections.reverse');
+    // Food / meal distribution — paid feature: food
+    Route::middleware('event.feature:food')->group(function () {
+        Route::post('/events/{event}/meals', [MealDistributionController::class, 'store'])->name('events.meals.store');
+        Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
+        Route::put('/events/{event}/meals/{meal}/stations', [MealDistributionController::class, 'updateStationAllocations'])->name('events.meals.stations.allocations.update');
+        Route::get('/events/{event}/meals/vouchers', [MealDistributionController::class, 'vouchers'])->name('events.meals.vouchers');
+        Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
+        Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
+        Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');
+        Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
+        Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
+        Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
+        Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->middleware('throttle:5,1')->name('events.meals.collections.reverse');
 
-    Route::post('/events/{event}/meals/stations/{station}/staff', [MealDistributionController::class, 'assignStaff'])->name('events.meals.stations.staff');
+        Route::post('/events/{event}/meals/stations/{station}/staff', [MealDistributionController::class, 'assignStaff'])->name('events.meals.stations.staff');
+    });
     Route::get('/events/{event}/audit-access', [AuditAccessController::class, 'index'])->name('audit.approvals.index');
     Route::post('/events/{event}/audit-access', [AuditAccessController::class, 'store'])->middleware('throttle:10,1')->name('audit.approvals.store');
     Route::post('/events/{event}/audit-attendance-summary', [AuditAccessController::class, 'summary'])->middleware('throttle:5,1')->name('audit.attendance-summary');
@@ -219,19 +229,22 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/registrations/{registration}/resend', [EventRegistrationFormController::class, 'resend'])->name('events.registrations.resend');
         Route::patch('/events/{event}/registrations/{registration}/participant', [EventRegistrationFormController::class, 'updateParticipant'])->name('events.registrations.participant.update');
         Route::get('/events/{event}/registrations/{registration}/history', [EventRegistrationFormController::class, 'participantHistory'])->name('events.registrations.participant.history');
-        Route::get('/events/{event}/badges', [EventRegistrationFormController::class, 'badges'])->name('events.badges');
-        Route::match(['get', 'post'], '/events/{event}/badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.badges.pdf');
-        Route::post('/events/{event}/badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.badges.exports.store');
-        Route::get('/events/{event}/badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.badges.qr');
-        Route::get('/events/{event}/badges/fonts/{font}', [EventRegistrationFormController::class, 'badgeFont'])->name('events.badges.font');
-        Route::patch('/events/{event}/badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.badges.settings');
-        Route::get('/events/{event}/staff-badges', [EventRegistrationFormController::class, 'badges'])->name('events.staff-badges');
-        Route::match(['get', 'post'], '/events/{event}/staff-badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.staff-badges.pdf');
-        Route::post('/events/{event}/staff-badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.staff-badges.exports.store');
+        Route::middleware('event.feature:badge_studio')->group(function () {
+            Route::get('/events/{event}/badges', [EventRegistrationFormController::class, 'badges'])->name('events.badges');
+            Route::match(['get', 'post'], '/events/{event}/badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.badges.pdf');
+            Route::post('/events/{event}/badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.badges.exports.store');
+            Route::get('/events/{event}/badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.badges.qr');
+            Route::get('/events/{event}/badges/fonts/{font}', [EventRegistrationFormController::class, 'badgeFont'])->name('events.badges.font');
+            Route::patch('/events/{event}/badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.badges.settings');
+            Route::get('/events/{event}/staff-badges', [EventRegistrationFormController::class, 'badges'])->name('events.staff-badges');
+            Route::match(['get', 'post'], '/events/{event}/staff-badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.staff-badges.pdf');
+            Route::post('/events/{event}/staff-badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.staff-badges.exports.store');
+            Route::get('/events/{event}/staff-badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.staff-badges.qr');
+            Route::patch('/events/{event}/staff-badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.staff-badges.settings');
+        });
+        // Not event-scoped in the URL, so they sit outside the feature-gated group.
         Route::get('/badge-exports/{badgeExport}', [EventRegistrationFormController::class, 'badgeExportStatus'])->name('badge-exports.show');
         Route::get('/badge-exports/{badgeExport}/download', [EventRegistrationFormController::class, 'downloadBadgeExport'])->name('badge-exports.download');
-        Route::get('/events/{event}/staff-badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.staff-badges.qr');
-        Route::patch('/events/{event}/staff-badges/settings', [EventRegistrationFormController::class, 'updateBadgeSettings'])->name('events.staff-badges.settings');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');
         Route::get('/events/{event}/registration-form/print-qr', [EventRegistrationFormController::class, 'printQr'])->name('events.registration-form.print-qr');
         Route::get('/events/{event}/registration-form/download-qr', [EventRegistrationFormController::class, 'downloadQr'])->name('events.registration-form.download-qr');
@@ -239,33 +252,36 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'updateSystemField'])->name('events.registration-fields.update');
         Route::delete('/events/{event}/registration-fields/{field}', [EventRegistrationFormController::class, 'destroyField'])->name('events.registration-fields.destroy');
 
-        Route::get('/events/{event}/accommodation', [AccommodationController::class, 'index'])->name('events.accommodation.index');
-        Route::patch('/events/{event}/accommodation/settings', [AccommodationController::class, 'updateSettings'])->name('events.accommodation.settings');
-        Route::post('/events/{event}/accommodation/sites', [AccommodationController::class, 'storeSite'])->name('events.accommodation.sites.store');
-        Route::post('/events/{event}/accommodation/sites/{site}/blocks', [AccommodationController::class, 'storeBlock'])->name('events.accommodation.blocks.store');
-        Route::post('/events/{event}/accommodation/blocks/{block}/floors', [AccommodationController::class, 'storeFloor'])->name('events.accommodation.floors.store');
-        Route::post('/events/{event}/accommodation/floors/{floor}/rooms', [AccommodationController::class, 'storeRoom'])->name('events.accommodation.rooms.store');
-        Route::post('/events/{event}/accommodation/floors/{floor}/rooms/bulk', [AccommodationController::class, 'bulkStoreRooms'])->name('events.accommodation.rooms.bulk');
-        Route::post('/events/{event}/accommodation/import', [AccommodationController::class, 'importRooms'])->name('events.accommodation.import');
-        Route::post('/events/{event}/accommodation/clone', [AccommodationController::class, 'cloneFrom'])->name('events.accommodation.clone');
-        Route::patch('/events/{event}/accommodation/sites/{site}', [AccommodationController::class, 'updateSite'])->name('events.accommodation.sites.update');
-        Route::patch('/events/{event}/accommodation/blocks/{block}', [AccommodationController::class, 'updateBlock'])->name('events.accommodation.blocks.update');
-        Route::patch('/events/{event}/accommodation/floors/{floor}', [AccommodationController::class, 'updateFloor'])->name('events.accommodation.floors.update');
-        Route::patch('/events/{event}/accommodation/rooms/{room}', [AccommodationController::class, 'updateRoom'])->name('events.accommodation.rooms.update');
-        Route::patch('/events/{event}/accommodation/registrations/{registration}', [AccommodationController::class, 'updateRequirement'])->name('events.accommodation.requirements.update');
-        Route::post('/events/{event}/accommodation/allocate', [AccommodationController::class, 'allocate'])->name('events.accommodation.allocate');
-        Route::put('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'assign'])->name('events.accommodation.assignments.update');
-        Route::delete('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'destroyAssignment'])->name('events.accommodation.assignments.destroy');
-        Route::post('/events/{event}/accommodation/registrations/{registration}/check-in', [AccommodationController::class, 'checkIn'])->name('events.accommodation.check-in');
-        Route::post('/events/{event}/accommodation/registrations/{registration}/check-out', [AccommodationController::class, 'checkOut'])->name('events.accommodation.check-out');
-        Route::post('/events/{event}/accommodation/notify', [AccommodationController::class, 'notify'])->name('events.accommodation.notify');
-        Route::post('/events/{event}/accommodation/invite-self-select', [AccommodationController::class, 'inviteSelfSelect'])->name('events.accommodation.invite-self-select');
-        Route::post('/events/{event}/accommodation/mark-all-required', [AccommodationController::class, 'markAllRequired'])->name('events.accommodation.mark-all-required');
-        Route::get('/events/{event}/accommodation/registrations/{registration}/room-preview', [AccommodationController::class, 'previewRoomPicker'])->name('events.accommodation.room-preview');
-        Route::get('/events/{event}/accommodation/report', [AccommodationController::class, 'report'])->name('events.accommodation.report');
-        Route::get('/events/{event}/accommodation/report.csv', [AccommodationController::class, 'exportCsv'])->name('events.accommodation.report.csv');
-        Route::get('/events/{event}/accommodation/report.pdf', [AccommodationController::class, 'exportPdf'])->name('events.accommodation.report.pdf');
-        Route::delete('/events/{event}/accommodation/inventory/{type}/{id}', [AccommodationController::class, 'destroyInventory'])->name('events.accommodation.inventory.destroy');
+        // Rooms & accommodation — paid feature: rooms
+        Route::middleware('event.feature:rooms')->group(function () {
+            Route::get('/events/{event}/accommodation', [AccommodationController::class, 'index'])->name('events.accommodation.index');
+            Route::patch('/events/{event}/accommodation/settings', [AccommodationController::class, 'updateSettings'])->name('events.accommodation.settings');
+            Route::post('/events/{event}/accommodation/sites', [AccommodationController::class, 'storeSite'])->name('events.accommodation.sites.store');
+            Route::post('/events/{event}/accommodation/sites/{site}/blocks', [AccommodationController::class, 'storeBlock'])->name('events.accommodation.blocks.store');
+            Route::post('/events/{event}/accommodation/blocks/{block}/floors', [AccommodationController::class, 'storeFloor'])->name('events.accommodation.floors.store');
+            Route::post('/events/{event}/accommodation/floors/{floor}/rooms', [AccommodationController::class, 'storeRoom'])->name('events.accommodation.rooms.store');
+            Route::post('/events/{event}/accommodation/floors/{floor}/rooms/bulk', [AccommodationController::class, 'bulkStoreRooms'])->name('events.accommodation.rooms.bulk');
+            Route::post('/events/{event}/accommodation/import', [AccommodationController::class, 'importRooms'])->name('events.accommodation.import');
+            Route::post('/events/{event}/accommodation/clone', [AccommodationController::class, 'cloneFrom'])->name('events.accommodation.clone');
+            Route::patch('/events/{event}/accommodation/sites/{site}', [AccommodationController::class, 'updateSite'])->name('events.accommodation.sites.update');
+            Route::patch('/events/{event}/accommodation/blocks/{block}', [AccommodationController::class, 'updateBlock'])->name('events.accommodation.blocks.update');
+            Route::patch('/events/{event}/accommodation/floors/{floor}', [AccommodationController::class, 'updateFloor'])->name('events.accommodation.floors.update');
+            Route::patch('/events/{event}/accommodation/rooms/{room}', [AccommodationController::class, 'updateRoom'])->name('events.accommodation.rooms.update');
+            Route::patch('/events/{event}/accommodation/registrations/{registration}', [AccommodationController::class, 'updateRequirement'])->name('events.accommodation.requirements.update');
+            Route::post('/events/{event}/accommodation/allocate', [AccommodationController::class, 'allocate'])->name('events.accommodation.allocate');
+            Route::put('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'assign'])->name('events.accommodation.assignments.update');
+            Route::delete('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'destroyAssignment'])->name('events.accommodation.assignments.destroy');
+            Route::post('/events/{event}/accommodation/registrations/{registration}/check-in', [AccommodationController::class, 'checkIn'])->name('events.accommodation.check-in');
+            Route::post('/events/{event}/accommodation/registrations/{registration}/check-out', [AccommodationController::class, 'checkOut'])->name('events.accommodation.check-out');
+            Route::post('/events/{event}/accommodation/notify', [AccommodationController::class, 'notify'])->name('events.accommodation.notify');
+            Route::post('/events/{event}/accommodation/invite-self-select', [AccommodationController::class, 'inviteSelfSelect'])->name('events.accommodation.invite-self-select');
+            Route::post('/events/{event}/accommodation/mark-all-required', [AccommodationController::class, 'markAllRequired'])->name('events.accommodation.mark-all-required');
+            Route::get('/events/{event}/accommodation/registrations/{registration}/room-preview', [AccommodationController::class, 'previewRoomPicker'])->name('events.accommodation.room-preview');
+            Route::get('/events/{event}/accommodation/report', [AccommodationController::class, 'report'])->name('events.accommodation.report');
+            Route::get('/events/{event}/accommodation/report.csv', [AccommodationController::class, 'exportCsv'])->name('events.accommodation.report.csv');
+            Route::get('/events/{event}/accommodation/report.pdf', [AccommodationController::class, 'exportPdf'])->name('events.accommodation.report.pdf');
+            Route::delete('/events/{event}/accommodation/inventory/{type}/{id}', [AccommodationController::class, 'destroyInventory'])->name('events.accommodation.inventory.destroy');
+        });
 
         // Event feedback/survey forms: build any question set, share via slug URL + QR,
         // review responses in a table, and export them as Excel/PDF.
@@ -338,13 +354,22 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/companies/history/{company}/restore', [CompanyHistoryController::class, 'restore'])->name('companies.history.restore')->withTrashed();
         Route::delete('/companies/history/{company}', [CompanyHistoryController::class, 'destroy'])->name('companies.history.destroy')->withTrashed();
 
-        // Subscription plans: full CRUD on prices, limits, and features.
+        // Subscription plans: full CRUD on prices, limits, and features. Legacy —
+        // kept working for companies already on it, no longer offered to new signups.
         Route::get('/pricing/plans', [PlanController::class, 'index'])->name('pricing.plans.index');
         Route::get('/pricing/plans/create', [PlanController::class, 'create'])->name('pricing.plans.create');
         Route::post('/pricing/plans', [PlanController::class, 'store'])->name('pricing.plans.store');
         Route::get('/pricing/plans/{plan}/edit', [PlanController::class, 'edit'])->name('pricing.plans.edit');
         Route::put('/pricing/plans/{plan}', [PlanController::class, 'update'])->name('pricing.plans.update');
         Route::delete('/pricing/plans/{plan}', [PlanController::class, 'destroy'])->name('pricing.plans.destroy');
+
+        // Advanced features: paid add-ons managers can select per event.
+        Route::get('/pricing/features', [FeatureController::class, 'index'])->name('pricing.features.index');
+        Route::get('/pricing/features/create', [FeatureController::class, 'create'])->name('pricing.features.create');
+        Route::post('/pricing/features', [FeatureController::class, 'store'])->name('pricing.features.store');
+        Route::get('/pricing/features/{feature}/edit', [FeatureController::class, 'edit'])->name('pricing.features.edit');
+        Route::put('/pricing/features/{feature}', [FeatureController::class, 'update'])->name('pricing.features.update');
+        Route::delete('/pricing/features/{feature}', [FeatureController::class, 'destroy'])->name('pricing.features.destroy');
 
         // Platform-wide integration credentials (e.g. Paystack keys), editable
         // from the admin UI instead of the server .env.

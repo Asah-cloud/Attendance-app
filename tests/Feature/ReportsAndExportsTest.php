@@ -1,5 +1,7 @@
 <?php
 
+use App\Exports\AreaAttendanceSummaryExport;
+use App\Exports\AttendanceExport;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
@@ -25,6 +27,7 @@ function reportsManager(Company $company): User
 function reportsEventWithAttendee(Company $company): Event
 {
     $event = Event::create(['company_id' => $company->id, 'title' => 'Reported Event', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'Attendee']);
     $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
 
@@ -124,6 +127,7 @@ it('downloads a grouped area attendance summary for the selected period', functi
     $company = Company::create(['name' => 'Acme Co']);
     $manager = reportsManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Area Event', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     foreach (['Kumasi Area', 'Kumasi Area', 'Accra Area'] as $index => $area) {
         $participant = Participant::create(['company_id' => $company->id, 'name' => 'Guest '.$index, 'room_group' => $area]);
         $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
@@ -140,6 +144,7 @@ it('downloads the detailed attendee list for a single area, including unspecifie
     $company = Company::create(['name' => 'Acme Co']);
     $manager = reportsManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Area Event', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
 
     $kumasi = Participant::create(['company_id' => $company->id, 'name' => 'Kumasi Guest', 'room_group' => 'Kumasi Area']);
     $noArea = Participant::create(['company_id' => $company->id, 'name' => 'No Area Guest']);
@@ -174,6 +179,7 @@ it('shows category and gender breakdowns and supports filtering the attendance r
     $company = Company::create(['name' => 'Acme Co']);
     $manager = reportsManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Reported Event', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
 
     $male = Participant::create(['company_id' => $company->id, 'name' => 'Male Guest', 'phone' => '0201111111', 'category' => 'Guest', 'gender' => 'Male', 'room_group' => 'Kumasi Area']);
     $female = Participant::create(['company_id' => $company->id, 'name' => 'Female Member', 'phone' => '0202222222', 'category' => 'Member', 'gender' => 'Female', 'room_group' => 'Kumasi Area']);
@@ -230,6 +236,7 @@ it('uses the same numbered staff and unique-person counts in reports and area ex
     $company = Company::create(['name' => 'Area Co']);
     $manager = reportsManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Two Day Event', 'event_date' => now()->subDay(), 'end_date' => now()]);
+    unlockAllEventFeatures($event);
     $guest = Participant::create(['company_id' => $company->id, 'name' => 'Guest', 'room_group' => 'Kumasi']);
     $numbered = Participant::create(['company_id' => $company->id, 'name' => 'Participant 7', 'is_support_staff' => true, 'department' => 'Accra']);
     $otherStaff = Participant::create(['company_id' => $company->id, 'name' => 'Usher', 'is_support_staff' => true, 'department' => 'Accra']);
@@ -246,9 +253,9 @@ it('uses the same numbered staff and unique-person counts in reports and area ex
         ->and($report['totalExpected'])->toBe(2)
         ->and($report['absentUsers'])->toBeEmpty();
     expect(app(AttendanceReportData::class)->forPeriod($event, 2)['presentUsers']->pluck('name')->all())->toBe(['Guest', 'Participant 7']);
-    expect((new \App\Exports\AreaAttendanceSummaryExport($event, 'all'))->collection()->pluck('present', 'area')->all())
+    expect((new AreaAttendanceSummaryExport($event, 'all'))->collection()->pluck('present', 'area')->all())
         ->toBe(['Kumasi' => 1, 'Accra' => 1]);
-    expect((new \App\Exports\AttendanceExport($event, 'all'))->collection()->count())->toBe(2);
+    expect((new AttendanceExport($event, 'all'))->collection()->count())->toBe(2);
 
     $this->actingAs($manager)
         ->get(route('reports.event', ['event' => $event, 'day' => 'all']))

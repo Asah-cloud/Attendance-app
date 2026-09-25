@@ -47,12 +47,12 @@ function payForOnboarding(TestCase $test, string $plan, string $email): string
     return $reference;
 }
 
-test('pricing displays all three test plan prices', function () {
+test('pricing displays the pay-per-event tiers and advanced features', function () {
     $this->get(route('pricing'))
         ->assertOk()
-        ->assertSee('GHS 99')
-        ->assertSee('GHS 299')
-        ->assertSee('GHS 799');
+        ->assertSee('No subscription')
+        ->assertSee('GHS 2.00')
+        ->assertSee('Custom Messages');
 });
 
 test('manager registration requires a completed payment session', function () {

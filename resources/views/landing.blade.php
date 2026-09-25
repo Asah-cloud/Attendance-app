@@ -12,7 +12,7 @@
                 <h1 class="mt-8 max-w-3xl text-5xl font-extrabold leading-[1.02] tracking-[-0.055em] sm:text-6xl lg:text-7xl">Know who showed up. <span class="text-blue-400">Act on what matters.</span></h1>
                 <p class="mt-7 max-w-xl text-lg leading-8 text-slate-300">A faster, cleaner way to manage event attendance—from QR check-in and live headcounts to reports your team can actually use.</p>
                 <div class="mt-10 flex flex-col gap-3 sm:flex-row">
-                    <a href="{{ route('pricing') }}" class="rounded-2xl bg-blue-600 px-7 py-4 text-center text-sm font-extrabold shadow-2xl shadow-blue-950 transition hover:-translate-y-0.5 hover:bg-blue-500">Choose a plan</a>
+                    <a href="{{ route('pricing') }}" class="rounded-2xl bg-blue-600 px-7 py-4 text-center text-sm font-extrabold shadow-2xl shadow-blue-950 transition hover:-translate-y-0.5 hover:bg-blue-500">See pricing</a>
                     <a href="#how-it-works" class="rounded-2xl border border-white/15 bg-white/5 px-7 py-4 text-center text-sm font-extrabold transition hover:bg-white/10">See how it works</a>
                 </div>
                 <div class="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm font-semibold text-slate-400">
@@ -140,7 +140,7 @@
         <div class="overflow-hidden rounded-[2.5rem] bg-[#071426] px-7 py-14 text-center text-white sm:px-14">
             <p class="text-xs font-extrabold uppercase tracking-[0.25em] text-amber-300">Ready when you are</p>
             <h2 class="mx-auto mt-5 max-w-3xl text-4xl font-extrabold tracking-[-0.04em] sm:text-5xl">Give every arrival a smoother start.</h2>
-            <p class="mx-auto mt-5 max-w-2xl leading-8 text-slate-300">Choose a plan that fits your events today and scales with your organisation tomorrow.</p>
+            <p class="mx-auto mt-5 max-w-2xl leading-8 text-slate-300">No subscription — register free and pay only for the events you run.</p>
             <a href="{{ route('pricing') }}" class="mt-9 inline-flex rounded-2xl bg-white px-7 py-4 text-sm font-extrabold text-[#071426] transition hover:bg-blue-50">Explore pricing</a>
         </div>
     </section>

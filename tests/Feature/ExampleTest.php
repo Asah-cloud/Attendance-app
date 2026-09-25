@@ -11,6 +11,6 @@ it('shows the public landing page', function () {
 it('shows the public pricing page', function () {
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('Straightforward pricing')
-        ->assertSee('Business');
+        ->assertSee('No subscription')
+        ->assertSee('Custom Messages');
 });

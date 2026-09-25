@@ -19,11 +19,37 @@
                         </tbody>
                     </table>
                 </div>
-                <p class="mt-4 text-2xl font-black">Total: {{ number_format($estimate['amount_minor'] / 100, 2) }}</p>
+                <p class="mt-4 text-lg font-bold text-gray-500">Attendee subtotal: {{ number_format($estimate['amount_minor'] / 100, 2) }}</p>
 
-                <form method="POST" action="{{ route('events.billing.finalize', $event) }}" class="mt-6">
+                <form method="POST" action="{{ route('events.billing.finalize', $event) }}" class="mt-6" x-data="{ featuresMinor: 0 }">
                     @csrf
-                    <button class="rounded-xl bg-blue-900 px-5 py-3 text-sm font-bold text-white">Finalize & request payment</button>
+
+                    @if($features->isNotEmpty())
+                        <div class="rounded-2xl border border-gray-100 p-5">
+                            <h4 class="font-black text-gray-900">Advanced features</h4>
+                            <p class="mt-1 text-xs text-gray-500">Optional, extra cost per event. Standard attendance, check-in and reports are always included free.</p>
+                            <div class="mt-4 space-y-3">
+                                @foreach($features as $feature)
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
+                                        <input type="checkbox" name="features[]" value="{{ $feature->key }}" data-cost="{{ $feature->cost_minor }}"
+                                               x-on:change="featuresMinor = Array.from($el.closest('form').querySelectorAll('input[name=\'features[]\']:checked')).reduce((sum, el) => sum + Number(el.dataset.cost), 0)"
+                                               class="mt-1 h-4 w-4 rounded border-gray-300">
+                                        <span class="flex-1">
+                                            <span class="flex items-center justify-between gap-3">
+                                                <span class="font-bold text-gray-900">{{ $feature->name }}</span>
+                                                <span class="font-black text-blue-700">+{{ number_format($feature->cost_minor / 100, 2) }}</span>
+                                            </span>
+                                            @if($feature->description)<span class="mt-0.5 block text-xs text-gray-500">{{ $feature->description }}</span>@endif
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <p class="mt-5 text-2xl font-black">Estimated total: {{ number_format($estimate['amount_minor'] / 100, 2) }} <span class="text-base font-bold text-blue-700" x-show="featuresMinor > 0">+ <span x-text="(featuresMinor / 100).toFixed(2)"></span> features</span></p>
+
+                    <button class="mt-4 rounded-xl bg-blue-900 px-5 py-3 text-sm font-bold text-white">Finalize & request payment</button>
                 </form>
             </section>
         @else
@@ -44,6 +70,20 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if(!empty($charge->feature_breakdown))
+                    <div class="mt-5 overflow-hidden rounded-2xl border border-gray-100">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500"><tr><th class="p-3">Feature</th><th class="p-3 text-right">Cost</th></tr></thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach($charge->feature_breakdown as $feature)
+                                    <tr><td class="p-3">{{ $feature['name'] }}</td><td class="p-3 text-right font-bold">{{ number_format($feature['cost_minor'] / 100, 2) }}</td></tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
                 <p class="mt-4 text-2xl font-black">Total: {{ $charge->currency }} {{ number_format($charge->amount_minor / 100, 2) }}</p>
 
                 @if($errors->has('payment'))

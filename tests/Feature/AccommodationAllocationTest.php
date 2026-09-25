@@ -56,6 +56,7 @@ function accommodationRoom(Event $event, string $name, int $capacity = 1, array 
 it('allocates confirmed attendees without exceeding capacity', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $room = accommodationRoom($event, 'A01', 2);
     accommodationRegistration($event, 'First Guest');
     accommodationRegistration($event, 'Second Guest');
@@ -70,6 +71,7 @@ it('allocates confirmed attendees without exceeding capacity', function () {
 it('honours gender category and accessibility restrictions', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $maleRoom = accommodationRoom($event, 'M1', 4, ['gender' => 'Male']);
     $accessibleRoom = accommodationRoom($event, 'F1', 1, ['block' => 'Block B', 'gender' => 'Female', 'accessible' => true]);
     $male = accommodationRegistration($event, 'Male Guest', 'Male');
@@ -84,6 +86,7 @@ it('honours gender category and accessibility restrictions', function () {
 it('allocates only the selected participant category and gender', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $room = accommodationRoom($event, 'A01', 3);
     $vipWoman = accommodationRegistration($event, 'VIP Woman', 'Female', 'VIP');
     $vipMan = accommodationRegistration($event, 'VIP Man', 'Male', 'VIP');
@@ -100,6 +103,7 @@ it('allocates only the selected participant category and gender', function () {
 it('prefers seating people who share a room group together, even over an empty higher-priority room', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $roomX = accommodationRoom($event, 'X01', 3); // created first: higher priority, currently empty
     $roomY = accommodationRoom($event, 'Y01', 3); // created second: lower priority, already holds their group
 
@@ -121,6 +125,7 @@ it('lets a manager set a participant\'s room group from the accommodation page',
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Grouped Guest');
 
     $this->actingAs($manager)->patch(route('events.accommodation.requirements.update', [$event, $registration]), [
@@ -134,6 +139,7 @@ it('explains why a filtered assign run placed nobody instead of a silent success
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     // Female-only room; the only person needing a room is Male → cannot be placed.
     accommodationRoom($event, 'F01', 2, ['gender' => 'Female']);
     accommodationRegistration($event, 'Male Guest', 'Male', 'STAFF');
@@ -157,6 +163,7 @@ it('lets a manager build inventory and blocks another company manager', function
     $manager = accommodationManager($company);
     $outsider = accommodationManager($other);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
 
     $this->actingAs($manager)->post(route('events.accommodation.sites.store', $event), ['name' => 'Campus'])->assertRedirect();
     $this->assertDatabaseHas('accommodation_sites', ['event_id' => $event->id, 'name' => 'Campus']);
@@ -166,6 +173,7 @@ it('lets a manager build inventory and blocks another company manager', function
 it('automatically assigns accommodation requested during public registration', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit', 'event_date' => now()->addDay(), 'registration_enabled' => true, 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 1, ['gender' => 'Female']);
     $event->ensureSystemRegistrationFields();
 
@@ -182,6 +190,7 @@ it('reveals a published assignment in an arrival scanner response', function () 
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'has_arrival_session' => true, 'arrival_date' => now(), 'accommodation_enabled' => true, 'accommodation_published' => true]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Arrival Guest');
     $room = accommodationRoom($event, 'A01');
     $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
@@ -194,6 +203,7 @@ it('checks an attendee into and out of accommodation while preserving history', 
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Room Guest');
     $room = accommodationRoom($event, 'A01');
     $assignment = $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
@@ -211,6 +221,7 @@ it('notifies assigned attendees when assignments are published', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Notify Guest');
     $room = accommodationRoom($event, 'A01');
     $assignment = $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
@@ -225,6 +236,7 @@ it('bulk creates and imports rooms without duplicating inventory', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $seed = accommodationRoom($event, 'Existing');
     $floor = $seed->floor;
 
@@ -241,6 +253,7 @@ it('lets a manager rename a room and rejects a duplicate name on the same floor'
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $room = accommodationRoom($event, 'A01', 2);
     $sibling = $room->floor->rooms()->create(['name' => 'A02', 'capacity' => 2]);
 
@@ -259,6 +272,7 @@ it('lets a manager rename a room and rejects a duplicate name on the same floor'
 it('matches rooms despite loose gender spellings', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $maleRoom = accommodationRoom($event, 'M1', 1, ['gender' => 'Male']);
     $femaleRoom = accommodationRoom($event, 'F1', 1, ['block' => 'Block B', 'gender' => 'Female']);
     $man = accommodationRegistration($event, 'Loose Man', 'M');
@@ -273,6 +287,7 @@ it('matches rooms despite loose gender spellings', function () {
 it('places one attendee at a time on confirmation without overbooking', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-one', 'event_date' => now()->addDay(), 'registration_enabled' => true, 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'Solo', 1);
     $event->ensureSystemRegistrationFields();
 
@@ -290,6 +305,7 @@ it('imports a CSV that starts with a UTF-8 BOM', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $csv = "\u{FEFF}location,building,floor,room,capacity\nMain,Block A,Ground,G1,3\n";
 
     $this->actingAs($manager)->post(route('events.accommodation.import', $event), ['file' => UploadedFile::fake()->createWithContent('rooms.csv', $csv)])
@@ -302,6 +318,7 @@ it('holds reserved rooms back from auto-allocation but allows manual assignment'
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $vip = accommodationRegistration($event, 'VIP Guest');
     $general = accommodationRegistration($event, 'General Guest');
     $reserved = accommodationRoom($event, 'Presidential Suite', 1);
@@ -331,6 +348,7 @@ it('lets a manager skip the immediate email on a manual assignment and send it l
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true, 'accommodation_published' => true]);
+    unlockAllEventFeatures($event);
     $held = accommodationRegistration($event, 'Held Guest');
     $notified = accommodationRegistration($event, 'Notified Guest');
     $room = accommodationRoom($event, 'Std 1', 2);
@@ -357,6 +375,7 @@ it('shows occupancy, assignment methods, and follow-up lists on the accommodatio
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     $room = accommodationRoom($event, 'A01', 2);
     $checkedIn = accommodationRegistration($event, 'Checked In Guest');
     $notCheckedIn = accommodationRegistration($event, 'Pending Checkin Guest');
@@ -380,7 +399,9 @@ it('clones sites, blocks, floors and rooms from a past event without assignments
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $source = Event::create(['company_id' => $company->id, 'title' => 'Summit 2025', 'event_date' => now()->subYear()]);
+    unlockAllEventFeatures($source);
     $destination = Event::create(['company_id' => $company->id, 'title' => 'Summit 2026', 'event_date' => now()]);
+    unlockAllEventFeatures($destination);
     $room = accommodationRoom($source, 'A01', 2, ['block' => 'Block A']);
     $guest = accommodationRegistration($source, 'Past Guest');
     $guest->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
@@ -408,8 +429,10 @@ it('refuses to clone accommodation inventory from another company\'s event', fun
     $otherCompany = Company::create(['name' => 'Other']);
     $manager = accommodationManager($company);
     $source = Event::create(['company_id' => $otherCompany->id, 'title' => 'Other Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($source);
     accommodationRoom($source, 'A01');
     $destination = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($destination);
 
     $this->actingAs($manager)->post(route('events.accommodation.clone', $destination), ['source_event_id' => $source->id])
         ->assertForbidden();
@@ -419,6 +442,7 @@ it('exports rooming lists and protects inventory with assignment history', funct
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Report Guest');
     $room = accommodationRoom($event, 'A01');
     $registration->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'automatic']);
@@ -433,6 +457,7 @@ it('exports rooming lists and protects inventory with assignment history', funct
 it('lets a confirmed attendee choose their own room before the cutoff', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2)]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Chooser');
     $upstairs = accommodationRoom($event, 'Room 210', 2, ['floor' => 'Second']);
     accommodationRoom($event, 'Room 011', 2);
@@ -449,10 +474,12 @@ it('lets a confirmed attendee choose their own room before the cutoff', function
 it('closes self-selection after the cutoff and blocks the last-bed race', function () {
     $company = Company::create(['name' => 'Acme']);
     $past = Event::create(['company_id' => $company->id, 'title' => 'Past', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->subDay()]);
+    unlockAllEventFeatures($past);
     $late = accommodationRegistration($past, 'Late');
     $this->get(route('registrations.room.select', $late->management_token))->assertNotFound();
 
     $open = Event::create(['company_id' => $company->id, 'title' => 'Open', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDay()]);
+    unlockAllEventFeatures($open);
     $first = accommodationRegistration($open, 'First');
     $second = accommodationRegistration($open, 'Second');
     $solo = accommodationRoom($open, 'Solo', 1);
@@ -469,6 +496,7 @@ it('emails the self-selection link to attendees who need a room', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(3)]);
+    unlockAllEventFeatures($event);
     $registration = accommodationRegistration($event, 'Invitee');
 
     $this->actingAs($manager)->post(route('events.accommodation.invite-self-select', $event))->assertRedirect();
@@ -481,6 +509,7 @@ it('warns instead of sending when nobody is marked as needing a room', function 
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(3)]);
+    unlockAllEventFeatures($event);
     $participant = Participant::create(['company_id' => $company->id, 'name' => 'Nobody', 'phone' => '209999999']);
     EventRegistration::create(['event_id' => $event->id, 'participant_id' => $participant->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
 
@@ -494,6 +523,7 @@ it('bulk-marks every confirmed attendee as needing a room', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Grand Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $p1 = Participant::create(['company_id' => $company->id, 'name' => 'One', 'phone' => '201111112']);
     $p2 = Participant::create(['company_id' => $company->id, 'name' => 'Two', 'phone' => '202222223']);
     $r1 = EventRegistration::create(['event_id' => $event->id, 'participant_id' => $p1->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
@@ -512,6 +542,7 @@ it('bulk-marks every confirmed attendee as needing a room', function () {
 it('sends a fresh registrant to the room picker while self-selection is open', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-pick', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2)]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 4);
     $event->ensureSystemRegistrationFields();
 
@@ -529,6 +560,7 @@ it('lets a manager preview the room picker for any attendee, even before self-se
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 2);
     $registration = accommodationRegistration($event, 'Preview Guest');
 
@@ -544,6 +576,7 @@ it('blocks a manager from another company from previewing the room picker', func
     $other = Company::create(['name' => 'Other']);
     $manager = accommodationManager($other);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 2);
     $registration = accommodationRegistration($event, 'Preview Guest');
 
@@ -555,6 +588,7 @@ it('links to the room picker in the registration email when self-selection is op
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-email', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2), 'automatic_attendee_email' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 4);
     $event->ensureSystemRegistrationFields();
 
@@ -579,6 +613,7 @@ it('keeps the normal confirmation link in the registration email when self-selec
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'slug' => 'summit-email-2', 'event_date' => now()->addWeek(), 'registration_enabled' => true, 'accommodation_enabled' => true, 'automatic_attendee_email' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 4);
     $event->ensureSystemRegistrationFields();
 
@@ -601,6 +636,7 @@ it('links to the room picker in the confirmed lifecycle email while self-selecti
     Notification::fake();
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2), 'automatic_attendee_email' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 4);
     $registration = accommodationRegistration($event, 'Confirmed Guest');
 
@@ -617,6 +653,7 @@ it('links to the room picker in the confirmed lifecycle email while self-selecti
 it('marks freshly imported attendees as needing a room and allocates one when self-selection is not open', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Import Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 4);
 
     Excel::import(new UsersImport($event, true), base_path('tests/Fixtures/participants.csv'));
@@ -631,6 +668,7 @@ it('sends imported attendees a room-picker link when notified while self-selecti
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Import Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2)]);
+    unlockAllEventFeatures($event);
     accommodationRoom($event, 'A01', 4);
     $file = UploadedFile::fake()->createWithContent('participants.csv', file_get_contents(base_path('tests/Fixtures/participants.csv')));
 

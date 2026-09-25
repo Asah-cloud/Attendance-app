@@ -32,7 +32,10 @@ function customMessageManager(Company $company): User
 
 function customMessageEvent(Company $company): Event
 {
-    return Event::create(['company_id' => $company->id, 'title' => 'Messaging Event', 'event_date' => now()->addWeek()]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Messaging Event', 'event_date' => now()->addWeek()]);
+    unlockAllEventFeatures($event);
+
+    return $event;
 }
 
 it('classifies Ghana numbers correctly and leaves everything else foreign', function () {

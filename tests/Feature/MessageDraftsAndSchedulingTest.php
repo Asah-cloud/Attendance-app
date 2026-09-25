@@ -35,6 +35,7 @@ function draftsSetup(): array
 {
     $company = Company::create(['name' => 'Grace Church']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Youth Camp', 'event_date' => now()->addWeek()]);
+    unlockAllEventFeatures($event);
     $ama = Participant::create(['company_id' => $company->id, 'name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0241234567']);
     $john = Participant::create(['company_id' => $company->id, 'name' => 'John Smith', 'email' => 'john@example.com', 'phone' => '+14155552671']);
     foreach ([$ama, $john] as $person) {

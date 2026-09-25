@@ -16,6 +16,7 @@ beforeEach(function () {
     Notification::fake();
     $this->company = Company::create(['name' => 'Audit Company']);
     $this->event = Event::create(['company_id' => $this->company->id, 'title' => 'Audit Summit', 'event_date' => now(), 'food_registration_required' => true]);
+    unlockAllEventFeatures($this->event);
     $this->head = auditUser('audit_head', $this->company, $this->event);
     $this->staff = auditUser('audit_staff', $this->company, $this->event);
     $this->manager = auditUser('manager', $this->company, $this->event);
@@ -83,9 +84,11 @@ it('enforces sharing point assignment and meal eligibility on the server', funct
 
 it('blocks unassigned and cross company events even with a stale assignment', function () {
     $other = Event::create(['company_id' => $this->company->id, 'title' => 'Unassigned', 'event_date' => now()]);
+    unlockAllEventFeatures($other);
     $this->actingAs($this->head)->get(route('events.meals.index', $other))->assertForbidden();
     $foreignCompany = Company::create(['name' => 'Foreign']);
     $foreign = Event::create(['company_id' => $foreignCompany->id, 'title' => 'Foreign event', 'event_date' => now()]);
+    unlockAllEventFeatures($foreign);
     $this->head->events()->attach($foreign);
     $this->get(route('events.meals.index', $foreign))->assertForbidden();
     $this->get(route('dashboard'))->assertDontSee('Foreign event');

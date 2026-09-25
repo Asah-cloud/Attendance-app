@@ -10,7 +10,7 @@
     }
     if ($user->hasRole('admin')) {
         $items[] = ['label' => 'Companies', 'route' => 'companies.index', 'active' => 'companies.*', 'icon' => 'M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1'];
-        $items[] = ['label' => 'Pricing', 'route' => 'pricing.plans.index', 'active' => ['pricing.plans.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*'], 'icon' => 'M12 8v8m-4-4h8M3 6h18M5 21V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v15l-7-4-7 4Z'];
+        $items[] = ['label' => 'Pricing', 'route' => 'pricing.plans.index', 'active' => ['pricing.plans.*', 'pricing.features.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*'], 'icon' => 'M12 8v8m-4-4h8M3 6h18M5 21V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v15l-7-4-7 4Z'];
         $items[] = ['label' => 'Integrations', 'route' => 'integrations.edit', 'active' => 'integrations.*', 'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z'];
     }
     if ($user->hasAnyRole(['admin', 'manager'])) {

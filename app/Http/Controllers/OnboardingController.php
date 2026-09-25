@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendeePricingTier;
 use App\Models\Company;
+use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\SubscriptionPayment;
 use App\Models\User;
@@ -33,7 +34,10 @@ class OnboardingController extends Controller
             ->orderBy('band_from')
             ->get();
 
-        return view('pricing', ['plans' => Plan::allKeyed(), 'payPerEventTiers' => $payPerEventTiers]);
+        return view('pricing', [
+            'payPerEventTiers' => $payPerEventTiers,
+            'features' => Feature::purchasable(),
+        ]);
     }
 
     public function choosePayPerEvent(Request $request): RedirectResponse

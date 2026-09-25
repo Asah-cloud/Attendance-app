@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureCompanyIsActive;
+use App\Http\Middleware\EnsureEventFeature;
 use App\Http\Middleware\RequirePasswordChange;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['webhooks/paystack']);
         $middleware->alias([
             'company.active' => EnsureCompanyIsActive::class,
+            'event.feature' => EnsureEventFeature::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,

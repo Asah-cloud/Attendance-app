@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
+use App\Models\Feature;
 use App\Services\EventBillingService;
 use App\Services\PaystackService;
 use Illuminate\Http\RedirectResponse;
@@ -18,14 +19,19 @@ class EventBillingController extends Controller
         $this->authorize('update', $event);
         $charge = $event->attendeeCharge;
         $estimate = $charge ? null : $billing->estimate($event);
+        $features = $charge ? null : Feature::purchasable();
 
-        return view('events.billing.show', compact('event', 'charge', 'estimate'));
+        return view('events.billing.show', compact('event', 'charge', 'estimate', 'features'));
     }
 
-    public function finalize(Event $event, EventBillingService $billing): RedirectResponse
+    public function finalize(Request $request, Event $event, EventBillingService $billing): RedirectResponse
     {
         $this->authorize('update', $event);
-        $billing->finalize($event);
+        $featureKeys = array_values(array_intersect(
+            (array) $request->input('features', []),
+            Feature::purchasable()->pluck('key')->all()
+        ));
+        $billing->finalize($event, $featureKeys);
 
         return redirect()->route('events.billing.show', $event)->with('success', 'Attendee bill finalized. Review it below and complete payment.');
     }

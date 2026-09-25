@@ -179,7 +179,9 @@ it('reserves every room on a floor and preserves reservations when inventory is 
     $company = Company::create(['name' => 'Acme']);
     $manager = supportStaffManager($company);
     $source = Event::create(['company_id' => $company->id, 'title' => 'One', 'event_date' => today()]);
+    unlockAllEventFeatures($source);
     $destination = Event::create(['company_id' => $company->id, 'title' => 'Two', 'event_date' => today()->addDay()]);
+    unlockAllEventFeatures($destination);
     $site = $source->accommodationSites()->create(['name' => 'Campus']);
     $block = $site->blocks()->create(['name' => 'Staff Block', 'category_restriction' => 'Staff']);
     $floor = $block->floors()->create(['name' => 'Staff Floor']);

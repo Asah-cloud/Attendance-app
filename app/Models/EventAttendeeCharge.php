@@ -21,6 +21,14 @@ class EventAttendeeCharge extends Model
 
     public const STATUS_REFUNDED = 'refunded';
 
+    /** Statuses reached only after payment succeeded — used to gate paid features. */
+    public const PAID_STATUSES = [
+        self::STATUS_PAID,
+        self::STATUS_RECONCILED,
+        self::STATUS_REFUND_DUE,
+        self::STATUS_REFUNDED,
+    ];
+
     protected $fillable = [
         'event_id',
         'company_id',
@@ -28,6 +36,9 @@ class EventAttendeeCharge extends Model
         'registered_count',
         'tier_breakdown',
         'amount_minor',
+        'features_amount_minor',
+        'feature_breakdown',
+        'grandfathered',
         'currency',
         'payment_reference',
         'paid_at',
@@ -45,6 +56,9 @@ class EventAttendeeCharge extends Model
             'registered_count' => 'integer',
             'tier_breakdown' => 'array',
             'amount_minor' => 'integer',
+            'features_amount_minor' => 'integer',
+            'feature_breakdown' => 'array',
+            'grandfathered' => 'boolean',
             'paid_at' => 'datetime',
             'finalized_at' => 'datetime',
             'checked_in_count' => 'integer',

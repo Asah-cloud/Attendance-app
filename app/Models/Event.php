@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\Channels\ArkeselChannel;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -119,7 +120,7 @@ class Event extends Model
     {
         return array_values(array_filter([
             $this->automatic_attendee_email ? 'mail' : null,
-            $this->automatic_attendee_sms ? \App\Notifications\Channels\ArkeselChannel::class : null,
+            $this->automatic_attendee_sms ? ArkeselChannel::class : null,
         ]));
     }
 
@@ -136,6 +137,31 @@ class Event extends Model
     public function attendeeCharge(): HasOne
     {
         return $this->hasOne(EventAttendeeCharge::class);
+    }
+
+    public function features(): HasMany
+    {
+        return $this->hasMany(EventFeature::class);
+    }
+
+    /**
+     * Whether this event has bought and paid for the given advanced feature.
+     * Standard functionality (attendance, check-in, basic reports) is never
+     * gated and doesn't need this check.
+     */
+    public function hasFeature(string $key): bool
+    {
+        $charge = $this->attendeeCharge;
+
+        if (! $charge || ! in_array($charge->status, EventAttendeeCharge::PAID_STATUSES, true)) {
+            return false;
+        }
+
+        if ($charge->grandfathered) {
+            return true;
+        }
+
+        return $this->features->contains('feature_key', $key);
     }
 
     public function checkedInParticipantCount(): int

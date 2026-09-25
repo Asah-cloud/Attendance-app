@@ -45,6 +45,7 @@ it('lets managers create food distributions for their events', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
 
     $this->actingAs($manager)->post(route('events.meals.store', $event), [
         'name' => 'Day 1 Lunch',
@@ -59,6 +60,7 @@ it('issues one portion from the existing attendee QR and blocks a duplicate', fu
     $company = Company::create(['name' => 'Acme']);
     $usher = mealUser('usher', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $usher->events()->attach($event);
     $registration = mealRegistration($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 2]);
@@ -84,6 +86,7 @@ it('lets a manager issue a meal by scanning an event staff badge', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $staff = Participant::create([
         'company_id' => $company->id,
         'name' => 'Event Usher',
@@ -116,6 +119,7 @@ it('enforces stock and confirmed registration requirements', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $first = mealRegistration($event, 'First Guest');
     $second = mealRegistration($event, 'Second Guest');
     $pending = mealRegistration($event, 'Pending Guest');
@@ -132,6 +136,7 @@ it('allows only managers to issue an audited extra portion and reverse a collect
     $manager = mealUser('manager', $company);
     $usher = mealUser('usher', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $usher->events()->attach($event);
     $registration = mealRegistration($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 1]);
@@ -155,6 +160,7 @@ it('provides managers with food reports and prevents stock below issued portions
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 3]);
 
@@ -170,6 +176,7 @@ it('lists attendees who have not collected food yet and totals waste by reason',
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $served = mealRegistration($event, 'Served Guest');
     $pending = mealRegistration($event, 'Pending Guest');
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
@@ -189,6 +196,7 @@ it('summarizes dietary requirements and forecast accuracy on the food report', f
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $vegetarian = mealRegistration($event, 'Vegetarian Guest');
     $vegetarian->participant->update(['dietary_notes' => 'Vegetarian']);
     $other = mealRegistration($event, 'Regular Guest');
@@ -218,6 +226,7 @@ it('auto-approves scans within a category entitlement and blocks beyond it', fun
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event, 'VIP Guest', 'VIP');
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
     $meal->entitlements()->create(['category' => 'VIP', 'portions_allowed' => 2]);
@@ -238,6 +247,7 @@ it('still blocks a second scan by default for a category with no configured enti
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event, 'Regular Guest', 'General');
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
 
@@ -249,6 +259,7 @@ it('lets a manager replace a distribution entitlements from a textarea', functio
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
     $meal->entitlements()->create(['category' => 'Stale', 'portions_allowed' => 5]);
 
@@ -266,6 +277,7 @@ it('saves dietary notes through the attendee edit flow and shows them in the foo
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
     $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $registration->registration_code])->assertOk();
@@ -286,6 +298,7 @@ it('records the serving station on a collection and totals them in the report', 
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
 
@@ -305,6 +318,7 @@ it('lets a manager assign a portion allocation to a station and blocks issuing b
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
     $this->actingAs($manager)->post(route('events.meals.stations.update', $event), ['stations' => "Gate A\nGate B"])->assertRedirect();
     $gateA = $event->mealStations()->where('name', 'Gate A')->firstOrFail();
@@ -349,6 +363,7 @@ it('lets a manager override a station allocation cap', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
     $this->actingAs($manager)->post(route('events.meals.stations.update', $event), ['stations' => 'Gate A'])->assertRedirect();
     $gateA = $event->mealStations()->where('name', 'Gate A')->firstOrFail();
@@ -373,6 +388,7 @@ it('reports remaining/low-stock status and alerts managers once when stock dips'
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 2, 'low_stock_threshold' => 1]);
 
     $status = $this->actingAs($manager)->getJson(route('events.meals.status', [$event, $meal]))->assertOk()->json();
@@ -393,6 +409,7 @@ it('resets the low-stock alert guard when stock is raised back above the thresho
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 2, 'low_stock_threshold' => 1, 'low_stock_notified_at' => now()]);
 
     $this->actingAs($manager)->patch(route('events.meals.update', [$event, $meal]), ['name' => 'Lunch', 'total_portions' => 5, 'is_active' => 1])->assertRedirect();
@@ -404,6 +421,7 @@ it('computes a food forecast from confirmed attendance and category entitlements
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     mealRegistration($event, 'VIP One', 'VIP');
     mealRegistration($event, 'VIP Two', 'VIP');
     mealRegistration($event, 'Regular One', 'General');
@@ -419,6 +437,7 @@ it('renders one printable voucher per confirmed attendee with the shared attenda
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     mealRegistration($event, 'Voucher Guest');
 
     $this->actingAs($manager)->get(route('events.meals.vouchers', $event))
@@ -431,6 +450,7 @@ it('serves confirmed attendees even when legacy food signup flags are enabled', 
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'food_registration_required' => true]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
 
@@ -448,6 +468,7 @@ it('issues food normally once an attendee is marked as needing it', function () 
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'food_registration_required' => true]);
+    unlockAllEventFeatures($event);
     $registration = mealRegistration($event);
     $registration->update(['food_required' => true]);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
@@ -460,6 +481,7 @@ it('removes food signup controls from the food dashboard', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'food_registration_required' => true]);
+    unlockAllEventFeatures($event);
     $this->actingAs($manager)->get(route('events.meals.index', $event))->assertOk()
         ->assertDontSee('Require food sign-up')->assertSee('Every confirmed participant is eligible');
 });
@@ -487,6 +509,7 @@ it('logs waste and reflects it in the food report totals', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
     $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
 
     $this->actingAs($manager)->post(route('events.meals.waste', [$event, $meal]), [

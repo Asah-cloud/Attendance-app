@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Event;
+use App\Models\EventAttendeeCharge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +46,35 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Grants an event full access to every advanced feature for tests that exercise
+ * functionality unrelated to billing (messages, badges, rooms, food, exports),
+ * without going through the real finalize/pay flow or its notifications.
+ */
+function unlockAllEventFeatures(Event $event): void
 {
-    // ..
+    $charge = $event->attendeeCharge;
+
+    if ($charge) {
+        $charge->update(['status' => EventAttendeeCharge::STATUS_PAID, 'grandfathered' => true]);
+
+        return;
+    }
+
+    EventAttendeeCharge::create([
+        'event_id' => $event->id,
+        'company_id' => $event->company_id,
+        'status' => EventAttendeeCharge::STATUS_PAID,
+        'registered_count' => 0,
+        'tier_breakdown' => [],
+        'amount_minor' => 0,
+        'features_amount_minor' => 0,
+        'feature_breakdown' => [],
+        'grandfathered' => true,
+        'currency' => config('plans.currency'),
+        'finalized_at' => now(),
+        'paid_at' => now(),
+    ]);
+
+    $event->unsetRelation('attendeeCharge');
 }

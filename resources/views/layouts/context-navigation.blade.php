@@ -9,7 +9,7 @@
         request()->routeIs('admin.users.*', 'admin.register-*') => ['Team', route('admin.users.index')],
         request()->routeIs('companies.history.*') => ['Company history', route('companies.history.index')],
         request()->routeIs('companies.*') => ['Companies', route('companies.index')],
-        request()->routeIs('pricing.plans.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') => ['Pricing', route('pricing.plans.index')],
+        request()->routeIs('pricing.plans.*', 'pricing.features.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') => ['Pricing', route('pricing.plans.index')],
         request()->routeIs('integrations.*') => ['Integrations', route('integrations.edit')],
         request()->routeIs('billing.*') => ['Billing', route('billing.index')],
         request()->routeIs('organization.*') => ['Organization', route('organization.branding.edit')],
@@ -60,8 +60,9 @@
         default => null,
     };
 
-    $pricingLinks = request()->routeIs('pricing.plans.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') ? [
+    $pricingLinks = request()->routeIs('pricing.plans.*', 'pricing.features.*', 'attendee-pricing.*', 'pricing.companies.*', 'attendee-billing.*') ? [
         ['label' => 'Plans', 'route' => route('pricing.plans.index'), 'active' => request()->routeIs('pricing.plans.*')],
+        ['label' => 'Features', 'route' => route('pricing.features.index'), 'active' => request()->routeIs('pricing.features.*')],
         ['label' => 'Attendee pricing', 'route' => route('attendee-pricing.edit'), 'active' => request()->routeIs('attendee-pricing.*')],
         ['label' => 'Companies', 'route' => route('pricing.companies.index'), 'active' => request()->routeIs('pricing.companies.*')],
         ['label' => 'Billing oversight', 'route' => route('attendee-billing.index'), 'active' => request()->routeIs('attendee-billing.*')],
