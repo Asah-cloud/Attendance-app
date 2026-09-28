@@ -6,10 +6,11 @@ use App\Imports\UsersImport;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
+use App\Notifications\Channels\ArkeselChannel;
 use App\Services\EventBillingService;
 use App\Services\PdfParticipantListParser;
-use App\Services\RegistrationLifecycleService;
 // Added these for the import to work
+use App\Services\RegistrationLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -166,12 +167,8 @@ class EventController extends Controller
 
         $company = Company::findOrFail($companyId);
 
-        if (! $company->is_active || (
-            $company->billing_mode === Company::BILLING_MODE_SUBSCRIPTION
-            && $company->subscription_ends_at
-            && $company->subscription_ends_at->endOfDay()->isPast()
-        )) {
-            return back()->withInput()->with('error', 'This company subscription is inactive or expired.');
+        if (! $company->is_active) {
+            return back()->withInput()->with('error', 'This company account is inactive.');
         }
 
         if ($request->hasFile('logo')) {
@@ -187,31 +184,8 @@ class EventController extends Controller
         $validated['food_registration_required'] = false;
         $validated['day'] = 1;
 
-        // Enforce active subscription limits
-        $created = DB::transaction(function () use ($companyId, $validated) {
-            $company = Company::query()->lockForUpdate()->findOrFail($companyId);
-
-            if ($company->billing_mode !== Company::BILLING_MODE_PAY_PER_EVENT
-                && $company->events()->count() >= $company->event_limit) {
-                return false;
-            }
-
-            $validated['company_id'] = $companyId;
-            Event::create($validated);
-
-            return true;
-        });
-
-        if (! $created) {
-            if (! empty($validated['logo_path'])) {
-                Storage::disk('public')->delete($validated['logo_path']);
-            }
-            if (! empty($validated['flyer_path'])) {
-                Storage::disk('public')->delete($validated['flyer_path']);
-            }
-
-            return back()->withInput()->with('error', "Cannot create event. {$company->name} has reached its event limit of {$company->event_limit}.");
-        }
+        $validated['company_id'] = $companyId;
+        Event::create($validated);
 
         return redirect('/events')->with('success', 'Event created!');
     }
@@ -310,7 +284,7 @@ class EventController extends Controller
                 $channels[] = 'mail';
             }
             if ($request->boolean('send_update_sms')) {
-                $channels[] = \App\Notifications\Channels\ArkeselChannel::class;
+                $channels[] = ArkeselChannel::class;
             }
             $lifecycle->eventChanged($event->fresh(), $channels);
         }

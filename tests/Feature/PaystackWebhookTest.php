@@ -3,7 +3,6 @@
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
-use App\Models\SubscriptionPayment;
 
 function signedPaystackWebhookHeaders(string $body, string $secret): array
 {
@@ -39,37 +38,14 @@ it('rejects a paystack webhook call with a wrong signature', function () {
     $response->assertForbidden();
 });
 
-it('confirms a pending subscription payment for a correctly signed webhook', function () {
-    $company = Company::create([
-        'name' => 'Webhook Co',
-        'is_active' => true,
-        'subscription_ends_at' => null,
-    ]);
-    $payment = SubscriptionPayment::create([
-        'company_id' => $company->id,
-        'plan_key' => 'starter',
-        'type' => 'initial',
-        'amount_minor' => 9900,
-        'currency' => 'GHS',
-        'payment_reference' => 'SUB-1-ABCDEFGHIJKLMNOP',
-        'status' => SubscriptionPayment::STATUS_PENDING,
-    ]);
-
-    $body = paystackWebhookBody($payment->payment_reference);
+it('ignores a legacy subscription reference now that subscriptions are retired', function () {
+    $body = paystackWebhookBody('SUB-1-ABCDEFGHIJKLMNOP');
     $headers = signedPaystackWebhookHeaders($body, 'sk_test_webhooksecret');
 
-    $response = $this->call('POST', route('paystack.webhook'), server: [
+    $this->call('POST', route('paystack.webhook'), server: [
         'CONTENT_TYPE' => 'application/json',
         'HTTP_X_PAYSTACK_SIGNATURE' => $headers['x-paystack-signature'],
-    ], content: $body);
-
-    $response->assertOk();
-    $payment->refresh();
-    $company->refresh();
-    expect($payment->status)->toBe(SubscriptionPayment::STATUS_PAID)
-        ->and($payment->paid_at)->not->toBeNull()
-        ->and($company->plan_key)->toBe('starter')
-        ->and($company->subscription_ends_at)->not->toBeNull();
+    ], content: $body)->assertOk();
 });
 
 it('confirms a pending event attendee charge for a correctly signed webhook', function () {
@@ -98,35 +74,6 @@ it('confirms a pending event attendee charge for a correctly signed webhook', fu
     $charge->refresh();
     expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PAID)
         ->and($charge->paid_at)->not->toBeNull();
-});
-
-it('is idempotent when the same webhook is delivered twice', function () {
-    $company = Company::create(['name' => 'Duplicate Delivery Co', 'is_active' => true, 'subscription_ends_at' => null]);
-    $payment = SubscriptionPayment::create([
-        'company_id' => $company->id,
-        'plan_key' => 'starter',
-        'type' => 'initial',
-        'amount_minor' => 9900,
-        'currency' => 'GHS',
-        'payment_reference' => 'SUB-1-DUPLICATEDELIVERY',
-        'status' => SubscriptionPayment::STATUS_PENDING,
-    ]);
-
-    $body = paystackWebhookBody($payment->payment_reference);
-    $headers = signedPaystackWebhookHeaders($body, 'sk_test_webhooksecret');
-
-    $deliver = fn () => $this->call('POST', route('paystack.webhook'), server: [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_X_PAYSTACK_SIGNATURE' => $headers['x-paystack-signature'],
-    ], content: $body);
-
-    $deliver()->assertOk();
-    $firstEndsAt = $company->refresh()->subscription_ends_at;
-
-    $deliver()->assertOk();
-    $company->refresh();
-
-    expect($company->subscription_ends_at->equalTo($firstEndsAt))->toBeTrue();
 });
 
 it('logs and ignores an onboarding reference with no matching account yet', function () {

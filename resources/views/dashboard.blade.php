@@ -10,7 +10,7 @@
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach([
                 ['Companies', $stats['companies'], 'bg-blue-50 text-blue-700'],
-                ['Active subscriptions', $stats['activeSubscriptions'], 'bg-emerald-50 text-emerald-700'],
+                ['Active companies', $stats['activeCompanies'], 'bg-emerald-50 text-emerald-700'],
                 ['Total events', $stats['events'], 'bg-violet-50 text-violet-700'],
                 ['Participants', number_format($stats['participants']), 'bg-amber-50 text-amber-700'],
                 ["Today's check-ins", number_format($stats['checkInsToday']), 'bg-cyan-50 text-cyan-700'],
@@ -21,7 +21,7 @@
         </div>
 
         <div class="mt-6 grid gap-6 xl:grid-cols-3">
-            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3">
                 <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5"><div><h3 class="font-extrabold text-slate-950">Upcoming events</h3><p class="mt-1 text-xs text-slate-500">Next events across every company</p></div><a href="{{ route('events.index') }}" class="text-xs font-extrabold text-blue-600">View all</a></div>
                 <div class="divide-y divide-slate-100">
                     @forelse($upcomingEvents as $event)
@@ -30,34 +30,22 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold text-slate-950">Subscriptions ending soon</h3><p class="mt-1 text-xs text-slate-500">Next 14 days</p></div>
-                <div class="divide-y divide-slate-100">
-                    @forelse($expiringCompanies as $company)
-                        <a href="{{ route('companies.edit', $company) }}" class="block px-6 py-4 hover:bg-slate-50"><div class="flex items-center justify-between gap-3"><span class="truncate text-sm font-bold text-slate-800">{{ $company->name }}</span><span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700">{{ now()->startOfDay()->diffInDays($company->subscription_ends_at, false) }} days</span></div><p class="mt-1 text-xs text-slate-500">Ends {{ $company->subscription_ends_at->format('M j, Y') }}</p></a>
-                    @empty <p class="px-6 py-10 text-center text-sm text-slate-500">No subscriptions ending soon.</p> @endforelse
-                </div>
-            </section>
         </div>
 
         <div class="mt-6 grid gap-6 lg:grid-cols-2">
             <section class="rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold">Newest companies</h3></div><div class="divide-y divide-slate-100">@forelse($recentCompanies as $company)<div class="flex items-center justify-between px-6 py-4"><div><p class="text-sm font-bold">{{ $company->name }}</p><p class="mt-1 text-xs text-slate-500">{{ $company->events_count }} events · {{ $company->users_count }} team members</p></div><span class="text-xs text-slate-400">{{ $company->created_at->diffForHumans() }}</span></div>@empty<p class="p-6 text-sm text-slate-500">No companies yet.</p>@endforelse</div></section>
-            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold">Recent payments</h3></div><div class="divide-y divide-slate-100">@forelse($recentPayments as $payment)<div class="flex items-center justify-between px-6 py-4"><div><p class="text-sm font-bold">{{ $payment->company?->name }}</p><p class="mt-1 text-xs text-slate-500">{{ ucfirst($payment->type) }} · {{ ucfirst($payment->plan_key) }}</p></div><div class="text-right"><p class="text-sm font-black text-emerald-700">{{ number_format($payment->amount_minor / 100, 2) }} {{ $payment->currency }}</p><p class="mt-1 text-xs text-slate-400">{{ $payment->paid_at?->diffForHumans() }}</p></div></div>@empty<p class="p-6 text-sm text-slate-500">No payments yet.</p>@endforelse</div></section>
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold">Recent event payments</h3></div><div class="divide-y divide-slate-100">@forelse($recentPayments as $payment)<div class="flex items-center justify-between px-6 py-4"><div><p class="text-sm font-bold">{{ $payment->company?->name }}</p><p class="mt-1 text-xs text-slate-500">{{ $payment->event?->title }} · {{ str_replace('_', ' ', $payment->status) }}</p></div><div class="text-right"><p class="text-sm font-black text-emerald-700">{{ number_format($payment->amount_minor / 100, 2) }} {{ $payment->currency }}</p><p class="mt-1 text-xs text-slate-400">{{ $payment->paid_at?->diffForHumans() }}</p></div></div>@empty<p class="p-6 text-sm text-slate-500">No payments yet.</p>@endforelse</div></section>
         </div>
 
     @elseif($dashboardType === 'manager')
         @php
             $statusTotal = max(1, (int) $registrationStatuses->sum());
-            $daysLeft = $company->subscription_ends_at ? now()->startOfDay()->diffInDays($company->subscription_ends_at, false) : null;
         @endphp
         <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div><p class="text-sm font-semibold text-blue-600">{{ $company->name }}</p><h2 class="mt-1 text-3xl font-black tracking-tight text-slate-950">Welcome back, {{ str(auth()->user()->name)->before(' ') }}</h2><p class="mt-2 text-sm text-slate-500">Your events, registrations and attendance at a glance.</p></div>
             <div class="flex gap-3"><a href="{{ route('events.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Create event</a></div>
         </div>
 
-        @if($daysLeft !== null && $daysLeft <= 14)
-            <a href="{{ route('billing.index') }}" class="mb-6 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900"><span><strong class="block text-sm">Subscription {{ $daysLeft < 0 ? 'expired' : 'ending soon' }}</strong><span class="text-xs">{{ $daysLeft < 0 ? 'Renew now to restore full access.' : $daysLeft.' days remaining.' }}</span></span><span class="text-sm font-extrabold">Manage billing →</span></a>
-        @endif
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach([

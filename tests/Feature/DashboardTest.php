@@ -43,7 +43,7 @@ it('shows platform data to the super admin', function () {
         ->assertOk()
         ->assertSee('Platform overview')
         ->assertSee('Platform Company')
-        ->assertSee('Active subscriptions');
+        ->assertSee('Active companies');
 });
 
 it('excludes archived companies from the super admin platform stats', function () {

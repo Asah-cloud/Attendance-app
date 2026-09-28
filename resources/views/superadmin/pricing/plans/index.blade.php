@@ -3,7 +3,7 @@
     <div class="py-10"><div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
 
         <div class="mb-6 flex items-center justify-between gap-4">
-            <div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Pricing</p><h2 class="mt-1 text-2xl font-black">Subscription plans</h2><p class="mt-1 text-sm text-slate-500">Prices, limits, and feature bullets shown on the public pricing page and billing screens.</p></div>
+            <div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">Pricing</p><h2 class="mt-1 text-2xl font-black">Subscription plans</h2><p class="mt-1 text-sm text-slate-500">Legacy subscription settings, kept for reference and for companies still assigned to a plan. Plans are no longer offered to new customers; billing is per event.</p></div>
             <a href="{{ route('pricing.plans.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-blue-200 hover:-translate-y-0.5 hover:bg-blue-700">Add plan</a>
         </div>
 

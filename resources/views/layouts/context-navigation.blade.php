@@ -49,7 +49,6 @@
         request()->routeIs('companies.create') => 'Add company',
         request()->routeIs('companies.edit') => 'Edit company',
         request()->routeIs('companies.history.show') => 'Archived company',
-        request()->routeIs('billing.checkout') => 'Checkout',
         request()->routeIs('participants.duplicates.compare') => 'Compare records',
         request()->routeIs('pricing.plans.create') => 'Add plan',
         request()->routeIs('pricing.plans.edit') => 'Edit plan',

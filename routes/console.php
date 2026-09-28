@@ -1,11 +1,8 @@
 <?php
 
 use App\Models\BadgeExport;
-use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventRegistration;
-use App\Notifications\CompanySubscriptionNotification;
-use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Services\ConfirmationReminderSender;
 use App\Services\CustomMessageSender;
 use App\Services\EmailDomainLifecycleManager;
@@ -41,34 +38,6 @@ Schedule::call(function (): void {
             }
         });
 })->hourly()->name('send-event-reminders')->withoutOverlapping();
-
-Schedule::call(function (): void {
-    Company::query()
-        ->whereDate('subscription_ends_at', now()->addDays(7)->toDateString())
-        ->whereNull('subscription_expiry_warning_sent_at')
-        ->with('users')
-        ->chunkById(100, function ($companies): void {
-            foreach ($companies as $company) {
-                foreach ($company->users->where('role', 'manager') as $manager) {
-                    NotifiesPerChannel::send($manager, new CompanySubscriptionNotification($company, false));
-                }
-                $company->update(['subscription_expiry_warning_sent_at' => now()]);
-            }
-        });
-
-    Company::query()
-        ->whereDate('subscription_ends_at', '<', now()->toDateString())
-        ->whereNull('subscription_expired_notice_sent_at')
-        ->with('users')
-        ->chunkById(100, function ($companies): void {
-            foreach ($companies as $company) {
-                foreach ($company->users->where('role', 'manager') as $manager) {
-                    NotifiesPerChannel::send($manager, new CompanySubscriptionNotification($company, true));
-                }
-                $company->update(['subscription_expired_notice_sent_at' => now()]);
-            }
-        });
-})->dailyAt('08:00')->name('send-subscription-lifecycle-notices')->withoutOverlapping();
 
 Schedule::call(fn () => app(ConfirmationReminderSender::class)->sendDue())
     ->dailyAt('09:00')->name('send-confirmation-reminders')->withoutOverlapping();

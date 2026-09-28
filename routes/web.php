@@ -104,14 +104,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('role:manager')->prefix('billing')->name('billing.')->group(function () {
         Route::get('/', [BillingController::class, 'index'])->name('index');
-        Route::get('/checkout/callback', [BillingController::class, 'checkoutCallback'])->name('checkout.callback');
-        Route::get('/checkout/{plan}', [BillingController::class, 'checkout'])->name('checkout');
-        Route::post('/checkout/{plan}/start', [BillingController::class, 'startCheckout'])
-            ->middleware('throttle:10,1')
-            ->name('checkout.start');
         Route::patch('/contact', [BillingController::class, 'updateContact'])->name('contact.update');
-        Route::post('/cancel-renewal', [BillingController::class, 'cancelRenewal'])->name('cancel');
-        Route::post('/resume-renewal', [BillingController::class, 'resumeRenewal'])->name('resume');
     });
 
     Route::middleware('role:manager')->prefix('organization')->name('organization.')->group(function () {

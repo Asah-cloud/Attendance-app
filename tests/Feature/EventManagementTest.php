@@ -5,6 +5,7 @@ use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\RegistrationLifecycleNotification;
+use App\Services\RegistrationLifecycleService;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -105,19 +106,19 @@ it('lets a manager toggle rooms and food sign-up when editing an event', functio
         ->and($event->fresh()->food_registration_required)->toBeFalse();
 });
 
-it('blocks event creation once a company reaches its event limit', function () {
+it('no longer caps how many events a company can create', function () {
     $company = Company::create(['name' => 'Acme Co', 'event_limit' => 1]);
     $manager = eventManagementManager($company);
     Event::create(['company_id' => $company->id, 'title' => 'Existing Event', 'event_date' => now()]);
 
     $this->actingAs($manager)
         ->post(route('events.store'), [
-            'title' => 'Over Limit Event',
+            'title' => 'Second Event',
             'event_date' => now()->addWeek()->toDateString(),
         ])
-        ->assertSessionHas('error');
+        ->assertRedirect('/events');
 
-    $this->assertDatabaseCount('events', 1);
+    $this->assertDatabaseCount('events', 2);
 });
 
 it('allows a manager to update their own event', function () {
@@ -162,13 +163,13 @@ it('keeps automatic attendee messages off until an event channel is selected', f
     $person = Participant::create(['company_id' => $company->id, 'name' => 'Attendee', 'email' => 'attendee@example.com']);
     $registration = $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
 
-    app(\App\Services\RegistrationLifecycleService::class)->notify($registration, 'confirmed');
+    app(RegistrationLifecycleService::class)->notify($registration, 'confirmed');
     Notification::assertNothingSent();
 
     $this->actingAs($manager)->put(route('events.update', $event), [
         'title' => 'Conference', 'event_date' => $event->event_date->toDateString(), 'automatic_attendee_email' => '1',
     ])->assertRedirect('/events');
-    app(\App\Services\RegistrationLifecycleService::class)->notify($registration->fresh(), 'confirmed');
+    app(RegistrationLifecycleService::class)->notify($registration->fresh(), 'confirmed');
     Notification::assertSentTo($person, RegistrationLifecycleNotification::class);
 });
 

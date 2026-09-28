@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\EventAttendeeCharge;
 use App\Models\EventRegistration;
 use App\Models\Participant;
-use App\Models\SubscriptionPayment;
 use App\Services\ApplicationCache;
 use Illuminate\View\View;
 
@@ -47,22 +47,17 @@ class DashboardController extends Controller
             return [
                 'stats' => [
                     'companies' => Company::count(),
-                    'activeSubscriptions' => Company::where('is_active', true)
-                        ->where(fn ($query) => $query->whereNull('subscription_ends_at')->orWhereDate('subscription_ends_at', '>=', $today))
-                        ->count(),
+                    'activeCompanies' => Company::where('is_active', true)->count(),
                     'events' => Event::whereHas('company')->count(),
                     'participants' => Participant::whereHas('company')->count(),
                     'checkInsToday' => Attendance::whereDate('created_at', $today)->whereHas('event.company')->count(),
-                    'revenueMinor' => SubscriptionPayment::where('status', 'paid')->whereHas('company')->sum('amount_minor'),
+                    'revenueMinor' => EventAttendeeCharge::whereIn('status', EventAttendeeCharge::PAID_STATUSES)->whereHas('company')->sum('amount_minor'),
                 ],
                 'recentCompanies' => Company::withCount(['events', 'users'])->latest()->limit(5)->get(),
-                'recentPayments' => SubscriptionPayment::with('company')->where('status', 'paid')->whereHas('company')->latest('paid_at')->limit(5)->get(),
+                'recentPayments' => EventAttendeeCharge::with(['company', 'event'])->whereIn('status', EventAttendeeCharge::PAID_STATUSES)->whereHas('company')->latest('paid_at')->limit(5)->get(),
                 'upcomingEvents' => Event::with('company')->withCount('registrations')->whereHas('company')
                     ->whereNull('cancelled_at')->whereDate('event_date', '>=', $today)
                     ->orderBy('event_date')->limit(5)->get(),
-                'expiringCompanies' => Company::whereNotNull('subscription_ends_at')
-                    ->whereBetween('subscription_ends_at', [$today, now()->addDays(14)->toDateString()])
-                    ->orderBy('subscription_ends_at')->limit(5)->get(),
             ];
         });
 
