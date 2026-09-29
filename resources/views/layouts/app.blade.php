@@ -1,3 +1,8 @@
+@php
+    $tourKey = \App\Support\OnboardingTours::keyFor(request());
+    $tourUser = auth()->user();
+    $autoStartTour = $tourKey && $tourUser?->hasRole('manager') && ! $tourUser->hasSeenTour($tourKey);
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -15,7 +20,8 @@
     </head>
     <body class="antialiased text-slate-950 selection:bg-blue-600 selection:text-white" style="font-family: Manrope, sans-serif"
         data-tour-complete-url="{{ route('tour.complete') }}"
-        data-auto-start-tour="{{ (auth()->check() && auth()->user()->hasRole('manager') && ! auth()->user()->onboarding_tour_completed_at) ? 'true' : 'false' }}">
+        data-tour-key="{{ $tourKey }}"
+        data-auto-start-tour="{{ $autoStartTour ? 'true' : 'false' }}">
         <x-toast />
         <div data-ui="app" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false" class="min-h-screen bg-slate-50">
             @include('layouts.navigation')
@@ -44,9 +50,9 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        @role('manager')
-                            <button type="button" data-tour-restart class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-sm font-extrabold text-slate-500 transition hover:border-blue-300 hover:text-blue-700" title="Replay the getting-started tour" aria-label="Replay the getting-started tour">?</button>
-                        @endrole
+                        @if($tourKey && $tourUser?->hasRole('manager'))
+                            <button type="button" data-tour-restart class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-sm font-extrabold text-slate-500 transition hover:border-blue-300 hover:text-blue-700" title="Replay this page's tour" aria-label="Replay this page's tour">?</button>
+                        @endif
                         <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-slate-100">
                             <span class="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-sm font-extrabold text-white">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
                             <span class="hidden text-left sm:block"><span class="block text-sm font-bold text-slate-800">{{ auth()->user()->name }}</span><span class="block text-xs text-slate-500">View profile</span></span>

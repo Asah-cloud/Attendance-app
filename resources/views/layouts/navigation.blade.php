@@ -6,7 +6,7 @@
     ];
 
     if ($user->hasAnyRole(['admin', 'manager'])) {
-        $items[] = ['label' => 'Team', 'route' => 'admin.users.index', 'active' => ['admin.users.*', 'admin.register-*'], 'icon' => 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.26a4 4 0 0 1 0 7.75'];
+        $items[] = ['label' => 'Team', 'route' => 'admin.users.index', 'active' => ['admin.users.*', 'admin.register-*'], 'icon' => 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.26a4 4 0 0 1 0 7.75', 'tour' => 'nav-team'];
     }
     if ($user->hasRole('admin')) {
         $items[] = ['label' => 'Companies', 'route' => 'companies.index', 'active' => 'companies.*', 'icon' => 'M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1'];
@@ -14,10 +14,10 @@
         $items[] = ['label' => 'Integrations', 'route' => 'integrations.edit', 'active' => 'integrations.*', 'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z'];
     }
     if ($user->hasAnyRole(['admin', 'manager'])) {
-        $items[] = ['label' => 'Event Staff', 'route' => 'support-staff.index', 'active' => 'support-staff.*', 'icon' => 'M8 7a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-5 14a9 9 0 0 1 18 0M16 11l2 2 4-4'];
+        $items[] = ['label' => 'Event Staff', 'route' => 'support-staff.index', 'active' => 'support-staff.*', 'icon' => 'M8 7a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-5 14a9 9 0 0 1 18 0M16 11l2 2 4-4', 'tour' => 'nav-staff-roster'];
     }
     if ($user->hasRole('manager')) {
-        $items[] = ['label' => 'Merge Duplicates', 'route' => 'participants.duplicates.index', 'active' => 'participants.duplicates.*', 'icon' => 'M17 8V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Zm4 5h8'];
+        $items[] = ['label' => 'Merge Duplicates', 'route' => 'participants.duplicates.index', 'active' => 'participants.duplicates.*', 'icon' => 'M17 8V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Zm4 5h8', 'tour' => 'nav-merge-duplicates'];
         $items[] = ['label' => 'Billing', 'route' => 'billing.index', 'active' => 'billing.*', 'icon' => 'M3 6h18v12H3V6Zm0 4h18M7 15h3', 'tour' => 'nav-billing'];
         $items[] = ['label' => 'Organization', 'route' => 'organization.branding.edit', 'active' => 'organization.*', 'icon' => 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.3 7.3 0 0 0-.1-1l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.8-1L14.6 3h-4L10 6a8 8 0 0 0-1.8 1L5.7 6 3.7 9.4l2 1.6a7.3 7.3 0 0 0 0 2L3.7 14.6l2 3.4 2.5-1a8 8 0 0 0 1.8 1l.6 3h4l.6-3a8 8 0 0 0 1.8-1l2.5 1 2-3.4-2-1.6a7.3 7.3 0 0 0 .1-1Z', 'tour' => 'nav-organization'];
     }

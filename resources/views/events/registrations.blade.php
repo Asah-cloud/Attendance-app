@@ -3,7 +3,7 @@
     <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div><h1 class="text-2xl font-black text-slate-900">Registrations</h1><p class="text-sm text-slate-500">Review and manage this event’s attendees.</p></div>
-            <div class="flex flex-wrap gap-2">
+            <div data-tour="event-attendees-actions" class="flex flex-wrap gap-2">
                 <a href="{{ route('events.registrations.export', $event) }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export CSV</a>
                 <a href="{{ route('events.badges', $event) }}" target="_blank" class="rounded-xl bg-teal-300 px-4 py-2 text-xs font-black uppercase tracking-wider text-teal-950">Print badges</a>
                 @can('update', $event)
@@ -30,7 +30,7 @@
         <x-event-closed-banner :event="$event" />
         <livewire:registration-stats :event="$event" />
         @if($errors->any())<div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
-        <details class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','category'])) open @endif>
+        <details data-tour="event-attendees-manual" class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','category'])) open @endif>
             <summary class="cursor-pointer font-black text-slate-900">Manually register an attendee</summary>
             <form method="POST" action="{{ route('events.registrations.store', $event) }}" class="mt-5 grid gap-4 md:grid-cols-2">@csrf
                 <input name="name" value="{{ old('name') }}" required placeholder="Full name" class="rounded-xl border-slate-200">
@@ -51,7 +51,7 @@
                 <button class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white md:col-span-2">Register attendee</button>
             </form>
         </details>
-        <form id="attendee-filter" method="GET" action="{{ route('events.registrations.index', $event) }}" class="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
+        <form id="attendee-filter" data-tour="event-attendees-filter" method="GET" action="{{ route('events.registrations.index', $event) }}" class="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
             <div class="flex-1">
                 <label for="attendee-search" class="mb-1 block text-xs font-black uppercase tracking-wider text-slate-500">Search attendees</label>
                 <input id="attendee-search" type="search" name="search" value="{{ $search }}" placeholder="Name, phone, email, member ID, type, gender, or code" class="w-full rounded-xl border-slate-200 text-sm" autocomplete="off">

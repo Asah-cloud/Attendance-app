@@ -4,7 +4,7 @@
     <div class="py-10">
         <div class="mx-auto max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8">
             <section class="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
-                <div class="rounded-3xl bg-[#071426] p-8 text-white shadow-xl">
+                <div data-tour="billing-explainer" class="rounded-3xl bg-[#071426] p-8 text-white shadow-xl">
                     <p class="text-xs font-black uppercase tracking-[0.2em] text-blue-300">Pay per event</p>
                     <p class="mt-2 text-sm font-bold text-slate-300">{{ $company->name }}</p>
                     <h3 class="mt-3 text-3xl font-black">No subscription, pay only for the events you run</h3>
@@ -22,7 +22,7 @@
                 </div>
             </section>
 
-            <section class="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+            <section data-tour="billing-events-table" class="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
                 <div class="border-b border-gray-100 p-6"><h3 class="font-black text-gray-900">Event bills</h3></div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">

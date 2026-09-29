@@ -12,7 +12,7 @@
                     <p class="text-sm text-gray-500 mt-1 font-medium">Keep your congregation updated by ensuring these details are accurate.</p>
                 </div>
 
-                <form action="{{ route('events.update', $event->id) }}" method="POST" enctype="multipart/form-data" class="p-8 space-y-8">
+                <form action="{{ route('events.update', $event->id) }}" method="POST" enctype="multipart/form-data" data-tour="event-settings-form" class="p-8 space-y-8">
                     @csrf
                     @method('PUT')
 
@@ -158,7 +158,7 @@
             </div>
 
             @can('delete', $event)
-                <div class="mt-8 rounded-2xl border border-red-200 bg-red-50/60 p-8">
+                <div data-tour="event-settings-danger" class="mt-8 rounded-2xl border border-red-200 bg-red-50/60 p-8">
                     <p class="text-sm font-black text-red-950">Danger zone</p>
                     <p class="mt-1 text-xs text-red-800">Permanently delete this event and all its registrations, attendance, and report data. This cannot be undone.</p>
                     <form method="POST" action="{{ route('events.destroy', $event) }}" class="mt-4" onsubmit="return confirm('Delete {{ $event->title }} and all its records? This cannot be undone.');">

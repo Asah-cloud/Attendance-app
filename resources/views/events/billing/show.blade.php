@@ -3,7 +3,7 @@
     <div class="py-10"><div class="mx-auto max-w-3xl space-y-8 px-4 sm:px-6 lg:px-8">
 
         @if(!$charge)
-            <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
+            <section data-tour="event-billing-estimate" class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
                 <h3 class="text-lg font-black">Estimated attendee bill</h3>
                 <p class="mt-1 text-sm text-gray-500">Live estimate based on {{ $estimate['registered_count'] }} confirmed registration(s) right now. This will keep changing until you finalize it.</p>
 
@@ -25,7 +25,7 @@
                     @csrf
 
                     @if($features->isNotEmpty())
-                        <div class="rounded-2xl border border-gray-100 p-5">
+                        <div data-tour="event-billing-features" class="rounded-2xl border border-gray-100 p-5">
                             <h4 class="font-black text-gray-900">Advanced features</h4>
                             <p class="mt-1 text-xs text-gray-500">Optional, extra cost per event. Standard attendance, check-in and reports are always included free.</p>
                             <div class="mt-4 space-y-3">
@@ -53,7 +53,7 @@
                 </form>
             </section>
         @else
-            <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
+            <section data-tour="event-billing-charge" class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h3 class="text-lg font-black">Attendee bill</h3>
                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-700">{{ str_replace('_', ' ', $charge->status) }}</span>

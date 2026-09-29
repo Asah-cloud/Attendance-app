@@ -8,7 +8,7 @@
             <p class="mt-1 text-sm text-slate-500">Search for a name, phone, or email, select two records that are really the same person, and choose which one should survive. Their registrations, attendance history, and edit history all move to the record you keep.</p>
         </div>
 
-        <form method="GET" data-live-search="#duplicate-results" class="mb-6 flex gap-3">
+        <form method="GET" data-live-search="#duplicate-results" data-tour="merge-duplicates-search" class="mb-6 flex gap-3">
             <input type="search" name="q" value="{{ $query }}" placeholder="Search by name, phone, or email" autocomplete="off" class="w-full rounded-xl border-slate-200">
             <button class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white">Search</button>
         </form>

@@ -6,7 +6,7 @@
                 Total Registered: {{ $users->total() }}
             </h3>
             
-            <a href="{{ route('admin.register-person') }}" class="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg">
+            <a href="{{ route('admin.register-person') }}" data-tour="team-add-member" class="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg">
                 + Register New Person
             </a>
         </div>

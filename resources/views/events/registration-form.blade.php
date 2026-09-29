@@ -3,7 +3,7 @@
     <div class="py-10"><div class="mx-auto max-w-5xl space-y-8 px-4 sm:px-6 lg:px-8">
 
         @php $registrationUrl = route('events.register', $event); @endphp
-        <section x-data="{ copied: false, link: @js($registrationUrl) }" class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-950 to-blue-800 p-7 text-white shadow-xl">
+        <section data-tour="event-forms-share" x-data="{ copied: false, link: @js($registrationUrl) }" class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-950 to-blue-800 p-7 text-white shadow-xl">
             <div class="grid items-center gap-7 md:grid-cols-[1fr_auto]">
                 <div>
                     <div class="flex flex-wrap items-center gap-3">
@@ -28,7 +28,7 @@
             </div>
         </section>
 
-        <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
+        <section data-tour="event-forms-settings" class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="text-lg font-black">Registration settings</h3><p class="text-sm text-gray-500">Registration is disabled until you publish it.</p></div>@if($event->registration_enabled)<a target="_blank" href="{{ route('events.register', $event) }}" class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Preview public form</a>@endif</div>
             <form method="POST" action="{{ route('events.registration-form.update', $event) }}" class="mt-6 grid gap-5 md:grid-cols-2">@csrf @method('PATCH')
                 <label class="flex items-center gap-3 rounded-2xl bg-gray-50 p-4"><input type="hidden" name="registration_enabled" value="0"><input type="checkbox" name="registration_enabled" value="1" @checked($event->registration_enabled)><span class="font-bold">Enable public registration</span></label>

@@ -45,7 +45,7 @@
 
                     <div class="flex flex-wrap gap-2 lg:justify-end">
                         @can('scanAttendance', $event)
-                            <a href="{{ route('events.scanner', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md">Open QR scanner</a>
+                            <a href="{{ route('events.scanner', $event) }}" data-tour="event-attendance-scanner" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md">Open QR scanner</a>
                             @unless($event->has_arrival_session)
                             <a href="{{ URL::signedRoute('scan.events', ['event' => $event->slug]) }}" target="_blank" class="rounded-xl bg-cyan-100 px-4 py-2.5 text-xs font-extrabold text-cyan-900 hover:bg-cyan-200">Phone check-in page</a>
                             @endunless
@@ -100,7 +100,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {{-- Left Side Stats --}}
                 <div class="lg:col-span-1 space-y-8" data-aos="fade-right" data-aos-delay="200">
-                    <div class="rounded-3xl border border-blue-100 bg-white p-8 shadow-sm">
+                    <div data-tour="event-attendance-stats" class="rounded-3xl border border-blue-100 bg-white p-8 shadow-sm">
                         <h3 class="text-xs font-black uppercase tracking-widest text-blue-900">Daily attendance</h3>
                         <p class="mt-3 text-sm leading-6 text-slate-600">{{ $event->has_arrival_session ? 'Only members who completed Arrival check-in appear here. Mark their attendance separately for each program day.' : 'Members can use phone or QR check-in, while staff can use the scanner or manual registry.' }}</p>
                     </div>
@@ -110,7 +110,7 @@
 
                 {{-- Right Side Search --}}
                 <div class="lg:col-span-2" data-aos="fade-left" data-aos-delay="300">
-                    <div data-no-lift class="bg-white shadow-sm border border-gray-100 rounded-3xl overflow-hidden">
+                    <div data-no-lift data-tour="event-attendance-manual" class="bg-white shadow-sm border border-gray-100 rounded-3xl overflow-hidden">
                         <div class="bg-gray-50/50 p-6 border-b border-gray-100">
                             <h3 class="font-black text-gray-900 tracking-tight uppercase text-xs">Manual Registry</h3>
                         </div>

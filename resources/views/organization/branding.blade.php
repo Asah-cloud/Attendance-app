@@ -2,7 +2,7 @@
     <x-slot name="header">Organization settings</x-slot>
 
     <div class="mx-auto max-w-3xl">
-        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div data-tour="organization-branding" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div class="flex flex-col gap-6 border-b border-slate-100 pb-7 sm:flex-row sm:items-center">
                 @if($company->logo_path)
                     <img src="{{ Storage::url($company->logo_path) }}" alt="{{ $company->name }} logo" class="h-24 w-24 rounded-2xl border border-slate-200 object-contain p-2">
@@ -21,7 +21,7 @@
             </form>
         </div>
 
-        <div id="email-domain-setup" class="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div id="email-domain-setup" data-tour="organization-messaging" class="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div class="border-b border-slate-100 pb-6">
                 <p class="text-xs font-extrabold uppercase tracking-[0.2em] text-blue-600">Messaging identity</p>
                 <h2 class="mt-2 text-2xl font-black text-slate-950">Send as your organization</h2>

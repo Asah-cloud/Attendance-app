@@ -5,7 +5,7 @@
         <section class="rounded-3xl bg-gradient-to-br from-indigo-700 to-blue-950 p-8 text-white shadow-xl">
             <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
                 <div><p class="text-xs font-black uppercase tracking-[.2em] text-indigo-200">Room allocation</p><h1 class="mt-2 text-3xl font-black">{{ $event->title }}</h1><p class="mt-3 max-w-2xl text-sm text-indigo-100">Add your buildings and rooms, mark who needs a bed, preview the result, then assign rooms automatically.</p></div>
-                <form method="POST" action="{{ route('events.accommodation.settings', $event) }}" class="flex flex-wrap items-center gap-4 rounded-2xl bg-white/10 p-4">@csrf @method('PATCH')
+                <form method="POST" action="{{ route('events.accommodation.settings', $event) }}" data-tour="event-rooms-settings" class="flex flex-wrap items-center gap-4 rounded-2xl bg-white/10 p-4">@csrf @method('PATCH')
                     <label class="flex items-center gap-2 text-sm font-bold"><input type="checkbox" name="accommodation_enabled" value="1" @checked($event->accommodation_enabled)> Use accommodation</label>
                     <label class="flex items-center gap-2 text-sm font-bold"><input type="checkbox" name="accommodation_published" value="1" @checked($event->accommodation_published)> Show rooms to attendees</label>
                     <label class="flex items-center gap-2 text-sm font-bold">Let attendees pick until<input type="datetime-local" name="accommodation_self_select_closes_at" value="{{ optional($event->accommodation_self_select_closes_at)->format('Y-m-d\TH:i') }}" class="rounded-lg border-0 bg-white/20 px-2 py-1 text-xs text-white [color-scheme:dark]"></label>
@@ -18,7 +18,7 @@
 
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ $errors->first() }}</div>@endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section data-tour="event-rooms-assign" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="text-xl font-black text-slate-900">Assign rooms automatically</h2><p class="mt-1 text-sm text-slate-500">People who need a step-free room are placed first. Rooms then fill in the priority order you set.</p></div><div class="flex flex-wrap gap-2">
                 <a href="{{ route('events.accommodation.report', $event) }}" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-800">View report</a>
                 <a href="{{ route('events.accommodation.report.csv', $event) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">CSV report</a>
@@ -66,7 +66,7 @@
         </section>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section data-tour="event-rooms-inventory" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xl font-black text-slate-900">Buildings &amp; rooms</h2>
                 <div class="flex flex-wrap gap-2 text-sm">

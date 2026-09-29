@@ -35,14 +35,14 @@
                         @if(auth()->user()->company?->logo_path)<img src="{{ Storage::url(auth()->user()->company->logo_path) }}" alt="{{ auth()->user()->company->name }} logo" class="h-20 w-20 shrink-0 rounded-2xl bg-white object-contain p-2 shadow-lg">@else<div class="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white/10 text-3xl font-black">{{ strtoupper(substr(auth()->user()->company?->name ?? 'O', 0, 1)) }}</div>@endif
                         <div class="min-w-0"><p class="text-xs font-extrabold uppercase tracking-[0.22em] text-blue-300">Event workspace</p><h2 class="mt-2 truncate text-2xl font-black sm:text-3xl">{{ auth()->user()->company?->name ?? 'Organization' }}</h2><p class="mt-2 text-sm text-blue-100">Manage events, registrations and attendance from one place.</p></div>
                     </div>
-                    <div class="flex shrink-0 flex-wrap gap-3"><a href="{{ route('admin.register-person') }}" class="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-extrabold hover:bg-white/20">Add usher</a><a href="{{ route('events.create') }}" class="rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-blue-900 shadow-lg">Create event</a></div>
+                    <div class="flex shrink-0 flex-wrap gap-3"><a href="{{ route('admin.register-person') }}" class="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-extrabold hover:bg-white/20">Add usher</a><a href="{{ route('events.create') }}" data-tour="events-index-create" class="rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-blue-900 shadow-lg">Create event</a></div>
                 </div>
             </section>
         @else
             <div class="mb-7"><p class="text-sm font-semibold text-blue-600">Attendance workspace</p><h2 class="mt-1 text-3xl font-black">Your assigned events</h2></div>
         @endrole
 
-        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div data-tour="events-index-list" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold text-slate-950">Event schedule</h3><p class="mt-1 text-xs text-slate-500">{{ $events->count() }} {{ Str::plural('event', $events->count()) }} available</p></div>
             <div class="divide-y divide-slate-100">
                 @forelse($events as $event)

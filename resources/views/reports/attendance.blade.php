@@ -37,7 +37,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="mb-6 flex flex-col justify-between gap-4 print:hidden sm:flex-row sm:items-center">
                 <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance report</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">{{ $selectedDay === 'all' ? 'All days: each person is counted once, even if they attended several days.' : 'Showing attendance for '.$event->attendanceSessionLabel($selectedDay).'.' }} Numbered participant staff are included; other staff are in the staff report.</p></div>
-                <div class="flex flex-wrap gap-2"><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
+                <div data-tour="event-reports-export" class="flex flex-wrap gap-2"><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
             </div>
             
             {{-- Print-Only Header (Hidden on Web) --}}
@@ -70,7 +70,7 @@
             </div>
 
             {{-- Category / Gender Filters --}}
-            <form method="GET" action="{{ route('reports.event', ['event' => $event->id, 'day' => $selectedDay]) }}" class="mb-8 flex flex-wrap items-center gap-3 print:hidden">
+            <form method="GET" action="{{ route('reports.event', ['event' => $event->id, 'day' => $selectedDay]) }}" data-tour="event-reports-filter" class="mb-8 flex flex-wrap items-center gap-3 print:hidden">
                 <span class="text-xs font-black uppercase tracking-widest text-gray-400">Filter registry</span>
                 <select name="category" onchange="this.form.submit()" class="rounded-xl border-gray-200 text-xs font-bold">
                     <option value="">All categories</option>

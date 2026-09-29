@@ -21,7 +21,7 @@
             </form>
         @endif
 
-        <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <section data-tour="staff-roster-import" class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <h2 class="text-xl font-black text-slate-900">Import staff roster</h2>
             <p class="mt-2 text-sm text-slate-600">Columns: <strong>A Name</strong>, <strong>B Department</strong>, <strong>C Category</strong>, <strong>D Gender</strong>. Category may be left blank and will default to Staff. Gender may be left blank; set it if staff will ever need room assignment. Re-importing the same name and department updates the existing person.</p>
             <form method="POST" action="{{ route('support-staff.import') }}" enctype="multipart/form-data" class="mt-5 grid gap-5 lg:grid-cols-2">@csrf
@@ -34,7 +34,7 @@
             </form>
         </section>
 
-        <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <section data-tour="staff-roster-manage" class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <h2 class="text-xl font-black text-slate-900">Manage staff by event</h2>
             <p class="mt-2 text-sm text-slate-600">Check staff in when they collect their badge, see who has checked in, and print their badges — separate from your attendee tools.</p>
             <div class="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-200">

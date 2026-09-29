@@ -35,7 +35,7 @@
             {{-- Sidebar (collapsible on large screens) --}}
             <aside class="min-w-0 lg:sticky lg:top-4 lg:self-start">
                 <div class="mb-3 flex items-center gap-2" :class="sidebar ? '' : 'lg:flex-col'">
-                    <button type="button" @click="composeOpen = true" title="Compose message"
+                    <button type="button" @click="composeOpen = true" title="Compose message" data-tour="event-messages-compose"
                             class="flex items-center justify-center gap-2 rounded-2xl bg-blue-900 py-3 text-sm font-black text-white shadow-lg shadow-blue-900/20 transition hover:bg-blue-800"
                             :class="sidebar ? 'flex-1 px-4' : 'flex-1 px-4 lg:w-full lg:flex-none lg:px-0'">
                         <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
@@ -47,7 +47,7 @@
                     </button>
                 </div>
 
-                <nav class="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Message filters">
+                <nav class="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Message filters" data-tour="event-messages-filters">
                     @foreach($filters as $key => [$label, $iconPath])
                         <a href="{{ route('events.messages.index', array_filter(['event' => $event, 'filter' => $key !== 'all' ? $key : null])) }}"
                            title="{{ $label }}" @if($filter === $key) aria-current="page" @endif

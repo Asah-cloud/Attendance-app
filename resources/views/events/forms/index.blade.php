@@ -3,11 +3,11 @@
     <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div><h1 class="text-2xl font-black text-slate-900">Forms</h1><p class="text-sm text-slate-500">Manage registration, confirmations, feedback, and surveys for this event.</p></div>
-            <a href="{{ route('events.forms.create', $event) }}" class="rounded-xl bg-blue-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Create form</a>
+            <a href="{{ route('events.forms.create', $event) }}" data-tour="event-forms-create" class="rounded-xl bg-blue-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Create form</a>
         </div>
 
         @can('manageWhenOpen', $event)
-            <div class="mb-8 grid gap-4 md:grid-cols-2">
+            <div data-tour="event-forms-links" class="mb-8 grid gap-4 md:grid-cols-2">
                 <a href="{{ route('events.registration-form.edit', $event) }}" class="group rounded-2xl border border-blue-200 bg-blue-50 p-6 transition hover:border-blue-400 hover:shadow-md">
                     <div class="flex items-start justify-between gap-4">
                         <div>

@@ -3,12 +3,12 @@
 
     <x-event-closed-banner :event="$event" />
 
-    <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and scan attendee or staff badge QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) and staff member(s) for this event.</p></div>@can('manageMeals', $event)<div class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
+    <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h2 class="mt-1 text-3xl font-black">Meals and refreshments</h2><p class="mt-2 text-sm text-slate-500">Create serving sessions and scan attendee or staff badge QR codes to issue food once. {{ $confirmedCount }} confirmed attendee(s) and staff member(s) for this event.</p></div>@can('manageMeals', $event)<div data-tour="event-food-actions" class="flex gap-2"><a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-700">Print vouchers</a><a href="{{ route('events.meals.report', $event) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-center text-sm font-extrabold text-blue-800">View food report</a></div>@endcan</div>
 
     <livewire:meal-overview-stats :event="$event" />
     @if($errors->any())<p class="mb-5 rounded-xl bg-red-50 p-4 text-red-700">{{ $errors->first() }}</p>@endif
     @can('manageMeals', $event)
-        <details class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm" @if($errors->any()) open @endif>
+        <details data-tour="event-food-create" class="mb-7 rounded-2xl border border-slate-200 bg-white shadow-sm" @if($errors->any()) open @endif>
             <summary class="cursor-pointer px-6 py-5 text-sm font-black text-blue-700">+ Create food distribution</summary>
             <form method="POST" action="{{ route('events.meals.store', $event) }}" class="grid gap-5 border-t border-slate-100 p-6 sm:grid-cols-2">
                 @csrf

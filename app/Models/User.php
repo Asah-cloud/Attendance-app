@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'email_verified_at', 'password', 'phone', 'member_id', 'category', 'role', 'company_id', 'must_change_password', 'password_changed_at', 'onboarding_tour_completed_at'])]
+#[Fillable(['name', 'email', 'email_verified_at', 'password', 'phone', 'member_id', 'category', 'role', 'company_id', 'must_change_password', 'password_changed_at', 'onboarding_tours_seen'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -33,8 +33,13 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'password_changed_at' => 'datetime',
-            'onboarding_tour_completed_at' => 'datetime',
+            'onboarding_tours_seen' => 'array',
         ];
+    }
+
+    public function hasSeenTour(string $key): bool
+    {
+        return in_array($key, $this->onboarding_tours_seen ?? [], true);
     }
 
     public function company(): BelongsTo

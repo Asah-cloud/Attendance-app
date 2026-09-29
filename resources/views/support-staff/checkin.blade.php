@@ -12,7 +12,7 @@
                     </div>
                     <div class="flex flex-wrap gap-2">
                         @can('scanAttendance', $event)
-                            <a href="{{ route('support-staff.checkin.scanner', $event) }}" class="rounded-xl bg-white px-5 py-3 text-sm font-black text-slate-900">Open Staff scanner</a>
+                            <a href="{{ route('support-staff.checkin.scanner', $event) }}" data-tour="event-staff-checkin-scanner" class="rounded-xl bg-white px-5 py-3 text-sm font-black text-slate-900">Open Staff scanner</a>
                         @endcan
                         <a href="{{ route('support-staff.report', $event) }}" class="rounded-xl border border-white/30 px-5 py-3 text-sm font-black text-white">Staff report</a>
                         <a href="{{ route('events.staff-badges', $event) }}" class="rounded-xl border border-white/30 px-5 py-3 text-sm font-black text-white">Staff badge studio</a>
@@ -22,7 +22,7 @@
 
             <livewire:staff-check-in-stats :event="$event" />
 
-            <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <section data-tour="event-staff-checkin-list" class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-100 bg-slate-50/70 p-6">
                     <h2 class="text-xs font-black uppercase tracking-widest text-slate-700">Staff assigned to this event</h2>
                     <p class="mt-2 text-sm text-slate-500">Not seeing someone? Import or assign them from the <a href="{{ route('support-staff.index') }}" class="font-bold text-blue-700 underline">Event Staff</a> page first.</p>
