@@ -23,7 +23,7 @@
     </section>
 
     <section class="mx-auto -mt-12 max-w-5xl px-5 pb-16 lg:px-8">
-        <div class="rounded-[2rem] border border-blue-200 bg-blue-50/40 p-8">
+        <div class="rounded-[2rem] border border-blue-200 bg-blue-50 p-8">
             <p class="text-sm font-extrabold text-blue-700">Standard, always included</p>
             <h2 class="mt-2 text-3xl font-extrabold text-[#071426]">Billed per confirmed attendee.</h2>
             <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600">Graduated rates that drop as your attendee count grows. Attendance, QR/manual check-in, registration forms, and daily & summary reports are included at no extra cost on every event.</p>
