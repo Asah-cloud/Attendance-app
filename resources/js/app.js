@@ -1,5 +1,6 @@
 import './bootstrap';
 import './live-search';
+import './onboarding-tour';
 
 import { Alpine, Livewire } from '../../vendor/livewire/livewire/dist/livewire.esm';
 

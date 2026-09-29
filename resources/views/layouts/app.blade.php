@@ -13,7 +13,9 @@
         <x-compiled-assets />
         <style>[x-cloak] { display: none !important; }</style>
     </head>
-    <body class="antialiased text-slate-950 selection:bg-blue-600 selection:text-white" style="font-family: Manrope, sans-serif">
+    <body class="antialiased text-slate-950 selection:bg-blue-600 selection:text-white" style="font-family: Manrope, sans-serif"
+        data-tour-complete-url="{{ route('tour.complete') }}"
+        data-auto-start-tour="{{ (auth()->check() && auth()->user()->hasRole('manager') && ! auth()->user()->onboarding_tour_completed_at) ? 'true' : 'false' }}">
         <x-toast />
         <div data-ui="app" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false" class="min-h-screen bg-slate-50">
             @include('layouts.navigation')
@@ -41,10 +43,15 @@
                             @endrole
                         </div>
                     </div>
-                    <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-slate-100">
-                        <span class="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-sm font-extrabold text-white">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
-                        <span class="hidden text-left sm:block"><span class="block text-sm font-bold text-slate-800">{{ auth()->user()->name }}</span><span class="block text-xs text-slate-500">View profile</span></span>
-                    </a>
+                    <div class="flex items-center gap-2">
+                        @role('manager')
+                            <button type="button" data-tour-restart class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-sm font-extrabold text-slate-500 transition hover:border-blue-300 hover:text-blue-700" title="Replay the getting-started tour" aria-label="Replay the getting-started tour">?</button>
+                        @endrole
+                        <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-slate-100">
+                            <span class="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-sm font-extrabold text-white">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
+                            <span class="hidden text-left sm:block"><span class="block text-sm font-bold text-slate-800">{{ auth()->user()->name }}</span><span class="block text-xs text-slate-500">View profile</span></span>
+                        </a>
+                    </div>
                 </header>
 
                 <main class="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">

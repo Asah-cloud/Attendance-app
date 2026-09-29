@@ -17,6 +17,7 @@ use App\Http\Controllers\EventRegistrationFormController;
 use App\Http\Controllers\MealDistributionController;
 use App\Http\Controllers\MessageTemplateController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\OnboardingTourController;
 use App\Http\Controllers\OrganizationBrandingController;
 use App\Http\Controllers\ParticipantMergeController;
 use App\Http\Controllers\PaystackWebhookController;
@@ -101,6 +102,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::post('/tour/complete', [OnboardingTourController::class, 'complete'])->name('tour.complete');
 
     Route::middleware('role:manager')->prefix('billing')->name('billing.')->group(function () {
         Route::get('/', [BillingController::class, 'index'])->name('index');

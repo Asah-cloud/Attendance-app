@@ -43,11 +43,11 @@
         @endphp
         <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div><p class="text-sm font-semibold text-blue-600">{{ $company->name }}</p><h2 class="mt-1 text-3xl font-black tracking-tight text-slate-950">Welcome back, {{ str(auth()->user()->name)->before(' ') }}</h2><p class="mt-2 text-sm text-slate-500">Your events, registrations and attendance at a glance.</p></div>
-            <div class="flex gap-3"><a href="{{ route('events.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Create event</a></div>
+            <div class="flex gap-3"><a href="{{ route('events.create') }}" data-tour="create-event" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Create event</a></div>
         </div>
 
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div data-tour="stats" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach([
                 ['Total events', $stats['events'], 'Event workspace'],
                 ['Upcoming events', $stats['upcomingEvents'], 'Ready to run'],

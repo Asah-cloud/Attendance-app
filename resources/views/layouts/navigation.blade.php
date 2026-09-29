@@ -2,7 +2,7 @@
     $user = auth()->user();
     $items = [
         ['label' => 'Dashboard', 'route' => 'dashboard', 'active' => 'dashboard', 'icon' => 'M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-12h8V3h-8v6Z'],
-        ['label' => 'Events', 'route' => 'events.index', 'active' => ['events.*', 'reports.*'], 'icon' => 'M6 2v3m12-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z'],
+        ['label' => 'Events', 'route' => 'events.index', 'active' => ['events.*', 'reports.*'], 'icon' => 'M6 2v3m12-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z', 'tour' => 'nav-events'],
     ];
 
     if ($user->hasAnyRole(['admin', 'manager'])) {
@@ -18,8 +18,8 @@
     }
     if ($user->hasRole('manager')) {
         $items[] = ['label' => 'Merge Duplicates', 'route' => 'participants.duplicates.index', 'active' => 'participants.duplicates.*', 'icon' => 'M17 8V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Zm4 5h8'];
-        $items[] = ['label' => 'Billing', 'route' => 'billing.index', 'active' => 'billing.*', 'icon' => 'M3 6h18v12H3V6Zm0 4h18M7 15h3'];
-        $items[] = ['label' => 'Organization', 'route' => 'organization.branding.edit', 'active' => 'organization.*', 'icon' => 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.3 7.3 0 0 0-.1-1l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.8-1L14.6 3h-4L10 6a8 8 0 0 0-1.8 1L5.7 6 3.7 9.4l2 1.6a7.3 7.3 0 0 0 0 2L3.7 14.6l2 3.4 2.5-1a8 8 0 0 0 1.8 1l.6 3h4l.6-3a8 8 0 0 0 1.8-1l2.5 1 2-3.4-2-1.6a7.3 7.3 0 0 0 .1-1Z'];
+        $items[] = ['label' => 'Billing', 'route' => 'billing.index', 'active' => 'billing.*', 'icon' => 'M3 6h18v12H3V6Zm0 4h18M7 15h3', 'tour' => 'nav-billing'];
+        $items[] = ['label' => 'Organization', 'route' => 'organization.branding.edit', 'active' => 'organization.*', 'icon' => 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.3 7.3 0 0 0-.1-1l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.8-1L14.6 3h-4L10 6a8 8 0 0 0-1.8 1L5.7 6 3.7 9.4l2 1.6a7.3 7.3 0 0 0 0 2L3.7 14.6l2 3.4 2.5-1a8 8 0 0 0 1.8 1l.6 3h4l.6-3a8 8 0 0 0 1.8-1l2.5 1 2-3.4-2-1.6a7.3 7.3 0 0 0 .1-1Z', 'tour' => 'nav-organization'];
     }
 @endphp
 
@@ -40,7 +40,7 @@
     <nav class="flex-1 space-y-1 overflow-y-auto px-4">
         @foreach($items as $item)
             @php $isActive = collect((array) $item['active'])->contains(fn ($pattern) => request()->routeIs($pattern)); @endphp
-            <a href="{{ route($item['route']) }}" @if($isActive) aria-current="page" @endif @click="sidebarOpen = false" class="group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition {{ $isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/40' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+            <a href="{{ route($item['route']) }}" @if(isset($item['tour'])) data-tour="{{ $item['tour'] }}" @endif @if($isActive) aria-current="page" @endif @click="sidebarOpen = false" class="group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition {{ $isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/40' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $item['icon'] }}" /></svg>
                 {{ $item['label'] }}
             </a>
