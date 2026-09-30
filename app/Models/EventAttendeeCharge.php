@@ -49,6 +49,8 @@ class EventAttendeeCharge extends Model
         'grandfathered',
         'currency',
         'payment_reference',
+        'paid_manually_by',
+        'manual_payment_note',
         'paid_at',
         'finalized_at',
         'checked_in_count',
@@ -93,6 +95,23 @@ class EventAttendeeCharge extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function paidManuallyBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'paid_manually_by');
+    }
+
+    /** Whether this was paid outside Paystack and recorded by an admin, rather than confirmed by the gateway. */
+    public function wasPaidManually(): bool
+    {
+        return $this->paid_manually_by !== null;
+    }
+
+    /** Whether an admin can record this bill as paid outside the app (bank transfer, mobile money, cash, ...). */
+    public function canMarkPaidManually(): bool
+    {
+        return in_array($this->status, [self::STATUS_PENDING_PAYMENT, self::STATUS_PAYMENT_FAILED], true);
     }
 
     public function isAwaitingReview(): bool

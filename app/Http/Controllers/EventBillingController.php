@@ -137,6 +137,23 @@ class EventBillingController extends Controller
         return redirect()->away($authorizationUrl);
     }
 
+    public function markPaid(Request $request, Event $event, EventBillingService $billing): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        abort_unless($request->user()->hasRole('admin'), 403);
+
+        $charge = $event->attendeeCharge;
+        abort_unless($charge && $charge->canMarkPaidManually(), 404);
+
+        $validated = $request->validate([
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $billing->markPaidManually($charge, $request->user(), $validated['note'] ?? null);
+
+        return redirect()->route('events.billing.show', $event)->with('success', 'Marked as paid.');
+    }
+
     public function callback(Event $event, Request $request, PaystackService $paystack, EventBillingService $billing): RedirectResponse
     {
         $this->authorize('update', $event);

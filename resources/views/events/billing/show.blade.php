@@ -286,8 +286,30 @@
                         @csrf
                         <button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white">{{ $charge->status === 'payment_failed' ? 'Try again' : 'Pay with Paystack' }}</button>
                     </form>
+
+                    @role('admin')
+                        <details class="mt-4">
+                            <summary class="cursor-pointer text-xs font-bold text-gray-500 hover:text-gray-700">Paid outside Paystack? Mark it as paid</summary>
+                            <form method="POST" action="{{ route('events.billing.mark-paid', $event) }}" class="mt-3 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4" onsubmit="return confirm('Mark this bill as paid? Do this only once you\'ve actually received the money — for example by bank transfer, mobile money, or cash.')">
+                                @csrf
+                                <div class="min-w-[220px] flex-1">
+                                    <label class="text-xs font-bold text-gray-500">Note (optional)</label>
+                                    <input type="text" name="note" placeholder="e.g. Bank transfer, ref TXN123" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
+                                </div>
+                                <button class="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white">Mark as paid</button>
+                            </form>
+                        </details>
+                    @endrole
                 @elseif($charge->status === 'paid')
-                    <p class="mt-4 text-sm text-gray-500">Paid {{ $charge->paid_at->format('M j, Y g:i A') }} · reference <span class="font-mono">{{ $charge->payment_reference }}</span>. Reconciliation happens automatically once the event closes.</p>
+                    <p class="mt-4 text-sm text-gray-500">
+                        Paid {{ $charge->paid_at->format('M j, Y g:i A') }} ·
+                        @if($charge->wasPaidManually())
+                            marked paid manually by {{ $charge->paidManuallyBy?->name ?? 'an admin' }}{{ $charge->manual_payment_note ? ' — '.$charge->manual_payment_note : '' }}.
+                        @else
+                            reference <span class="font-mono">{{ $charge->payment_reference }}</span>.
+                        @endif
+                        Reconciliation happens automatically once the event closes.
+                    </p>
                 @endif
 
                 @if(in_array($charge->status, ['reconciled', 'refund_due', 'refunded']))

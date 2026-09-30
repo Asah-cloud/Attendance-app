@@ -307,6 +307,27 @@ class EventBillingService
         });
     }
 
+    /**
+     * Record that a bill was paid outside the app — bank transfer, mobile
+     * money, cash — since Paystack never confirmed it for us.
+     */
+    public function markPaidManually(EventAttendeeCharge $charge, User $admin, ?string $note): EventAttendeeCharge
+    {
+        return DB::transaction(function () use ($charge, $admin, $note): EventAttendeeCharge {
+            $locked = EventAttendeeCharge::query()->lockForUpdate()->findOrFail($charge->id);
+            abort_unless($locked->canMarkPaidManually(), 422, 'This bill is not awaiting payment.');
+
+            $locked->update([
+                'status' => EventAttendeeCharge::STATUS_PAID,
+                'paid_at' => now(),
+                'paid_manually_by' => $admin->id,
+                'manual_payment_note' => $note,
+            ]);
+
+            return $locked->fresh();
+        });
+    }
+
     public function voidForCancellation(Event $event): void
     {
         $charge = EventAttendeeCharge::where('event_id', $event->id)->first();

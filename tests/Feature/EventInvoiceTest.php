@@ -510,3 +510,107 @@ it('voids a pending-review invoice request when the event is cancelled', functio
 
     expect(EventAttendeeCharge::where('event_id', $event->id)->value('status'))->toBe(EventAttendeeCharge::STATUS_VOIDED);
 });
+
+it('lets an admin mark a bill as paid outside Paystack, with a note, and reflects it on the manager\'s side', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 2);
+
+    $billing = app(EventBillingService::class);
+    $charge = $billing->requestInvoice($event);
+    $billing->approveInvoice($charge, $admin, [], [], 0, null);
+
+    $this->actingAs($manager)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertDontSee('Mark it as paid');
+
+    $this->actingAs($admin)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('Mark it as paid');
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.mark-paid', $event), ['note' => 'Bank transfer, ref TXN123'])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge->refresh();
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PAID)
+        ->and($charge->wasPaidManually())->toBeTrue()
+        ->and($charge->paid_manually_by)->toBe($admin->id)
+        ->and($charge->manual_payment_note)->toBe('Bank transfer, ref TXN123')
+        ->and($charge->paid_at)->not->toBeNull();
+
+    // The manager immediately sees it reflected as paid, with no more pay button.
+    $this->actingAs($manager)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('marked paid manually')
+        ->assertSee('Bank transfer, ref TXN123')
+        ->assertDontSee('Pay with Paystack');
+});
+
+it('prevents a manager from marking a bill as paid', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $billing = app(EventBillingService::class);
+    $charge = $billing->requestInvoice($event);
+    $billing->approveInvoice($charge, $admin, [], [], 0, null);
+
+    $this->actingAs($manager)
+        ->post(route('events.billing.mark-paid', $event), ['note' => 'I paid myself'])
+        ->assertForbidden();
+
+    expect($charge->fresh()->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT);
+});
+
+it('cannot mark a bill paid while it is still awaiting review, or once it is already paid', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $this->actingAs($manager)->post(route('events.billing.request', $event));
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.mark-paid', $event))
+        ->assertNotFound();
+
+    $billing = app(EventBillingService::class);
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    $billing->approveInvoice($charge, $admin, [], [], 0, null);
+    $billing->markPaidManually($charge->fresh(), $admin, null);
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.mark-paid', $event))
+        ->assertNotFound();
+});
+
+it('unlocks paid features once a bill is marked paid manually', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $billing = app(EventBillingService::class);
+    $charge = $billing->requestInvoice($event, ['custom_messages']);
+    $billing->approveInvoice($charge, $admin, ['custom_messages'], [], 0, null);
+
+    $this->actingAs($manager)
+        ->get(route('events.messages.index', $event))
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $billing->markPaidManually($charge->fresh(), $admin, 'Cash received at the door');
+
+    $this->actingAs($manager)
+        ->get(route('events.messages.index', $event))
+        ->assertOk();
+});
