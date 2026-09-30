@@ -136,6 +136,33 @@ it('lets an admin preview the invoice PDF while it is still awaiting review', fu
         ->assertHeader('content-type', 'application/pdf');
 });
 
+it('shows Asah Apex Attendance branding above the billed company on the invoice', function () {
+    $company = Company::create(['name' => 'Acme Co', 'email' => 'billing@acme.example']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $this->actingAs($manager)->post(route('events.billing.request', $event));
+    $this->actingAs($admin)->post(route('events.billing.approve', $event), ['discount' => '0']);
+
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    $html = view('events.billing.invoice-pdf', [
+        'charge' => $charge,
+        'event' => $event,
+        'company' => $company,
+        'platformLogo' => null,
+    ])->render();
+
+    expect($html)->toContain('Asah Apex Attendance')
+        ->toContain('Billed to')
+        ->toContain('Acme Co')
+        ->toContain('billing@acme.example');
+
+    // The platform's name appears before the billed company's, in document order.
+    expect(strpos($html, 'Asah Apex Attendance'))->toBeLessThan(strpos($html, 'Acme Co'));
+});
+
 it('lets an admin override a feature\'s price for this invoice only, without changing its catalog price', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = invoiceManager($company);

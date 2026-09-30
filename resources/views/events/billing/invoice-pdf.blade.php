@@ -4,8 +4,14 @@
 <meta charset="utf-8">
 <style>
     body { font-family: DejaVu Sans, sans-serif; color: #17323b; font-size: 12px; }
+    .platform-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .platform-header img { width: 48px; height: 48px; object-fit: contain; }
+    .platform-name { font-size: 16px; font-weight: bold; color: #071426; }
+    .platform-tagline { margin: 2px 0 0; font-size: 10px; color: #64748b; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #071426; padding-bottom: 16px; margin-bottom: 24px; }
-    .company-name { font-size: 18px; font-weight: bold; color: #071426; }
+    .bill-to .eyebrow { margin: 0; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; }
+    .bill-to .company-name { margin: 3px 0 0; font-size: 16px; font-weight: bold; color: #071426; }
+    .bill-to .company-email { margin: 2px 0 0; font-size: 11px; color: #64748b; }
     .invoice-title { text-align: right; }
     .invoice-title h1 { font-size: 22px; margin: 0; color: #071426; }
     .invoice-title p { margin: 4px 0 0; color: #64748b; }
@@ -28,8 +34,20 @@
 </style>
 </head>
 <body>
+    <div class="platform-header">
+        @if($platformLogo)<img src="{{ $platformLogo }}" alt="Asah Apex Attendance">@endif
+        <div>
+            <div class="platform-name">Asah Apex Attendance</div>
+            <p class="platform-tagline">Event attendance, registration &amp; billing platform</p>
+        </div>
+    </div>
+
     <div class="header">
-        <div class="company-name">{{ $company->name }}</div>
+        <div class="bill-to">
+            <p class="eyebrow">Billed to</p>
+            <div class="company-name">{{ $company->name }}</div>
+            @if($company->email)<p class="company-email">{{ $company->email }}</p>@endif
+        </div>
         <div class="invoice-title">
             <h1>INVOICE</h1>
             <p>{{ $charge->invoice_number }}</p>
@@ -67,6 +85,7 @@
     <div class="footer">
         <p>{{ $charge->registered_count }} confirmed attendee(s) at time of invoicing.</p>
         @if($charge->paid_at)<p>Paid {{ $charge->paid_at->format('M j, Y g:i A') }} · reference {{ $charge->payment_reference }}</p>@endif
+        <p>Issued by Asah Apex Attendance{{ config('mail.from.address') ? ' · '.config('mail.from.address') : '' }}</p>
     </div>
 </body>
 </html>

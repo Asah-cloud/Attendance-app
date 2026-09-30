@@ -205,8 +205,19 @@ class EventBillingService
     {
         $charge->loadMissing(['event', 'company']);
 
-        return Pdf::loadView('events.billing.invoice-pdf', ['charge' => $charge, 'event' => $charge->event, 'company' => $charge->company])
-            ->setPaper('a4');
+        return Pdf::loadView('events.billing.invoice-pdf', [
+            'charge' => $charge,
+            'event' => $charge->event,
+            'company' => $charge->company,
+            'platformLogo' => $this->platformLogoDataUri(),
+        ])->setPaper('a4');
+    }
+
+    private function platformLogoDataUri(): ?string
+    {
+        $path = public_path('images/asah-apex-logo-512.png');
+
+        return is_file($path) ? 'data:image/png;base64,'.base64_encode(file_get_contents($path)) : null;
     }
 
     private function resolveFeatures(array $featureKeys)
