@@ -21,7 +21,7 @@
                 </div>
                 <p class="mt-4 text-lg font-bold text-gray-500">Attendee subtotal: {{ number_format($estimate['amount_minor'] / 100, 2) }}</p>
 
-                <form method="POST" action="{{ route('events.billing.finalize', $event) }}" class="mt-6" x-data="{ featuresMinor: 0 }">
+                <form method="POST" action="{{ route('events.billing.request', $event) }}" class="mt-6" x-data="{ featuresMinor: 0 }">
                     @csrf
 
                     @if($features->isNotEmpty())
@@ -49,13 +49,88 @@
 
                     <p class="mt-5 text-2xl font-black">Estimated total: {{ number_format($estimate['amount_minor'] / 100, 2) }} <span class="text-base font-bold text-blue-700" x-show="featuresMinor > 0">+ <span x-text="(featuresMinor / 100).toFixed(2)"></span> features</span></p>
 
-                    <button class="mt-4 rounded-xl bg-blue-900 px-5 py-3 text-sm font-bold text-white">Finalize & request payment</button>
+                    <button class="mt-4 rounded-xl bg-blue-900 px-5 py-3 text-sm font-bold text-white">{{ auth()->user()->hasRole('admin') ? 'Generate invoice' : 'Request invoice' }}</button>
                 </form>
+                @role('admin')
+                    <p class="mt-3 text-xs text-gray-400">You'll review and approve it yourself on the next step, same as any other invoice.</p>
+                @else
+                    <p class="mt-3 text-xs text-gray-400">An admin reviews the figures — including any advanced features and possible discount — before the invoice is finalized and sent to you.</p>
+                @endrole
+            </section>
+        @elseif($charge->isAwaitingReview())
+            <section data-tour="event-billing-charge" class="rounded-3xl border border-amber-200 bg-amber-50/60 p-7 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-lg font-black text-amber-900">Invoice requested — awaiting review</h3>
+                    <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase text-amber-800">pending review</span>
+                </div>
+                <p class="mt-1 text-sm text-amber-800">Requested {{ $charge->finalized_at->format('M j, Y g:i A') }} for {{ $charge->registered_count }} confirmed registration(s). Nothing is payable yet.</p>
+
+                <div class="mt-5 overflow-hidden rounded-2xl border border-amber-100 bg-white">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500"><tr><th class="p-3">Band</th><th class="p-3">Attendees</th><th class="p-3">Rate</th><th class="p-3 text-right">Subtotal</th></tr></thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($charge->tier_breakdown as $band)
+                                <tr><td class="p-3">{{ $band['band_from'] }}–{{ $band['band_to'] ?? '∞' }}</td><td class="p-3">{{ $band['count_in_band'] }}</td><td class="p-3">{{ number_format($band['rate_minor'] / 100, 2) }}</td><td class="p-3 text-right font-bold">{{ number_format($band['subtotal_minor'] / 100, 2) }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mt-4 text-lg font-bold text-gray-700">Attendee subtotal: {{ $charge->currency }} {{ number_format(($charge->amount_minor - $charge->features_amount_minor) / 100, 2) }}</p>
+
+                @role('admin')
+                    <form method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-6" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: 0 }">
+                        @csrf
+                        @if($reviewFeatures->isNotEmpty())
+                            <div class="rounded-2xl border border-gray-100 bg-white p-5">
+                                <h4 class="font-black text-gray-900">Advanced features requested</h4>
+                                <p class="mt-1 text-xs text-gray-500">Uncheck any the company shouldn't be billed for, or add one they need.</p>
+                                <div class="mt-4 space-y-3">
+                                    @foreach($reviewFeatures as $feature)
+                                        @php $checked = collect($charge->feature_breakdown ?? [])->contains('key', $feature->key); @endphp
+                                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
+                                            <input type="checkbox" name="features[]" value="{{ $feature->key }}" data-cost="{{ $feature->cost_minor }}" @checked($checked)
+                                                   x-on:change="featuresMinor = Array.from($el.closest('form').querySelectorAll('input[name=\'features[]\']:checked')).reduce((sum, el) => sum + Number(el.dataset.cost), 0)"
+                                                   class="mt-1 h-4 w-4 rounded border-gray-300">
+                                            <span class="flex-1">
+                                                <span class="flex items-center justify-between gap-3">
+                                                    <span class="font-bold text-gray-900">{{ $feature->name }}</span>
+                                                    <span class="font-black text-blue-700">+{{ number_format($feature->cost_minor / 100, 2) }}</span>
+                                                </span>
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="mt-4 rounded-2xl border border-gray-100 bg-white p-5">
+                            <h4 class="font-black text-gray-900">Discount</h4>
+                            <p class="mt-1 text-xs text-gray-500">Optional. Reduces the total — for a courtesy, error correction, or negotiated rate.</p>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label class="text-xs font-bold text-gray-500">Amount ({{ $charge->currency }})</label>
+                                    <input type="number" name="discount" step="0.01" min="0" x-model.number="discount" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-gray-500">Reason</label>
+                                    <input type="text" name="discount_reason" placeholder="e.g. Repeat customer courtesy" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
+                                </div>
+                            </div>
+                            @error('discount_reason')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <p class="mt-5 text-2xl font-black">New total: {{ $charge->currency }} <span x-text="(({{ $charge->amount_minor - $charge->features_amount_minor }} + featuresMinor - (discount * 100 || 0)) / 100).toFixed(2)"></span></p>
+
+                        <button class="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Approve & send invoice</button>
+                    </form>
+                @else
+                    <p class="mt-6 text-sm font-semibold text-amber-800">An admin will review this and send you the final invoice to download or by email.</p>
+                @endrole
             </section>
         @else
             <section data-tour="event-billing-charge" class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h3 class="text-lg font-black">Attendee bill</h3>
+                    <h3 class="text-lg font-black">Attendee bill{{ $charge->invoice_number ? ' · '.$charge->invoice_number : '' }}</h3>
                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-700">{{ str_replace('_', ' ', $charge->status) }}</span>
                 </div>
                 <p class="mt-1 text-sm text-gray-500">Finalized {{ $charge->finalized_at->format('M j, Y g:i A') }} for {{ $charge->registered_count }} confirmed registration(s).</p>
@@ -84,7 +159,22 @@
                     </div>
                 @endif
 
+                @if($charge->discount_minor > 0)
+                    <p class="mt-3 text-sm font-bold text-emerald-700">Discount applied: -{{ $charge->currency }} {{ number_format($charge->discount_minor / 100, 2) }}{{ $charge->discount_reason ? ' — '.$charge->discount_reason : '' }}</p>
+                @endif
+
                 <p class="mt-4 text-2xl font-black">Total: {{ $charge->currency }} {{ number_format($charge->amount_minor / 100, 2) }}</p>
+
+                @if($charge->hasApprovedInvoice())
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <a href="{{ route('events.billing.invoice', $event) }}" class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50">Download invoice PDF</a>
+                        <form method="POST" action="{{ route('events.billing.invoice.email', $event) }}">
+                            @csrf
+                            <button class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50">Email me this invoice</button>
+                        </form>
+                    </div>
+                    @if($charge->invoice_emailed_at)<p class="mt-2 text-xs text-gray-400">Last emailed {{ $charge->invoice_emailed_at->diffForHumans() }}.</p>@endif
+                @endif
 
                 @if($errors->has('payment'))
                     <div class="mt-6 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-900">{{ $errors->first('payment') }}</div>

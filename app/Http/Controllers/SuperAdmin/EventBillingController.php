@@ -13,7 +13,7 @@ class EventBillingController extends Controller
     public function index(): View
     {
         $charges = EventAttendeeCharge::query()
-            ->whereIn('status', [EventAttendeeCharge::STATUS_PENDING_PAYMENT, EventAttendeeCharge::STATUS_REFUND_DUE])
+            ->whereIn('status', [EventAttendeeCharge::STATUS_PENDING_REVIEW, EventAttendeeCharge::STATUS_PENDING_PAYMENT, EventAttendeeCharge::STATUS_REFUND_DUE])
             ->with(['event', 'company'])
             ->latest('finalized_at')
             ->paginate(25);

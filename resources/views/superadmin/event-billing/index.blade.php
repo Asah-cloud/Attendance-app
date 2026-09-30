@@ -21,7 +21,9 @@
                     <td class="px-5 py-4">{{ $charge->currency }} {{ number_format($charge->amount_minor / 100, 2) }}</td>
                     <td class="px-5 py-4">{{ $charge->refund_amount_minor ? $charge->currency.' '.number_format($charge->refund_amount_minor / 100, 2) : '—' }}</td>
                     <td class="px-5 py-4">
-                        @if($charge->status === 'refund_due')
+                        @if($charge->status === 'pending_review')
+                            <a href="{{ route('events.billing.show', $charge->event) }}" class="text-xs font-bold text-amber-700">Review</a>
+                        @elseif($charge->status === 'refund_due')
                             <form method="POST" action="{{ route('attendee-billing.refund', $charge) }}" onsubmit="return confirm('Confirm the refund has been sent outside the app?')">@csrf<button class="text-xs font-bold text-emerald-700">Mark refunded</button></form>
                         @endif
                     </td>

@@ -34,9 +34,10 @@ it('shows selectable features on the billing show page before finalizing', funct
         ->assertSee('Custom Messages (Email & SMS)');
 });
 
-it('lets a manager buy advanced features when finalizing a bill and locks in the price', function () {
+it('lets a manager request features on an invoice, and locks in the price once an admin approves it', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = attendeeBillingManager($company);
+    $admin = attendeeBillingAdmin();
     $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
     registerConfirmedAttendees($event, 3);
 
@@ -44,23 +45,82 @@ it('lets a manager buy advanced features when finalizing a bill and locks in the
     $badges = Feature::where('key', 'badge_studio')->firstOrFail();
 
     $this->actingAs($manager)
-        ->post(route('events.billing.finalize', $event), ['features' => ['custom_messages', 'badge_studio']])
+        ->post(route('events.billing.request', $event), ['features' => ['custom_messages', 'badge_studio']])
         ->assertRedirect(route('events.billing.show', $event));
 
     $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
     $attendeeAmount = 3 * 200;
     $featuresAmount = $messages->cost_minor + $badges->cost_minor;
 
-    expect($charge->amount_minor)->toBe($attendeeAmount + $featuresAmount)
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_REVIEW)
+        ->and($charge->amount_minor)->toBe($attendeeAmount + $featuresAmount)
         ->and($charge->features_amount_minor)->toBe($featuresAmount)
         ->and($charge->feature_breakdown)->toHaveCount(2);
+
+    // Nothing is purchased/gated yet — only once an admin approves it.
+    $this->assertDatabaseMissing('event_features', ['event_id' => $event->id]);
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), ['features' => ['custom_messages', 'badge_studio'], 'discount' => '0'])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge->refresh();
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
+        ->and($charge->amount_minor)->toBe($attendeeAmount + $featuresAmount)
+        ->and($charge->invoice_number)->not->toBeNull();
 
     $this->assertDatabaseHas('event_features', ['event_id' => $event->id, 'feature_key' => 'custom_messages']);
     $this->assertDatabaseHas('event_features', ['event_id' => $event->id, 'feature_key' => 'badge_studio']);
     $this->assertDatabaseMissing('event_features', ['event_id' => $event->id, 'feature_key' => 'rooms']);
 });
 
-it('ignores inactive or unknown feature keys submitted to finalize', function () {
+it('lets an admin drop a requested feature and apply a discount when approving an invoice', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = attendeeBillingManager($company);
+    $admin = attendeeBillingAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    registerConfirmedAttendees($event, 3);
+
+    $this->actingAs($manager)
+        ->post(route('events.billing.request', $event), ['features' => ['custom_messages', 'badge_studio']]);
+
+    $badges = Feature::where('key', 'badge_studio')->firstOrFail();
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), [
+            'features' => ['badge_studio'], // dropped custom_messages
+            'discount' => '5.00',
+            'discount_reason' => 'Loyal customer',
+        ])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
+        ->and($charge->features_amount_minor)->toBe($badges->cost_minor)
+        ->and($charge->discount_minor)->toBe(500)
+        ->and($charge->discount_reason)->toBe('Loyal customer')
+        ->and($charge->amount_minor)->toBe((3 * 200) + $badges->cost_minor - 500);
+
+    $this->assertDatabaseMissing('event_features', ['event_id' => $event->id, 'feature_key' => 'custom_messages']);
+    $this->assertDatabaseHas('event_features', ['event_id' => $event->id, 'feature_key' => 'badge_studio']);
+});
+
+it('prevents a manager from approving their own invoice request', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = attendeeBillingManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    registerConfirmedAttendees($event, 1);
+
+    $this->actingAs($manager)->post(route('events.billing.request', $event));
+
+    $this->actingAs($manager)
+        ->post(route('events.billing.approve', $event), ['discount' => '0'])
+        ->assertForbidden();
+
+    expect(EventAttendeeCharge::where('event_id', $event->id)->value('status'))->toBe(EventAttendeeCharge::STATUS_PENDING_REVIEW);
+});
+
+it('ignores inactive or unknown feature keys submitted with an invoice request', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = attendeeBillingManager($company);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
@@ -69,7 +129,7 @@ it('ignores inactive or unknown feature keys submitted to finalize', function ()
     Feature::where('key', 'rooms')->update(['is_active' => false]);
 
     $this->actingAs($manager)
-        ->post(route('events.billing.finalize', $event), ['features' => ['rooms', 'not-a-real-key']]);
+        ->post(route('events.billing.request', $event), ['features' => ['rooms', 'not-a-real-key']]);
 
     $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
     expect($charge->features_amount_minor)->toBe(0);

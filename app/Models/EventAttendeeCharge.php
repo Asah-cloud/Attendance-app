@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventAttendeeCharge extends Model
 {
+    public const STATUS_PENDING_REVIEW = 'pending_review';
+
     public const STATUS_PENDING_PAYMENT = 'pending_payment';
 
     public const STATUS_VOIDED = 'voided';
@@ -38,6 +40,12 @@ class EventAttendeeCharge extends Model
         'amount_minor',
         'features_amount_minor',
         'feature_breakdown',
+        'discount_minor',
+        'discount_reason',
+        'invoice_number',
+        'reviewed_by',
+        'reviewed_at',
+        'invoice_emailed_at',
         'grandfathered',
         'currency',
         'payment_reference',
@@ -58,6 +66,9 @@ class EventAttendeeCharge extends Model
             'amount_minor' => 'integer',
             'features_amount_minor' => 'integer',
             'feature_breakdown' => 'array',
+            'discount_minor' => 'integer',
+            'reviewed_at' => 'datetime',
+            'invoice_emailed_at' => 'datetime',
             'grandfathered' => 'boolean',
             'paid_at' => 'datetime',
             'finalized_at' => 'datetime',
@@ -77,5 +88,20 @@ class EventAttendeeCharge extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function isAwaitingReview(): bool
+    {
+        return $this->status === self::STATUS_PENDING_REVIEW;
+    }
+
+    public function hasApprovedInvoice(): bool
+    {
+        return $this->invoice_number !== null;
     }
 }

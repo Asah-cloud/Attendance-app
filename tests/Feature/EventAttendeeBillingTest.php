@@ -104,10 +104,11 @@ it('lets a company-level override beat both plan and platform tiers', function (
     expect($calc['amount_minor'])->toBe(450 * 10);
 });
 
-it('lets a manager finalize and pay an event attendee bill', function () {
+it('lets a manager request an invoice, an admin approve it, and the manager pay it', function () {
     fakePaystackForEventBilling();
     $company = Company::create(['name' => 'Acme Co']);
     $manager = attendeeBillingManager($company);
+    $admin = attendeeBillingAdmin();
     $event = Event::create(['company_id' => $company->id, 'title' => 'Annual Conference', 'event_date' => now()->addWeek()]);
     registerConfirmedAttendees($event, 3);
 
@@ -117,15 +118,33 @@ it('lets a manager finalize and pay an event attendee bill', function () {
         ->assertSee('Estimated attendee bill');
 
     $this->actingAs($manager)
-        ->post(route('events.billing.finalize', $event))
+        ->post(route('events.billing.request', $event))
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $this->assertDatabaseHas('event_attendee_charges', [
+        'event_id' => $event->id,
+        'status' => EventAttendeeCharge::STATUS_PENDING_REVIEW,
+        'registered_count' => 3,
+        'amount_minor' => 3 * 200,
+    ]);
+
+    // A manager sees only a waiting message — no payment option — until it's reviewed.
+    $this->actingAs($manager)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('awaiting review')
+        ->assertDontSee('Pay with Paystack');
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), ['discount' => '0'])
         ->assertRedirect(route('events.billing.show', $event));
 
     $this->assertDatabaseHas('event_attendee_charges', [
         'event_id' => $event->id,
         'status' => EventAttendeeCharge::STATUS_PENDING_PAYMENT,
-        'registered_count' => 3,
         'amount_minor' => 3 * 200,
     ]);
+    expect(EventAttendeeCharge::where('event_id', $event->id)->value('invoice_number'))->not->toBeNull();
 
     $this->actingAs($manager)
         ->post(route('events.billing.pay', $event))

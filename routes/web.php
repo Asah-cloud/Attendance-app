@@ -298,7 +298,10 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
 
         // Per-attendee event billing: finalize the graduated attendee bill and pay it.
         Route::get('/events/{event}/billing', [EventBillingController::class, 'show'])->name('events.billing.show');
-        Route::post('/events/{event}/billing/finalize', [EventBillingController::class, 'finalize'])->name('events.billing.finalize');
+        Route::post('/events/{event}/billing/request', [EventBillingController::class, 'requestInvoice'])->name('events.billing.request');
+        Route::post('/events/{event}/billing/approve', [EventBillingController::class, 'approve'])->name('events.billing.approve');
+        Route::get('/events/{event}/billing/invoice', [EventBillingController::class, 'downloadInvoice'])->name('events.billing.invoice');
+        Route::post('/events/{event}/billing/invoice/email', [EventBillingController::class, 'emailInvoice'])->name('events.billing.invoice.email');
         Route::post('/events/{event}/billing/pay', [EventBillingController::class, 'pay'])->name('events.billing.pay');
         Route::get('/events/{event}/billing/callback', [EventBillingController::class, 'callback'])->name('events.billing.callback');
 
