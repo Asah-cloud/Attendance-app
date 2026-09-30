@@ -163,6 +163,27 @@ it('shows Asah Apex Attendance branding above the billed company on the invoice'
     expect(strpos($html, 'Asah Apex Attendance'))->toBeLessThan(strpos($html, 'Acme Co'));
 });
 
+it('omits the confirmed-attendee line on the invoice when there are none, but shows it otherwise', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $admin = invoiceAdmin();
+    $billing = app(EventBillingService::class);
+
+    $emptyEvent = Event::create(['company_id' => $company->id, 'title' => 'Empty Event', 'event_date' => now()->addWeek()]);
+    $emptyCharge = $billing->requestInvoice($emptyEvent);
+    $billing->approveInvoice($emptyCharge, $admin, [], [], 0, null);
+
+    $peopledEvent = Event::create(['company_id' => $company->id, 'title' => 'Peopled Event', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($peopledEvent, 2);
+    $peopledCharge = $billing->requestInvoice($peopledEvent);
+    $billing->approveInvoice($peopledCharge, $admin, [], [], 0, null);
+
+    $emptyHtml = view('events.billing.invoice-pdf', ['charge' => $emptyCharge->fresh(), 'event' => $emptyEvent, 'company' => $company, 'platformLogo' => null])->render();
+    $peopledHtml = view('events.billing.invoice-pdf', ['charge' => $peopledCharge->fresh(), 'event' => $peopledEvent, 'company' => $company, 'platformLogo' => null])->render();
+
+    expect($emptyHtml)->not->toContain('confirmed attendee')
+        ->and($peopledHtml)->toContain('2 confirmed attendee(s)');
+});
+
 it('lets an admin override a feature\'s price for this invoice only, without changing its catalog price', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = invoiceManager($company);

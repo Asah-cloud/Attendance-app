@@ -83,7 +83,7 @@
     </table>
 
     <div class="footer">
-        <p>{{ $charge->registered_count }} confirmed attendee(s) at time of invoicing.</p>
+        @if($charge->registered_count > 0)<p>{{ $charge->registered_count }} confirmed attendee(s) at time of invoicing.</p>@endif
         @if($charge->paid_at)<p>Paid {{ $charge->paid_at->format('M j, Y g:i A') }} · reference {{ $charge->payment_reference }}</p>@endif
         <p>Issued by Asah Apex Attendance{{ config('mail.from.address') ? ' · '.config('mail.from.address') : '' }}</p>
     </div>
