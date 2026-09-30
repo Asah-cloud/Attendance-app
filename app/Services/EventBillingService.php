@@ -140,7 +140,7 @@ class EventBillingService
 
         $charge = DB::transaction(function () use ($charge, $reviewer, $featureKeys, $discountMinor, $discountReason): EventAttendeeCharge {
             $locked = EventAttendeeCharge::query()->lockForUpdate()->findOrFail($charge->id);
-            abort_unless($locked->status === EventAttendeeCharge::STATUS_PENDING_REVIEW, 422, 'This invoice is not awaiting review.');
+            abort_unless($locked->needsInvoice(), 422, 'This bill already has an invoice, or cannot be invoiced.');
 
             $event = Event::query()->lockForUpdate()->findOrFail($locked->event_id);
             $attendeeSubtotal = $locked->amount_minor - $locked->features_amount_minor;
@@ -181,7 +181,7 @@ class EventBillingService
 
     public function resendInvoiceEmail(EventAttendeeCharge $charge): void
     {
-        abort_if($charge->isAwaitingReview() || ! $charge->hasApprovedInvoice(), 422, 'This invoice is not ready to send yet.');
+        abort_if(! $charge->hasApprovedInvoice(), 422, 'This invoice is not ready to send yet.');
 
         $this->notifyManagers($charge->event, new EventInvoiceReady($charge));
         $charge->update(['invoice_emailed_at' => now()]);

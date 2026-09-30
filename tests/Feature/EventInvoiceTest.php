@@ -197,6 +197,73 @@ it('lets an admin generate and approve an invoice themselves, without a manager 
     Notification::assertSentTo($manager, EventInvoiceReady::class);
 });
 
+it('lets an admin generate a formal invoice for a bill that was already created automatically, without blocking its payability', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->subDay()]);
+    invoiceAttendees($event, 3);
+
+    // Simulates the automatic end-of-event fallback: instantly payable, no review.
+    $charge = app(EventBillingService::class)->finalize($event);
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
+        ->and($charge->invoice_number)->toBeNull()
+        ->and($charge->needsInvoice())->toBeTrue();
+
+    // The manager can already pay it — nothing changed for them yet.
+    $this->actingAs($manager)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('Pay with Paystack');
+
+    // The admin sees the option to generate a formal invoice for it.
+    $this->actingAs($admin)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('Generate invoice')
+        ->assertSee('No formal invoice yet');
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), ['discount' => '0'])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge->refresh();
+    expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
+        ->and($charge->invoice_number)->not->toBeNull()
+        ->and($charge->needsInvoice())->toBeFalse();
+
+    Notification::assertSentTo($manager, EventInvoiceReady::class);
+
+    // Still payable, and now downloadable too.
+    $this->actingAs($manager)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('Pay with Paystack')
+        ->assertSee('Download invoice PDF');
+
+    $this->actingAs($manager)
+        ->get(route('events.billing.invoice', $event))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+});
+
+it('does not offer to generate an invoice for a bill that already has one', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $billing = app(EventBillingService::class);
+    $charge = $billing->finalize($event);
+    $billing->approveInvoice($charge, $admin, [], 0, null);
+
+    $this->actingAs($admin)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertDontSee('No formal invoice yet');
+});
+
 it('voids a pending-review invoice request when the event is cancelled', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $manager = invoiceManager($company);

@@ -104,4 +104,21 @@ class EventAttendeeCharge extends Model
     {
         return $this->invoice_number !== null;
     }
+
+    /**
+     * Whether this bill can still get (or needs) a formal, numbered invoice —
+     * true for a fresh manager/admin request, but also for a bill that was
+     * created automatically at the event's date and never went through
+     * review. False once it already has one, or once it's paid/void/refunded.
+     */
+    public function needsInvoice(): bool
+    {
+        return $this->invoice_number === null && ! in_array($this->status, [
+            self::STATUS_VOIDED,
+            self::STATUS_PAID,
+            self::STATUS_RECONCILED,
+            self::STATUS_REFUND_DUE,
+            self::STATUS_REFUNDED,
+        ], true);
+    }
 }

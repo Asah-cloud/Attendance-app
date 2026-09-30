@@ -22,7 +22,7 @@ class EventBillingController extends Controller
         $charge = $event->attendeeCharge;
         $estimate = $charge ? null : $billing->estimate($event);
         $features = $charge ? null : Feature::purchasable();
-        $reviewFeatures = $charge?->isAwaitingReview() ? Feature::purchasable() : null;
+        $reviewFeatures = $charge?->needsInvoice() ? Feature::purchasable() : null;
 
         return view('events.billing.show', compact('event', 'charge', 'estimate', 'features', 'reviewFeatures'));
     }
@@ -42,7 +42,7 @@ class EventBillingController extends Controller
         abort_unless($request->user()->hasRole('admin'), 403);
 
         $charge = $event->attendeeCharge;
-        abort_unless($charge && $charge->isAwaitingReview(), 404);
+        abort_unless($charge && $charge->needsInvoice(), 404);
 
         $validated = $request->validate([
             'discount' => ['nullable', 'numeric', 'min:0'],
@@ -65,7 +65,7 @@ class EventBillingController extends Controller
         $this->authorize('update', $event);
         $charge = $event->attendeeCharge;
         abort_unless($charge, 404);
-        abort_if($charge->isAwaitingReview() && ! auth()->user()->hasRole('admin'), 404);
+        abort_if(! $charge->hasApprovedInvoice() && ! auth()->user()->hasRole('admin'), 404);
 
         return $billing->renderInvoicePdf($charge)->download(($charge->invoice_number ?: 'invoice-draft').'.pdf');
     }
