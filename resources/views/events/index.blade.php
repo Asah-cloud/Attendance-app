@@ -4,7 +4,11 @@
     @role('admin')
         <div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div><p class="text-sm font-semibold text-blue-600">Platform events</p><h2 class="mt-1 text-3xl font-black tracking-tight">Company event workspaces</h2><p class="mt-2 text-sm text-slate-500">Review events by company or create a new company workspace.</p></div>
-            <div class="flex flex-wrap gap-3"><a href="{{ route('companies.index') }}" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50">View companies</a><a href="{{ route('companies.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Add company</a></div>
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ route('events.index', $showPast ? [] : ['past' => 1]) }}" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50">{{ $showPast ? 'Hide past events' : 'Show past events' }}</a>
+                <a href="{{ route('companies.index') }}" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50">View companies</a>
+                <a href="{{ route('companies.create') }}" class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Add company</a>
+            </div>
         </div>
 
         <div class="space-y-5">
@@ -18,9 +22,9 @@
                         <div class="flex gap-2"><a href="{{ route('companies.edit', $company) }}" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-extrabold text-slate-700">Edit company</a><a href="{{ route('events.create', ['company_id' => $company->id]) }}" class="rounded-lg bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-700">Create event</a></div>
                     </div>
                     <div class="divide-y divide-slate-100">
-                        @forelse($company->events as $event)
+                        @forelse($company->visibleEvents as $event)
                             <div class="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center"><div class="min-w-0 flex-1"><p class="truncate text-sm font-extrabold">{{ $event->title }}</p><p class="mt-1 text-xs text-slate-500">{{ $event->event_date->format('M j, Y') }}{{ $event->location ? ' · '.$event->location : '' }}</p></div><span class="w-fit rounded-full px-3 py-1 text-[10px] font-black uppercase {{ $event->status === 'active' ? 'bg-emerald-50 text-emerald-700' : ($event->status === 'upcoming' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600') }}">{{ $event->status }}</span><div class="flex gap-2"><a href="{{ route('events.attendance', $event) }}" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-extrabold text-white">Open attendance</a><a href="{{ route('events.edit', $event) }}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-extrabold text-slate-600">Edit</a></div></div>
-                        @empty <p class="px-6 py-8 text-center text-sm text-slate-500">No events created for this company.</p> @endforelse
+                        @empty <p class="px-6 py-8 text-center text-sm text-slate-500">{{ $showPast ? 'No events created for this company.' : 'No upcoming or active events for this company.' }}</p> @endforelse
                     </div>
                 </section>
             @empty <div class="rounded-2xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-500">No companies have been created yet.</div> @endforelse
@@ -43,7 +47,10 @@
         @endrole
 
         <div data-tour="events-index-list" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-100 px-6 py-5"><h3 class="font-extrabold text-slate-950">Event schedule</h3><p class="mt-1 text-xs text-slate-500">{{ $events->count() }} {{ Str::plural('event', $events->count()) }} available</p></div>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+                <div><h3 class="font-extrabold text-slate-950">Event schedule</h3><p class="mt-1 text-xs text-slate-500">{{ $events->count() }} {{ Str::plural('event', $events->count()) }} {{ $showPast ? 'total' : 'upcoming or active' }}</p></div>
+                <a href="{{ route('events.index', $showPast ? [] : ['past' => 1]) }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50">{{ $showPast ? 'Hide past events' : 'Show past events' }}</a>
+            </div>
             <div class="divide-y divide-slate-100">
                 @forelse($events as $event)
                     @if(auth()->user()->hasRole('manager') || auth()->user()->can('view', $event))
@@ -52,7 +59,7 @@
                             <div class="flex flex-wrap items-center gap-3 lg:justify-end"><span class="rounded-full px-3 py-1.5 text-[10px] font-black uppercase {{ $event->status === 'active' ? 'bg-emerald-50 text-emerald-700' : ($event->status === 'upcoming' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600') }}">{{ $event->status }}</span><span class="text-xs font-bold text-slate-500">{{ $event->event_date->format('M j, Y') }}</span><a href="{{ route('events.attendance', $event) }}" class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-blue-700">Take attendance</a>@role('manager')<a href="{{ route('events.edit', $event) }}" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-extrabold text-slate-600 hover:bg-white">Edit</a>@endrole</div>
                         </article>
                     @endif
-                @empty <div class="px-6 py-14 text-center"><p class="text-sm font-bold text-slate-700">No events yet</p><p class="mt-2 text-xs text-slate-500">Create an event to begin collecting registrations and attendance.</p>@role('manager')<a href="{{ route('events.create') }}" class="mt-5 inline-block rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Create your first event</a>@endrole</div> @endforelse
+                @empty <div class="px-6 py-14 text-center"><p class="text-sm font-bold text-slate-700">No events yet</p><p class="mt-2 text-xs text-slate-500">{{ $showPast ? 'Create an event to begin collecting registrations and attendance.' : 'No upcoming or active events right now.' }}</p>@role('manager')<a href="{{ route('events.create') }}" class="mt-5 inline-block rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Create your first event</a>@endrole</div> @endforelse
             </div>
         </div>
     @endhasanyrole

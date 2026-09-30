@@ -25,33 +25,37 @@ class EventController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
         if ($user->isAudit() && ! $user->hasAnyRole(['admin', 'manager'])) {
             return view('audit.events', ['events' => $user->events()->where('company_id', $user->company_id)->withCount('confirmedParticipants')->orderBy('event_date')->get()]);
         }
 
+        $showPast = $request->boolean('past');
+        $hideClosed = fn ($events) => $showPast ? $events : $events->reject(fn (Event $event) => $event->status === 'closed');
+
         $companies = collect(); // Default empty collection for non-admins
 
         if ($user->hasRole('admin')) {
             // Super Admin sees all companies with their nested relationships
             $companies = Company::with(['events', 'users'])->get();
+            $companies->each(fn (Company $company) => $company->setRelation('visibleEvents', $hideClosed($company->events)));
             $events = Event::orderBy('created_at', 'desc')->get();
         } elseif ($user->hasRole('manager')) {
             // Managers only see events belonging to their specific company
-            $events = Event::where('company_id', $user->company_id)
+            $events = $hideClosed(Event::where('company_id', $user->company_id)
                 ->orderBy('created_at', 'desc')
-                ->get();
+                ->get());
         } else {
             // Ushers only see events they have been assigned to work, within their own company.
-            $events = $user->events()
+            $events = $hideClosed($user->events()
                 ->where('company_id', $user->company_id)
                 ->orderBy('created_at', 'desc')
-                ->get();
+                ->get());
         }
 
-        return view('events.index', compact('events', 'companies'));
+        return view('events.index', compact('events', 'companies', 'showPast'));
     }
 
     /**
