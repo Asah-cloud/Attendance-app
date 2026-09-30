@@ -22,7 +22,7 @@ class EventBillingController extends Controller
         $charge = $event->attendeeCharge;
         $estimate = $charge ? null : $billing->estimate($event);
         $features = $charge ? null : Feature::purchasable();
-        $reviewFeatures = $charge?->needsInvoice() ? Feature::purchasable() : null;
+        $reviewFeatures = $charge?->isEditable() ? Feature::purchasable() : null;
         $companyManagers = $charge?->hasApprovedInvoice() ? $event->company->users()->where('role', 'manager')->get() : null;
 
         return view('events.billing.show', compact('event', 'charge', 'estimate', 'features', 'reviewFeatures', 'companyManagers'));
@@ -43,7 +43,8 @@ class EventBillingController extends Controller
         abort_unless($request->user()->hasRole('admin'), 403);
 
         $charge = $event->attendeeCharge;
-        abort_unless($charge && $charge->needsInvoice(), 404);
+        abort_unless($charge && $charge->isEditable(), 404);
+        $wasAlreadyInvoiced = $charge->hasApprovedInvoice();
 
         $validated = $request->validate([
             'discount' => ['nullable', 'numeric', 'min:0'],
@@ -66,7 +67,11 @@ class EventBillingController extends Controller
 
         $billing->approveInvoice($charge, $request->user(), $featureKeys, $featureAmounts, $discountMinor, $validated['discount_reason'] ?? null);
 
-        return redirect()->route('events.billing.show', $event)->with('success', 'Invoice saved. Preview, download, or send it to managers below.');
+        $message = $wasAlreadyInvoiced
+            ? 'Invoice updated. Re-send it if managers already have a copy.'
+            : 'Invoice saved. Preview, download, or send it to managers below.';
+
+        return redirect()->route('events.billing.show', $event)->with('success', $message);
     }
 
     public function downloadInvoice(Request $request, Event $event, EventBillingService $billing): Response

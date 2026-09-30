@@ -392,7 +392,7 @@ it('lets an admin generate a formal invoice for a bill that was already created 
         ->assertHeader('content-type', 'application/pdf');
 });
 
-it('does not offer to generate an invoice for a bill that already has one', function () {
+it('offers to edit, not generate, an invoice that already has one', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $admin = invoiceAdmin();
     $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
@@ -405,7 +405,98 @@ it('does not offer to generate an invoice for a bill that already has one', func
     $this->actingAs($admin)
         ->get(route('events.billing.show', $event))
         ->assertOk()
-        ->assertDontSee('No formal invoice yet');
+        ->assertDontSee('No formal invoice yet')
+        ->assertSee('Edit this invoice')
+        ->assertSee('Edit invoice', false);
+});
+
+it('lets an admin edit an already-saved invoice, keeping the same invoice number', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 2);
+
+    $this->actingAs($manager)
+        ->post(route('events.billing.request', $event), ['features' => ['custom_messages']]);
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), ['features' => ['custom_messages'], 'discount' => '0']);
+
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    $originalInvoiceNumber = $charge->invoice_number;
+    $messages = Feature::where('key', 'custom_messages')->firstOrFail();
+
+    $badges = Feature::where('key', 'badge_studio')->firstOrFail();
+
+    // Edit it later: drop custom_messages, add badge_studio, apply a discount.
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), [
+            'features' => ['badge_studio'],
+            'discount' => '3.00',
+            'discount_reason' => 'Adjusted after the fact',
+        ])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge->refresh();
+    expect($charge->invoice_number)->toBe($originalInvoiceNumber)
+        ->and($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
+        ->and($charge->discount_minor)->toBe(300)
+        ->and($charge->discount_reason)->toBe('Adjusted after the fact')
+        ->and(collect($charge->feature_breakdown)->pluck('key')->all())->toBe(['badge_studio'])
+        ->and($charge->amount_minor)->toBe((2 * 200) + $badges->cost_minor - 300);
+
+    $this->assertDatabaseMissing('event_features', ['event_id' => $event->id, 'feature_key' => 'custom_messages']);
+    $this->assertDatabaseHas('event_features', ['event_id' => $event->id, 'feature_key' => 'badge_studio']);
+});
+
+it('flags that an invoice was edited after it was already sent', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $this->actingAs($manager)->post(route('events.billing.request', $event));
+    $this->actingAs($admin)->post(route('events.billing.approve', $event), ['discount' => '0']);
+    $this->actingAs($admin)->post(route('events.billing.invoice.send', $event), ['managers' => [$manager->id]]);
+
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    expect($charge->hasUnsentChanges())->toBeFalse();
+
+    $this->travel(1)->minute();
+    $this->actingAs($admin)->post(route('events.billing.approve', $event), ['discount' => '2.00', 'discount_reason' => 'Late adjustment']);
+
+    $charge->refresh();
+    expect($charge->hasUnsentChanges())->toBeTrue();
+
+    $this->actingAs($admin)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('edited after it was last sent');
+});
+
+it('blocks editing an invoice once it has been paid', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $billing = app(EventBillingService::class);
+    $charge = $billing->requestInvoice($event);
+    $billing->approveInvoice($charge, $admin, [], [], 0, null);
+    $billing->confirmPayment($charge->fresh());
+
+    $this->actingAs($admin)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertDontSee('Edit this invoice')
+        ->assertDontSee('Edit invoice', false);
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), ['discount' => '0'])
+        ->assertNotFound();
 });
 
 it('voids a pending-review invoice request when the event is cancelled', function () {

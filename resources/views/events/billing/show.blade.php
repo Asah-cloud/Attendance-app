@@ -118,7 +118,7 @@
                                 </div>
                                 <div>
                                     <label class="text-xs font-bold text-gray-500">Reason</label>
-                                    <input type="text" name="discount_reason" placeholder="e.g. Repeat customer courtesy" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
+                                    <input type="text" name="discount_reason" value="{{ old('discount_reason', $charge->discount_reason) }}" placeholder="e.g. Repeat customer courtesy" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
                                 </div>
                             </div>
                             @error('discount_reason')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
@@ -171,17 +171,22 @@
                 <p class="mt-4 text-2xl font-black">Total: {{ $charge->currency }} {{ number_format($charge->amount_minor / 100, 2) }}</p>
 
                 @role('admin')
-                    @if($charge->needsInvoice())
-                        <div class="mt-6 rounded-2xl border border-blue-200 bg-blue-50/60 p-5" x-data="{ open: false }">
+                    @if($charge->isEditable())
+                        <div class="mt-6 rounded-2xl border border-blue-200 bg-blue-50/60 p-5" x-data="{ open: {{ $charge->hasApprovedInvoice() ? 'false' : 'true' }} }">
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div>
-                                    <p class="font-black text-blue-900">No formal invoice yet</p>
-                                    <p class="mt-1 text-xs text-blue-800">This bill was created automatically and hasn't been reviewed. Generate a numbered invoice — optionally adjusting features or applying a discount first — then preview, download, or choose who to send it to.</p>
+                                    @if($charge->hasApprovedInvoice())
+                                        <p class="font-black text-blue-900">Edit this invoice</p>
+                                        <p class="mt-1 text-xs text-blue-800">Adjust features or the discount, then save again. It keeps the same invoice number — re-send it if managers already have a copy.</p>
+                                    @else
+                                        <p class="font-black text-blue-900">No formal invoice yet</p>
+                                        <p class="mt-1 text-xs text-blue-800">This bill was created automatically and hasn't been reviewed. Generate a numbered invoice — optionally adjusting features or applying a discount first — then preview, download, or choose who to send it to.</p>
+                                    @endif
                                 </div>
-                                <button type="button" @click="open = !open" class="shrink-0 rounded-xl bg-blue-900 px-4 py-2.5 text-xs font-bold text-white" x-text="open ? 'Close' : 'Generate invoice'"></button>
+                                <button type="button" @click="open = !open" class="shrink-0 rounded-xl bg-blue-900 px-4 py-2.5 text-xs font-bold text-white" x-text="open ? 'Close' : '{{ $charge->hasApprovedInvoice() ? 'Edit invoice' : 'Generate invoice' }}'"></button>
                             </div>
 
-                            <form x-show="open" x-cloak method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-5" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: 0, recomputeFeatures() { this.featuresMinor = Array.from($el.querySelectorAll('[data-feature-row]')).reduce((sum, row) => { const cb = row.querySelector('input[type=checkbox]'); const amt = row.querySelector('input[type=number]'); return cb.checked ? sum + Math.round((parseFloat(amt.value) || 0) * 100) : sum; }, 0); } }">
+                            <form x-show="open" x-cloak method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-5" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: {{ $charge->discount_minor / 100 }}, recomputeFeatures() { this.featuresMinor = Array.from($el.querySelectorAll('[data-feature-row]')).reduce((sum, row) => { const cb = row.querySelector('input[type=checkbox]'); const amt = row.querySelector('input[type=number]'); return cb.checked ? sum + Math.round((parseFloat(amt.value) || 0) * 100) : sum; }, 0); } }">
                                 @csrf
                                 @if($reviewFeatures->isNotEmpty())
                                     <div class="rounded-2xl border border-blue-100 bg-white p-5">
@@ -220,7 +225,7 @@
                                         </div>
                                         <div>
                                             <label class="text-xs font-bold text-gray-500">Reason</label>
-                                            <input type="text" name="discount_reason" placeholder="e.g. Repeat customer courtesy" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
+                                            <input type="text" name="discount_reason" value="{{ old('discount_reason', $charge->discount_reason) }}" placeholder="e.g. Repeat customer courtesy" class="mt-1 w-full rounded-xl border-gray-200 text-sm">
                                         </div>
                                     </div>
                                     @error('discount_reason')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
@@ -244,6 +249,7 @@
                         </form>
                     </div>
                     @if($charge->invoice_emailed_at)<p class="mt-2 text-xs text-gray-400">Last emailed {{ $charge->invoice_emailed_at->diffForHumans() }}.</p>@endif
+                    @if($charge->hasUnsentChanges())<p class="mt-2 text-xs font-bold text-amber-700">This invoice was edited after it was last sent — send it again so managers see the latest figures.</p>@endif
 
                     @role('admin')
                         <div class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-5">

@@ -113,12 +113,32 @@ class EventAttendeeCharge extends Model
      */
     public function needsInvoice(): bool
     {
-        return $this->invoice_number === null && ! in_array($this->status, [
+        return $this->invoice_number === null && $this->isEditable();
+    }
+
+    /**
+     * Whether an admin can (still) edit this bill's features and discount —
+     * true both before it first gets an invoice number and afterward, right
+     * up until it's actually paid, voided, or refunded. Once money has
+     * changed hands the figures are locked.
+     */
+    public function isEditable(): bool
+    {
+        return ! in_array($this->status, [
             self::STATUS_VOIDED,
             self::STATUS_PAID,
             self::STATUS_RECONCILED,
             self::STATUS_REFUND_DUE,
             self::STATUS_REFUNDED,
         ], true);
+    }
+
+    /** Whether the invoice has been edited since it was last emailed. */
+    public function hasUnsentChanges(): bool
+    {
+        return $this->hasApprovedInvoice()
+            && $this->invoice_emailed_at !== null
+            && $this->reviewed_at !== null
+            && $this->reviewed_at->gt($this->invoice_emailed_at);
     }
 }

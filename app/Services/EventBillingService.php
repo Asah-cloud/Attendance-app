@@ -142,7 +142,7 @@ class EventBillingService
 
         $charge = DB::transaction(function () use ($charge, $reviewer, $featureKeys, $featureAmounts, $discountMinor, $discountReason): EventAttendeeCharge {
             $locked = EventAttendeeCharge::query()->lockForUpdate()->findOrFail($charge->id);
-            abort_unless($locked->needsInvoice(), 422, 'This bill already has an invoice, or cannot be invoiced.');
+            abort_unless($locked->isEditable(), 422, 'This bill has already been paid, voided, or refunded and can no longer be edited.');
 
             $event = Event::query()->lockForUpdate()->findOrFail($locked->event_id);
             $attendeeSubtotal = $locked->amount_minor - $locked->features_amount_minor;
