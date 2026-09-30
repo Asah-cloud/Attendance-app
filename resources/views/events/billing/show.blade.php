@@ -78,26 +78,31 @@
                 <p class="mt-4 text-lg font-bold text-gray-700">Attendee subtotal: {{ $charge->currency }} {{ number_format(($charge->amount_minor - $charge->features_amount_minor) / 100, 2) }}</p>
 
                 @role('admin')
-                    <form method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-6" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: 0 }">
+                    <form method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-6" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: 0, recomputeFeatures() { this.featuresMinor = Array.from($el.querySelectorAll('[data-feature-row]')).reduce((sum, row) => { const cb = row.querySelector('input[type=checkbox]'); const amt = row.querySelector('input[type=number]'); return cb.checked ? sum + Math.round((parseFloat(amt.value) || 0) * 100) : sum; }, 0); } }">
                         @csrf
                         @if($reviewFeatures->isNotEmpty())
                             <div class="rounded-2xl border border-gray-100 bg-white p-5">
                                 <h4 class="font-black text-gray-900">Advanced features requested</h4>
-                                <p class="mt-1 text-xs text-gray-500">Uncheck any the company shouldn't be billed for, or add one they need.</p>
+                                <p class="mt-1 text-xs text-gray-500">Uncheck any the company shouldn't be billed for, add one they need, or adjust its price for this invoice only.</p>
                                 <div class="mt-4 space-y-3">
                                     @foreach($reviewFeatures as $feature)
-                                        @php $checked = collect($charge->feature_breakdown ?? [])->contains('key', $feature->key); @endphp
-                                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
-                                            <input type="checkbox" name="features[]" value="{{ $feature->key }}" data-cost="{{ $feature->cost_minor }}" @checked($checked)
-                                                   x-on:change="featuresMinor = Array.from($el.closest('form').querySelectorAll('input[name=\'features[]\']:checked')).reduce((sum, el) => sum + Number(el.dataset.cost), 0)"
-                                                   class="mt-1 h-4 w-4 rounded border-gray-300">
-                                            <span class="flex-1">
-                                                <span class="flex items-center justify-between gap-3">
-                                                    <span class="font-bold text-gray-900">{{ $feature->name }}</span>
-                                                    <span class="font-black text-blue-700">+{{ number_format($feature->cost_minor / 100, 2) }}</span>
-                                                </span>
-                                            </span>
-                                        </label>
+                                        @php
+                                            $checked = collect($charge->feature_breakdown ?? [])->contains('key', $feature->key);
+                                            $lineAmount = collect($charge->feature_breakdown ?? [])->firstWhere('key', $feature->key)['cost_minor'] ?? $feature->cost_minor;
+                                        @endphp
+                                        <div data-feature-row class="rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
+                                            <label class="flex cursor-pointer items-start gap-3">
+                                                <input type="checkbox" name="features[]" value="{{ $feature->key }}" @checked($checked)
+                                                       x-on:change="recomputeFeatures()"
+                                                       class="mt-1 h-4 w-4 rounded border-gray-300">
+                                                <span class="flex-1 font-bold text-gray-900">{{ $feature->name }}</span>
+                                            </label>
+                                            <div class="mt-2 flex items-center gap-2 pl-7">
+                                                <span class="text-xs font-bold text-gray-500">{{ $charge->currency }}</span>
+                                                <input type="number" name="feature_amounts[{{ $feature->key }}]" step="0.01" min="0" value="{{ number_format($lineAmount / 100, 2, '.', '') }}"
+                                                       x-on:input="recomputeFeatures()" class="w-28 rounded-lg border-gray-200 text-sm">
+                                            </div>
+                                        </div>
                                     @endforeach
                                 </div>
                             </div>
@@ -121,10 +126,10 @@
 
                         <p class="mt-5 text-2xl font-black">New total: {{ $charge->currency }} <span x-text="(({{ $charge->amount_minor - $charge->features_amount_minor }} + featuresMinor - (discount * 100 || 0)) / 100).toFixed(2)"></span></p>
 
-                        <button class="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Approve & send invoice</button>
+                        <button class="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Save invoice</button>
                     </form>
                 @else
-                    <p class="mt-6 text-sm font-semibold text-amber-800">An admin will review this and send you the final invoice to download or by email.</p>
+                    <p class="mt-6 text-sm font-semibold text-amber-800">An admin will review this and decide when to send you the final invoice, to download or by email.</p>
                 @endrole
             </section>
         @else
@@ -171,30 +176,36 @@
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                     <p class="font-black text-blue-900">No formal invoice yet</p>
-                                    <p class="mt-1 text-xs text-blue-800">This bill was created automatically and hasn't been reviewed. Generate a numbered invoice — optionally adjusting features or applying a discount first — and it'll be emailed to the manager.</p>
+                                    <p class="mt-1 text-xs text-blue-800">This bill was created automatically and hasn't been reviewed. Generate a numbered invoice — optionally adjusting features or applying a discount first — then preview, download, or choose who to send it to.</p>
                                 </div>
                                 <button type="button" @click="open = !open" class="shrink-0 rounded-xl bg-blue-900 px-4 py-2.5 text-xs font-bold text-white" x-text="open ? 'Close' : 'Generate invoice'"></button>
                             </div>
 
-                            <form x-show="open" x-cloak method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-5" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: 0 }">
+                            <form x-show="open" x-cloak method="POST" action="{{ route('events.billing.approve', $event) }}" class="mt-5" x-data="{ featuresMinor: {{ $charge->features_amount_minor }}, discount: 0, recomputeFeatures() { this.featuresMinor = Array.from($el.querySelectorAll('[data-feature-row]')).reduce((sum, row) => { const cb = row.querySelector('input[type=checkbox]'); const amt = row.querySelector('input[type=number]'); return cb.checked ? sum + Math.round((parseFloat(amt.value) || 0) * 100) : sum; }, 0); } }">
                                 @csrf
                                 @if($reviewFeatures->isNotEmpty())
                                     <div class="rounded-2xl border border-blue-100 bg-white p-5">
                                         <h4 class="font-black text-gray-900">Advanced features</h4>
+                                        <p class="mt-1 text-xs text-gray-500">Adjust a feature's price for this invoice only if needed.</p>
                                         <div class="mt-4 space-y-3">
                                             @foreach($reviewFeatures as $feature)
-                                                @php $checked = collect($charge->feature_breakdown ?? [])->contains('key', $feature->key); @endphp
-                                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
-                                                    <input type="checkbox" name="features[]" value="{{ $feature->key }}" data-cost="{{ $feature->cost_minor }}" @checked($checked)
-                                                           x-on:change="featuresMinor = Array.from($el.closest('form').querySelectorAll('input[name=\'features[]\']:checked')).reduce((sum, el) => sum + Number(el.dataset.cost), 0)"
-                                                           class="mt-1 h-4 w-4 rounded border-gray-300">
-                                                    <span class="flex-1">
-                                                        <span class="flex items-center justify-between gap-3">
-                                                            <span class="font-bold text-gray-900">{{ $feature->name }}</span>
-                                                            <span class="font-black text-blue-700">+{{ number_format($feature->cost_minor / 100, 2) }}</span>
-                                                        </span>
-                                                    </span>
-                                                </label>
+                                                @php
+                                                    $checked = collect($charge->feature_breakdown ?? [])->contains('key', $feature->key);
+                                                    $lineAmount = collect($charge->feature_breakdown ?? [])->firstWhere('key', $feature->key)['cost_minor'] ?? $feature->cost_minor;
+                                                @endphp
+                                                <div data-feature-row class="rounded-xl border border-gray-100 p-3 hover:bg-gray-50">
+                                                    <label class="flex cursor-pointer items-start gap-3">
+                                                        <input type="checkbox" name="features[]" value="{{ $feature->key }}" @checked($checked)
+                                                               x-on:change="recomputeFeatures()"
+                                                               class="mt-1 h-4 w-4 rounded border-gray-300">
+                                                        <span class="flex-1 font-bold text-gray-900">{{ $feature->name }}</span>
+                                                    </label>
+                                                    <div class="mt-2 flex items-center gap-2 pl-7">
+                                                        <span class="text-xs font-bold text-gray-500">{{ $charge->currency }}</span>
+                                                        <input type="number" name="feature_amounts[{{ $feature->key }}]" step="0.01" min="0" value="{{ number_format($lineAmount / 100, 2, '.', '') }}"
+                                                               x-on:input="recomputeFeatures()" class="w-28 rounded-lg border-gray-200 text-sm">
+                                                    </div>
+                                                </div>
                                             @endforeach
                                         </div>
                                     </div>
@@ -217,7 +228,7 @@
 
                                 <p class="mt-5 text-xl font-black">New total: {{ $charge->currency }} <span x-text="(({{ $charge->amount_minor - $charge->features_amount_minor }} + featuresMinor - (discount * 100 || 0)) / 100).toFixed(2)"></span></p>
 
-                                <button class="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Approve & send invoice</button>
+                                <button class="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Save invoice</button>
                             </form>
                         </div>
                     @endif
@@ -225,13 +236,37 @@
 
                 @if($charge->hasApprovedInvoice())
                     <div class="mt-4 flex flex-wrap gap-2">
+                        <a href="{{ route('events.billing.invoice', ['event' => $event, 'preview' => 1]) }}" target="_blank" class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50">Preview</a>
                         <a href="{{ route('events.billing.invoice', $event) }}" class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50">Download invoice PDF</a>
                         <form method="POST" action="{{ route('events.billing.invoice.email', $event) }}">
                             @csrf
-                            <button class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50">Email me this invoice</button>
+                            <button class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50">Email it to me</button>
                         </form>
                     </div>
                     @if($charge->invoice_emailed_at)<p class="mt-2 text-xs text-gray-400">Last emailed {{ $charge->invoice_emailed_at->diffForHumans() }}.</p>@endif
+
+                    @role('admin')
+                        <div class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-5">
+                            <h4 class="font-black text-gray-900">Send to managers</h4>
+                            <p class="mt-1 text-xs text-gray-500">Choose who at {{ $event->company->name }} should receive this invoice by email.</p>
+                            @if($companyManagers->isEmpty())
+                                <p class="mt-3 text-sm text-gray-500">This company has no manager accounts yet.</p>
+                            @else
+                                <form method="POST" action="{{ route('events.billing.invoice.send', $event) }}" class="mt-3">
+                                    @csrf
+                                    <div class="space-y-2">
+                                        @foreach($companyManagers as $companyManager)
+                                            <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                                                <input type="checkbox" name="managers[]" value="{{ $companyManager->id }}" checked class="h-4 w-4 rounded border-gray-300">
+                                                <span><span class="block font-bold text-gray-900">{{ $companyManager->name }}</span><span class="block text-xs text-gray-500">{{ $companyManager->email }}</span></span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <button class="mt-4 rounded-xl bg-blue-900 px-5 py-2.5 text-sm font-bold text-white">Send invoice</button>
+                                </form>
+                            @endif
+                        </div>
+                    @endrole
                 @endif
 
                 @if($errors->has('payment'))

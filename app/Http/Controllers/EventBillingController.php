@@ -23,8 +23,9 @@ class EventBillingController extends Controller
         $estimate = $charge ? null : $billing->estimate($event);
         $features = $charge ? null : Feature::purchasable();
         $reviewFeatures = $charge?->needsInvoice() ? Feature::purchasable() : null;
+        $companyManagers = $charge?->hasApprovedInvoice() ? $event->company->users()->where('role', 'manager')->get() : null;
 
-        return view('events.billing.show', compact('event', 'charge', 'estimate', 'features', 'reviewFeatures'));
+        return view('events.billing.show', compact('event', 'charge', 'estimate', 'features', 'reviewFeatures', 'companyManagers'));
     }
 
     public function requestInvoice(Request $request, Event $event, EventBillingService $billing): RedirectResponse
@@ -50,35 +51,69 @@ class EventBillingController extends Controller
                 Rule::requiredIf((float) ($request->input('discount') ?? 0) > 0),
                 'nullable', 'string', 'max:255',
             ],
+            'feature_amounts' => ['nullable', 'array'],
+            'feature_amounts.*' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $discountMinor = (int) round(((float) ($validated['discount'] ?? 0)) * 100);
         $featureKeys = $this->validFeatureKeys($request);
+        $featureAmounts = [];
+        foreach ($validated['feature_amounts'] ?? [] as $key => $amount) {
+            if (in_array($key, $featureKeys, true) && $amount !== null && $amount !== '') {
+                $featureAmounts[$key] = (int) round(((float) $amount) * 100);
+            }
+        }
 
-        $billing->approveInvoice($charge, $request->user(), $featureKeys, $discountMinor, $validated['discount_reason'] ?? null);
+        $billing->approveInvoice($charge, $request->user(), $featureKeys, $featureAmounts, $discountMinor, $validated['discount_reason'] ?? null);
 
-        return redirect()->route('events.billing.show', $event)->with('success', 'Invoice approved and sent to the manager.');
+        return redirect()->route('events.billing.show', $event)->with('success', 'Invoice saved. Preview, download, or send it to managers below.');
     }
 
-    public function downloadInvoice(Event $event, EventBillingService $billing): Response
+    public function downloadInvoice(Request $request, Event $event, EventBillingService $billing): Response
     {
         $this->authorize('update', $event);
         $charge = $event->attendeeCharge;
         abort_unless($charge, 404);
         abort_if(! $charge->hasApprovedInvoice() && ! auth()->user()->hasRole('admin'), 404);
 
-        return $billing->renderInvoicePdf($charge)->download(($charge->invoice_number ?: 'invoice-draft').'.pdf');
+        $pdf = $billing->renderInvoicePdf($charge);
+        $filename = ($charge->invoice_number ?: 'invoice-draft').'.pdf';
+
+        return $request->boolean('preview') ? $pdf->stream($filename) : $pdf->download($filename);
     }
 
-    public function emailInvoice(Event $event, EventBillingService $billing): RedirectResponse
+    public function emailInvoice(Request $request, Event $event, EventBillingService $billing): RedirectResponse
     {
         $this->authorize('update', $event);
         $charge = $event->attendeeCharge;
         abort_unless($charge, 404);
 
-        $billing->resendInvoiceEmail($charge);
+        $billing->sendInvoiceEmail($charge, [$request->user()]);
 
-        return redirect()->route('events.billing.show', $event)->with('success', 'Invoice emailed.');
+        return redirect()->route('events.billing.show', $event)->with('success', 'Invoice emailed to you.');
+    }
+
+    public function sendInvoice(Request $request, Event $event, EventBillingService $billing): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        abort_unless($request->user()->hasRole('admin'), 403);
+
+        $charge = $event->attendeeCharge;
+        abort_unless($charge && $charge->hasApprovedInvoice(), 404);
+
+        $validated = $request->validate([
+            'managers' => ['required', 'array', 'min:1'],
+            'managers.*' => ['integer'],
+        ]);
+
+        $managers = $event->company->users()
+            ->where('role', 'manager')
+            ->whereIn('id', $validated['managers'])
+            ->get();
+
+        $billing->sendInvoiceEmail($charge, $managers);
+
+        return redirect()->route('events.billing.show', $event)->with('success', 'Invoice sent to '.$managers->count().' manager(s).');
     }
 
     public function pay(Event $event, EventBillingService $billing): RedirectResponse

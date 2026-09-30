@@ -302,6 +302,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/billing/approve', [EventBillingController::class, 'approve'])->name('events.billing.approve');
         Route::get('/events/{event}/billing/invoice', [EventBillingController::class, 'downloadInvoice'])->name('events.billing.invoice');
         Route::post('/events/{event}/billing/invoice/email', [EventBillingController::class, 'emailInvoice'])->name('events.billing.invoice.email');
+        Route::post('/events/{event}/billing/invoice/send', [EventBillingController::class, 'sendInvoice'])->name('events.billing.invoice.send');
         Route::post('/events/{event}/billing/pay', [EventBillingController::class, 'pay'])->name('events.billing.pay');
         Route::get('/events/{event}/billing/callback', [EventBillingController::class, 'callback'])->name('events.billing.callback');
 

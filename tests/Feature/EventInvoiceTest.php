@@ -4,6 +4,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
 use App\Models\EventRegistration;
+use App\Models\Feature;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\EventInvoiceReady;
@@ -49,10 +50,11 @@ function invoiceAttendees(Event $event, int $count): void
     }
 }
 
-it('emails the invoice with a PDF attached once an admin approves it', function () {
+it('saves the invoice without emailing anyone, then sends it to chosen managers with a PDF attached', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Acme Co']);
     $manager = invoiceManager($company);
+    $otherManager = invoiceManager($company);
     $admin = invoiceAdmin();
     $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
     invoiceAttendees($event, 2);
@@ -61,11 +63,41 @@ it('emails the invoice with a PDF attached once an admin approves it', function 
     $this->actingAs($admin)->post(route('events.billing.approve', $event), ['discount' => '0']);
 
     $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
-    expect($charge->invoice_emailed_at)->not->toBeNull();
+    expect($charge->invoice_emailed_at)->toBeNull();
+    Notification::assertNothingSent();
 
-    Notification::assertSentTo($manager, EventInvoiceReady::class, function ($notification, $channels) use ($charge) {
+    $this->actingAs($admin)
+        ->get(route('events.billing.show', $event))
+        ->assertOk()
+        ->assertSee('Send to managers')
+        ->assertSee($manager->email)
+        ->assertSee($otherManager->email);
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.invoice.send', $event), ['managers' => [$manager->id]])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    expect($charge->fresh()->invoice_emailed_at)->not->toBeNull();
+
+    Notification::assertSentTo($manager, EventInvoiceReady::class, function ($notification) use ($charge) {
         return $notification->charge->is($charge);
     });
+    Notification::assertNotSentTo($otherManager, EventInvoiceReady::class);
+});
+
+it('prevents a manager from sending the invoice to other managers', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $this->actingAs($manager)->post(route('events.billing.request', $event));
+    $this->actingAs($admin)->post(route('events.billing.approve', $event), ['discount' => '0']);
+
+    $this->actingAs($manager)
+        ->post(route('events.billing.invoice.send', $event), ['managers' => [$manager->id]])
+        ->assertForbidden();
 });
 
 it('lets a manager download the invoice PDF once approved, but not while awaiting review', function () {
@@ -102,6 +134,64 @@ it('lets an admin preview the invoice PDF while it is still awaiting review', fu
         ->get(route('events.billing.invoice', $event))
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
+});
+
+it('lets an admin override a feature\'s price for this invoice only, without changing its catalog price', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 2);
+
+    $this->actingAs($manager)
+        ->post(route('events.billing.request', $event), ['features' => ['custom_messages', 'badge_studio']]);
+
+    $messages = Feature::where('key', 'custom_messages')->firstOrFail();
+    $badges = Feature::where('key', 'badge_studio')->firstOrFail();
+    $catalogMessagesPrice = $messages->cost_minor;
+
+    $this->actingAs($admin)
+        ->post(route('events.billing.approve', $event), [
+            'features' => ['custom_messages', 'badge_studio'],
+            'feature_amounts' => [
+                'custom_messages' => '10.00', // discounted for this invoice only
+            ],
+            'discount' => '0',
+        ])
+        ->assertRedirect(route('events.billing.show', $event));
+
+    $charge = EventAttendeeCharge::where('event_id', $event->id)->firstOrFail();
+    $messagesLine = collect($charge->feature_breakdown)->firstWhere('key', 'custom_messages');
+    $badgesLine = collect($charge->feature_breakdown)->firstWhere('key', 'badge_studio');
+
+    expect($messagesLine['cost_minor'])->toBe(1000)
+        ->and($badgesLine['cost_minor'])->toBe($badges->cost_minor)
+        ->and($charge->features_amount_minor)->toBe(1000 + $badges->cost_minor)
+        ->and($charge->amount_minor)->toBe((2 * 200) + 1000 + $badges->cost_minor);
+
+    $this->assertDatabaseHas('event_features', ['event_id' => $event->id, 'feature_key' => 'custom_messages', 'cost_minor' => 1000]);
+
+    // The catalog price itself is untouched.
+    expect($messages->fresh()->cost_minor)->toBe($catalogMessagesPrice);
+});
+
+it('streams the PDF inline for preview but attaches it for download', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = invoiceManager($company);
+    $admin = invoiceAdmin();
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Conference', 'event_date' => now()->addWeek()]);
+    invoiceAttendees($event, 1);
+
+    $this->actingAs($manager)->post(route('events.billing.request', $event));
+    $this->actingAs($admin)->post(route('events.billing.approve', $event), ['discount' => '0']);
+
+    $preview = $this->actingAs($manager)->get(route('events.billing.invoice', ['event' => $event, 'preview' => 1]));
+    $preview->assertOk();
+    expect($preview->headers->get('content-disposition'))->toContain('inline');
+
+    $download = $this->actingAs($manager)->get(route('events.billing.invoice', $event));
+    $download->assertOk();
+    expect($download->headers->get('content-disposition'))->toContain('attachment');
 });
 
 it('lets a manager resend the invoice email on demand', function () {
@@ -148,12 +238,12 @@ it('generates sequential invoice numbers', function () {
     $eventOne = Event::create(['company_id' => $company->id, 'title' => 'One', 'event_date' => now()->addWeek()]);
     invoiceAttendees($eventOne, 1);
     $chargeOne = $billing->requestInvoice($eventOne);
-    $billing->approveInvoice($chargeOne, $admin, [], 0, null);
+    $billing->approveInvoice($chargeOne, $admin, [], [], 0, null);
 
     $eventTwo = Event::create(['company_id' => $company->id, 'title' => 'Two', 'event_date' => now()->addWeek()]);
     invoiceAttendees($eventTwo, 1);
     $chargeTwo = $billing->requestInvoice($eventTwo);
-    $billing->approveInvoice($chargeTwo, $admin, [], 0, null);
+    $billing->approveInvoice($chargeTwo, $admin, [], [], 0, null);
 
     expect($chargeOne->fresh()->invoice_number)->not->toBe($chargeTwo->fresh()->invoice_number);
 });
@@ -183,7 +273,7 @@ it('lets an admin generate and approve an invoice themselves, without a manager 
     $this->actingAs($admin)
         ->get(route('events.billing.show', $event))
         ->assertOk()
-        ->assertSee('Approve & send invoice', false);
+        ->assertSee('Save invoice');
 
     $this->actingAs($admin)
         ->post(route('events.billing.approve', $event), ['discount' => '0'])
@@ -194,6 +284,10 @@ it('lets an admin generate and approve an invoice themselves, without a manager 
         ->and($charge->reviewed_by)->toBe($admin->id)
         ->and($charge->invoice_number)->not->toBeNull();
 
+    // Saving doesn't email anyone — the admin decides that separately.
+    Notification::assertNothingSent();
+
+    $this->actingAs($admin)->post(route('events.billing.invoice.send', $event), ['managers' => [$manager->id]]);
     Notification::assertSentTo($manager, EventInvoiceReady::class);
 });
 
@@ -210,6 +304,8 @@ it('lets an admin generate a formal invoice for a bill that was already created 
     expect($charge->status)->toBe(EventAttendeeCharge::STATUS_PENDING_PAYMENT)
         ->and($charge->invoice_number)->toBeNull()
         ->and($charge->needsInvoice())->toBeTrue();
+
+    Notification::fake(); // reset past the "bill ready" notice finalize() itself sends
 
     // The manager can already pay it — nothing changed for them yet.
     $this->actingAs($manager)
@@ -233,9 +329,9 @@ it('lets an admin generate a formal invoice for a bill that was already created 
         ->and($charge->invoice_number)->not->toBeNull()
         ->and($charge->needsInvoice())->toBeFalse();
 
-    Notification::assertSentTo($manager, EventInvoiceReady::class);
+    // Still payable, and now downloadable too — nobody has been emailed yet.
+    Notification::assertNothingSent();
 
-    // Still payable, and now downloadable too.
     $this->actingAs($manager)
         ->get(route('events.billing.show', $event))
         ->assertOk()
@@ -256,7 +352,7 @@ it('does not offer to generate an invoice for a bill that already has one', func
 
     $billing = app(EventBillingService::class);
     $charge = $billing->finalize($event);
-    $billing->approveInvoice($charge, $admin, [], 0, null);
+    $billing->approveInvoice($charge, $admin, [], [], 0, null);
 
     $this->actingAs($admin)
         ->get(route('events.billing.show', $event))
