@@ -80,9 +80,10 @@ class ParticipantRegistrationService
             'gender' => $trusted
                 ? ($this->usableString($data['gender'] ?? null) ?? $user->gender)
                 : ($user->gender ?? $this->usableString($data['gender'] ?? null)),
-            'room_group' => $trusted
-                ? ($this->usableString($data['room_group'] ?? null) ?? $user->room_group)
-                : ($user->room_group ?? $this->usableString($data['room_group'] ?? null)),
+            // Unlike contact/profile fields, room_group is specific to each event (which area/
+            // room a person is in this time), so it's never carried over from a prior event —
+            // a blank submission clears it rather than falling back to the participant's history.
+            'room_group' => $this->usableString($data['room_group'] ?? null),
             'company_id' => $user->company_id ?? $event->company_id,
         ])->save();
 
