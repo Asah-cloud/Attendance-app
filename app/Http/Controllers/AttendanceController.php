@@ -194,9 +194,10 @@ class AttendanceController extends Controller
         $registration = $event->registrations()
             ->with(['participant', 'roomAssignment.room.floor.block.site'])
             ->where('status', EventRegistration::STATUS_CONFIRMED)
-            ->whereHas('participant', fn ($query) => $query->whereIn('phone', [
-                $phone, '0'.$phone, '233'.$phone, '+233'.$phone,
-            ]))
+            ->whereHas('participant', function ($query) use ($phone): void {
+                $variants = [$phone, '0'.$phone, '233'.$phone, '+233'.$phone];
+                $query->whereIn('phone', $variants)->orWhereIn('secondary_phone', $variants);
+            })
             ->first();
 
         if (! $registration) {

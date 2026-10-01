@@ -25,7 +25,7 @@ class ConfirmationReminderSender
             ->with(['event', 'participant'])
             ->chunkById(100, function ($registrations) use (&$sent): void {
                 foreach ($registrations as $registration) {
-                    if (! $registration->participant->email && ! $registration->participant->phone) {
+                    if (! $registration->participant->email && ! $registration->participant->phone && ! $registration->participant->secondary_phone) {
                         continue;
                     }
                     NotifiesPerChannel::send($registration->participant, new AttendanceConfirmationRequest($registration), $registration->event->attendeeNotificationChannels());

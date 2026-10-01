@@ -82,7 +82,7 @@ class AttendanceConfirmationController extends Controller
 
         $sent = 0;
         foreach ($registrations as $registration) {
-            if (! $registration->participant->email && ! $registration->participant->phone) {
+            if (! $registration->participant->email && ! $registration->participant->phone && ! $registration->participant->secondary_phone) {
                 continue;
             }
             NotifiesPerChannel::send($registration->participant, new AttendanceConfirmationRequest($registration));

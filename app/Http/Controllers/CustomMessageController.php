@@ -445,7 +445,7 @@ class CustomMessageController extends Controller
     /**
      * @param  list<int>  $participantIds
      * @param  list<array{name: string, email: ?string, phone: ?string}>  $extras
-     * @return Collection<int, array{participant_id: ?int, name: string, email: ?string, phone: ?string}>
+     * @return Collection<int, array{participant_id: ?int, name: string, email: ?string, phone: ?string, secondary_phone: ?string}>
      */
     private function recipientRows(Event $event, array $participantIds, array $extras): Collection
     {
@@ -458,11 +458,12 @@ class CustomMessageController extends Controller
                     'name' => $participant->name,
                     'email' => $participant->email,
                     'phone' => $participant->phone,
+                    'secondary_phone' => $participant->secondary_phone,
                 ]));
         }
 
         foreach ($extras as $extra) {
-            $rows->push(['participant_id' => null, 'name' => $extra['name'], 'email' => $extra['email'] ?? null, 'phone' => $extra['phone'] ?? null]);
+            $rows->push(['participant_id' => null, 'name' => $extra['name'], 'email' => $extra['email'] ?? null, 'phone' => $extra['phone'] ?? null, 'secondary_phone' => $extra['secondary_phone'] ?? null]);
         }
 
         return $rows;

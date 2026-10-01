@@ -38,9 +38,10 @@ class ParticipantRegistrationService
      */
     public function resolveParticipant(Event $event, array $data, bool $trusted = true): Participant
     {
-        $phone = $this->normalizePhone($data['phone'] ?? null);
+        [$phone, $secondaryPhone] = $this->splitPhones($data['phone'] ?? null);
         $email = $this->usableEmail($data['email'] ?? null);
         $memberId = $this->usableString($data['member_id'] ?? null);
+        $gender = $this->usableString($data['gender'] ?? null);
         $lookupEmails = collect($data['lookup_emails'] ?? [])
             ->prepend($email)
             ->filter()
@@ -52,7 +53,7 @@ class ParticipantRegistrationService
         // Scoped to this event's company: the same person attending events run by two
         // different companies gets an independent participant record in each, rather
         // than being treated as one shared identity (or blocked outright).
-        $user = $this->findExistingUser($lookupEmails, $phone, $memberId, $event->company_id, $trusted);
+        $user = $this->findExistingUser($lookupEmails, $phone, $secondaryPhone, $memberId, $event->company_id, $trusted, $gender);
 
         if (! $user) {
             return Participant::create([
@@ -61,9 +62,10 @@ class ParticipantRegistrationService
                         ?? $this->usableString($data['generated_email'] ?? null)
                         ?? null,
                 'phone' => $phone,
+                'secondary_phone' => $secondaryPhone,
                 'member_id' => $memberId,
                 'category' => $this->usableString($data['category'] ?? null) ?? 'Member',
-                'gender' => $this->usableString($data['gender'] ?? null),
+                'gender' => $gender,
                 'room_group' => $this->usableString($data['room_group'] ?? null),
                 'company_id' => $event->company_id,
             ]);
@@ -73,13 +75,14 @@ class ParticipantRegistrationService
             'name' => $trusted ? ($data['name'] ?? $user->name) : ($user->name ?? $data['name'] ?? null),
             'email' => $trusted ? ($email ?? $user->email) : ($user->email ?? $email),
             'phone' => $user->phone ?? $phone,
+            'secondary_phone' => $user->secondary_phone ?? $secondaryPhone,
             'member_id' => $user->member_id ?? $memberId,
             'category' => $trusted
                 ? ($this->usableString($data['category'] ?? null) ?? $user->category)
                 : ($user->category ?? $this->usableString($data['category'] ?? null)),
             'gender' => $trusted
-                ? ($this->usableString($data['gender'] ?? null) ?? $user->gender)
-                : ($user->gender ?? $this->usableString($data['gender'] ?? null)),
+                ? ($gender ?? $user->gender)
+                : ($user->gender ?? $gender),
             // Unlike contact/profile fields, room_group is specific to each event (which area/
             // room a person is in this time), so it's never carried over from a prior event —
             // a blank submission clears it rather than falling back to the participant's history.
@@ -103,11 +106,36 @@ class ParticipantRegistrationService
         return $phone !== '' ? $phone : null;
     }
 
-    private function findExistingUser(array $emails, ?string $phone, ?string $memberId, ?int $companyId, bool $trusted): ?Participant
+    /**
+     * A spreadsheet/PDF phone cell sometimes holds two numbers for the same person (e.g.
+     * "0244123456/0201234567"). Split only on explicit multi-number separators — never on
+     * bare whitespace or '-', which commonly appear inside a single formatted number — then
+     * normalize each side independently and keep at most the first two.
+     *
+     * @return array{0: ?string, 1: ?string} [primary, secondary]
+     */
+    private function splitPhones(?string $raw): array
     {
+        if ($raw === null || trim($raw) === '') {
+            return [null, null];
+        }
+
+        $numbers = collect(preg_split('/[\/,;&\n]+|\s+(?:or|and)\s+/i', $raw))
+            ->map(fn ($part) => $this->normalizePhone($part))
+            ->filter()
+            ->unique()
+            ->values();
+
+        return [$numbers->get(0), $numbers->get(1)];
+    }
+
+    private function findExistingUser(array $emails, ?string $phone, ?string $secondaryPhone, ?string $memberId, ?int $companyId, bool $trusted, ?string $gender): ?Participant
+    {
+        $phones = array_values(array_filter([$phone, $secondaryPhone]));
+
         $contactMatches = collect([
             $emails !== [] ? Participant::query()->where('company_id', $companyId)->whereIn('email', $emails)->first() : null,
-            $phone ? Participant::query()->where('company_id', $companyId)->where('phone', $phone)->first() : null,
+            $this->findByPhone($phones, $companyId, $gender),
         ])->filter()->unique('id')->values();
 
         if ($contactMatches->count() > 1) {
@@ -135,6 +163,31 @@ class ParticipantRegistrationService
         }
 
         return $contactMatch ?? $memberMatch;
+    }
+
+    /**
+     * A household often registers several people under one shared phone number, so a phone
+     * match alone isn't proof of identity the way it is for an individual's own number. When
+     * this row states a gender, prefer a same-company candidate on that phone whose gender
+     * agrees (or is still unknown) over one on record as a different gender — the latter is
+     * treated as a distinct family member sharing the line, not the same person, and gets
+     * its own participant record instead of silently overwriting theirs.
+     */
+    private function findByPhone(array $phones, ?int $companyId, ?string $gender): ?Participant
+    {
+        if ($phones === []) {
+            return null;
+        }
+
+        $candidates = Participant::query()->where('company_id', $companyId)
+            ->where(fn ($query) => $query->whereIn('phone', $phones)->orWhereIn('secondary_phone', $phones))
+            ->get();
+
+        if ($gender === null) {
+            return $candidates->first();
+        }
+
+        return $candidates->first(fn (Participant $candidate) => $candidate->gender === null || $candidate->gender === $gender);
     }
 
     private function usableEmail(?string $email): ?string

@@ -6,6 +6,7 @@ use App\Services\ArkeselBalanceAlerter;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -14,11 +15,15 @@ class ArkeselChannel
     public function send(object $notifiable, Notification $notification): ?array
     {
         $message = $notification->toArkesel($notifiable);
+        // routeNotificationForArkesel() may return one number (a plain string) or several
+        // (an array, e.g. a participant's primary + secondary phone) — Arkesel's API already
+        // accepts a list of recipients per call, so either shape fans out in one request.
         $recipient = method_exists($notifiable, 'routeNotificationForArkesel')
             ? $notifiable->routeNotificationForArkesel($notification)
             : ($notifiable->phone ?? null);
+        $recipients = array_values(array_unique(array_filter(Arr::wrap($recipient))));
 
-        if (! $recipient || ! config('services.arkesel.key')) {
+        if ($recipients === [] || ! config('services.arkesel.key')) {
             return null;
         }
 
@@ -29,7 +34,7 @@ class ArkeselChannel
         $payload = [
             'sender' => $sender ?: config('services.arkesel.sender'),
             'message' => $message,
-            'recipients' => [$recipient],
+            'recipients' => $recipients,
             'sandbox' => (bool) config('services.arkesel.sandbox'),
         ];
 

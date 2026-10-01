@@ -66,10 +66,33 @@
                 <a href="{{ route('events.registrations.index', $event) }}" class="rounded-xl border border-slate-200 px-5 py-3 text-center text-xs font-black uppercase tracking-wider text-slate-600">Clear</a>
             @endif
         </form>
+        @if($possibleDuplicates->isNotEmpty())
+            <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                <h2 class="text-sm font-black uppercase tracking-wider text-amber-800">Possible duplicate attendees</h2>
+                <p class="mt-1 text-xs text-amber-700">These attendees share a name but not a phone number or email, so they weren't automatically combined into one record. Review them and cancel the extra entry if it's the same person.</p>
+                <div class="mt-4 space-y-4">
+                    @foreach($possibleDuplicates as $group)
+                        <div class="rounded-xl bg-white p-4 shadow-sm">
+                            <p class="text-sm font-black text-slate-900">{{ $group->first()->participant->name }}</p>
+                            <div class="mt-2 divide-y divide-slate-100">
+                                @foreach($group as $registration)
+                                    <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                                        <span class="text-slate-600">{{ $registration->participant->email ?: '—' }} · {{ $registration->participant->phone ?: '—' }} <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold">{{ ucfirst($registration->status) }}</span></span>
+                                        @if($registration->status !== 'cancelled')
+                                            <form method="POST" action="{{ route('events.registrations.cancel', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-red-700">Cancel this one</button></form>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
         <div id="attendee-results"><div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-4">Attendee</th><th class="px-5 py-4">Contact</th><th class="px-5 py-4">Type</th><th class="px-5 py-4">Gender</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Registered</th><th class="px-5 py-4">Actions</th></tr></thead>
             <tbody class="divide-y divide-slate-100">@forelse($registrations as $registration)
-                <tr><td class="px-5 py-4 font-bold text-slate-900">{{ $registration->participant->name }}</td><td class="px-5 py-4 text-slate-600">{{ $registration->participant->email ?: '—' }}<br>{{ $registration->participant->phone ?: '' }}</td><td class="px-5 py-4">{{ $registration->participant->category }}</td><td class="px-5 py-4">{{ $registration->participant->gender ?: '—' }}</td><td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">{{ ucfirst($registration->status) }}</span></td><td class="px-5 py-4 text-slate-500">{{ $registration->registered_at?->format('M j, Y g:i A') }}</td>
+                <tr><td class="px-5 py-4 font-bold text-slate-900">{{ $registration->participant->name }}</td><td class="px-5 py-4 text-slate-600">{{ $registration->participant->email ?: '—' }}<br>{{ $registration->participant->phone ?: '' }}@if($registration->participant->secondary_phone)<br>{{ $registration->participant->secondary_phone }}@endif</td><td class="px-5 py-4">{{ $registration->participant->category }}</td><td class="px-5 py-4">{{ $registration->participant->gender ?: '—' }}</td><td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">{{ ucfirst($registration->status) }}</span></td><td class="px-5 py-4 text-slate-500">{{ $registration->registered_at?->format('M j, Y g:i A') }}</td>
                     <td class="px-5 py-4"><div class="flex min-w-56 flex-wrap gap-2">
                         <button type="button" onclick="document.getElementById('edit-participant-{{ $registration->id }}').classList.toggle('hidden')" class="text-xs font-bold text-slate-700">Edit</button>
                         <a href="{{ route('events.registrations.participant.history', [$event, $registration]) }}" class="text-xs font-bold text-slate-500">History</a>
@@ -85,6 +108,7 @@
                             <input name="name" value="{{ old('name', $registration->participant->name) }}" required placeholder="Full name" class="rounded-xl border-slate-200 text-sm">
                             <input type="email" name="email" value="{{ old('email', $registration->participant->email) }}" placeholder="Email" class="rounded-xl border-slate-200 text-sm">
                             <input name="phone" value="{{ old('phone', $registration->participant->phone) }}" placeholder="Phone" class="rounded-xl border-slate-200 text-sm">
+                            <input name="secondary_phone" value="{{ old('secondary_phone', $registration->participant->secondary_phone) }}" placeholder="Secondary phone (optional)" class="rounded-xl border-slate-200 text-sm">
                             <select name="gender" required class="rounded-xl border-slate-200 text-sm">
                                 <option value="">Select gender</option>
                                 @foreach($genderField->options ?? ['Male', 'Female'] as $option)<option value="{{ $option }}" @selected(old('gender', $registration->participant->gender) === $option)>{{ $option }}</option>@endforeach

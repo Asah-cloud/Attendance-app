@@ -76,6 +76,17 @@ it('records arrival separately and then allows day one attendance', function () 
     $this->assertDatabaseHas('attendances', ['event_id' => $event->id, 'participant_id' => $participant->id, 'day' => 1]);
 });
 
+it('checks in by a participant\'s secondary phone number', function () {
+    [$company, $event, $participant] = arrivalEvent();
+    $participant->update(['secondary_phone' => '209876543']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)
+        ->post(route('arrival.check', ['event' => $event->slug]), ['phone' => '0209876543'])
+        ->assertSessionHas('success', 'Welcome, Arrival Guest! Your Arrival check-in is complete.');
+});
+
 it('provides a separate arrival report', function () {
     [$company, $event] = arrivalEvent();
     $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);

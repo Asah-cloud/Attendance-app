@@ -17,7 +17,7 @@ class CustomMessageSender
     /**
      * Create one delivery row per person and channel, and queue each delivery.
      *
-     * @param  Collection<int, array{participant_id: ?int, name: string, email: ?string, phone: ?string}>  $recipients
+     * @param  Collection<int, array{participant_id: ?int, name: string, email: ?string, phone: ?string, secondary_phone: ?string}>  $recipients
      */
     public function deliver(CustomMessage $message, Collection $recipients): void
     {
@@ -25,12 +25,13 @@ class CustomMessageSender
         $hasSmsBody = filled($message->sms_body);
 
         foreach ($recipients as $recipient) {
-            $channels = $this->routing->determineChannels($message->mode, $recipient['email'], $recipient['phone'], $hasEmailBody, $hasSmsBody);
+            $channels = $this->routing->determineChannels($message->mode, $recipient['email'], $recipient['phone'], $hasEmailBody, $hasSmsBody, $recipient['secondary_phone'] ?? null);
             $person = [
                 'participant_id' => $recipient['participant_id'],
                 'name' => $recipient['name'],
                 'email' => $recipient['email'],
                 'phone' => $recipient['phone'],
+                'secondary_phone' => $recipient['secondary_phone'] ?? null,
             ];
 
             if (empty($channels)) {
@@ -51,7 +52,7 @@ class CustomMessageSender
      * The people a draft or scheduled message will go to, read fresh from the saved selection so
      * contact details changed since it was written are picked up.
      *
-     * @return Collection<int, array{participant_id: ?int, name: string, email: ?string, phone: ?string}>
+     * @return Collection<int, array{participant_id: ?int, name: string, email: ?string, phone: ?string, secondary_phone: ?string}>
      */
     public function storedRecipients(CustomMessage $message): Collection
     {
@@ -64,6 +65,7 @@ class CustomMessageSender
                 'name' => $participant->name,
                 'email' => $participant->email,
                 'phone' => $participant->phone,
+                'secondary_phone' => $participant->secondary_phone,
             ]);
 
         foreach ($message->draftExtras() as $extra) {
@@ -72,6 +74,7 @@ class CustomMessageSender
                 'name' => $extra['name'],
                 'email' => $extra['email'] ?? null,
                 'phone' => $extra['phone'] ?? null,
+                'secondary_phone' => $extra['secondary_phone'] ?? null,
             ]);
         }
 

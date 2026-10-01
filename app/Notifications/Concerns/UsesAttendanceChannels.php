@@ -30,7 +30,7 @@ trait UsesAttendanceChannels
             $channels[] = 'mail';
         }
 
-        if (config('services.arkesel.enabled') && ! empty($notifiable->phone)) {
+        if (config('services.arkesel.enabled') && (! empty($notifiable->phone) || ! empty($notifiable->secondary_phone))) {
             $channels[] = ArkeselChannel::class;
         }
 

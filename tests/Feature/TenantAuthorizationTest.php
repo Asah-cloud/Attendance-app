@@ -213,6 +213,44 @@ it('imports every row as a distinct participant when the id column is blank, and
         ->toBe(['Siloam 1', 'Siloam 2', 'Siloam 3']);
 });
 
+it('splits a phone cell holding two numbers into a primary and secondary phone', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Import Event', 'event_date' => now()]);
+
+    (new UsersImport($event))->importRow(['1', 'Two Number Guest', 'Female', 'Accra', 'Member', '0244123456/0201234567'], 2);
+
+    $participant = Participant::where('company_id', $company->id)->where('name', 'Two Number Guest')->firstOrFail();
+    expect($participant->phone)->toBe('244123456')
+        ->and($participant->secondary_phone)->toBe('201234567');
+});
+
+it('matches an existing participant by their secondary phone on a later import', function () {
+    $company = Company::create(['name' => 'One']);
+    $firstEvent = Event::create(['company_id' => $company->id, 'title' => 'First Event', 'event_date' => now()]);
+    $secondEvent = Event::create(['company_id' => $company->id, 'title' => 'Second Event', 'event_date' => now()->addDay()]);
+
+    (new UsersImport($firstEvent))->importRow(['1', 'Kwame Asante', 'Male', 'Accra', 'Member', '0244123456/0201234567'], 2);
+    // A different list only has his second number, under a different local row id.
+    (new UsersImport($secondEvent))->importRow(['9', 'Kwame Asante', 'Male', 'Accra', 'Member', '0201234567'], 2);
+
+    expect(Participant::where('company_id', $company->id)->count())->toBe(1);
+});
+
+it('keeps family members who share one phone number as separate participants by gender', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Family Event', 'event_date' => now()]);
+
+    (new UsersImport($event))->importRow(['1', 'Kwame Mensah', 'Male', 'Accra', 'Member', '0244123456'], 2);
+    (new UsersImport($event))->importRow(['2', 'Ama Mensah', 'Female', 'Accra', 'Member', '0244123456'], 2);
+    // Re-importing the husband's row again (same gender) should update him, not create a third person.
+    (new UsersImport($event))->importRow(['1', 'Kwame Mensah Jr', 'Male', 'Accra', 'Member', '0244123456'], 2);
+
+    $participants = Participant::where('company_id', $company->id)->where('phone', '244123456')->get();
+    expect($participants)->toHaveCount(2)
+        ->and($participants->firstWhere('gender', 'Male')->name)->toBe('Kwame Mensah Jr')
+        ->and($participants->firstWhere('gender', 'Female')->name)->toBe('Ama Mensah');
+});
+
 it('does not merge unrelated people when row ids repeat in different event lists', function () {
     $company = Company::create(['name' => 'One']);
     $firstEvent = Event::create(['company_id' => $company->id, 'title' => 'First Event', 'event_date' => now()]);

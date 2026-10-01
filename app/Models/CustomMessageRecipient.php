@@ -25,6 +25,7 @@ class CustomMessageRecipient extends Model
         'name',
         'email',
         'phone',
+        'secondary_phone',
         'channel',
         'status',
         'error_message',
@@ -45,8 +46,12 @@ class CustomMessageRecipient extends Model
         return $this->email;
     }
 
-    public function routeNotificationForArkesel(): ?string
+    /** @return array<int, string> up to two Arkesel-ready numbers: primary and secondary phone. */
+    public function routeNotificationForArkesel(): array
     {
-        return PhoneNumberService::toArkeselFormat($this->phone);
+        return array_values(array_filter([
+            PhoneNumberService::toArkeselFormat($this->phone),
+            PhoneNumberService::toArkeselFormat($this->secondary_phone),
+        ]));
     }
 }

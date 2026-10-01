@@ -25,10 +25,11 @@ class CustomMessageService
      *
      * @return list<string> zero, one, or two of 'mail'/'sms'
      */
-    public function determineChannels(string $mode, ?string $email, ?string $phone, bool $hasEmailBody, bool $hasSmsBody): array
+    public function determineChannels(string $mode, ?string $email, ?string $phone, bool $hasEmailBody, bool $hasSmsBody, ?string $secondaryPhone = null): array
     {
         $hasEmail = $hasEmailBody && filled($email) && ! str_ends_with($email, '@example.invalid');
-        $isGhana = $hasSmsBody && config('services.arkesel.enabled') && PhoneNumberService::isGhanaNumber($phone);
+        $isGhana = $hasSmsBody && config('services.arkesel.enabled')
+            && (PhoneNumberService::isGhanaNumber($phone) || PhoneNumberService::isGhanaNumber($secondaryPhone));
 
         return match ($mode) {
             self::MODE_EMAIL_ONLY => $hasEmail ? ['mail'] : [],

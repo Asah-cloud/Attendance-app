@@ -59,8 +59,40 @@ class EventRegistrationFormController extends Controller
             ->withQueryString();
         $categoryField = $event->registrationFields()->where('field_key', 'category')->first();
         $genderField = $event->registrationFields()->where('field_key', 'gender')->first();
+        $possibleDuplicates = $this->possibleDuplicateRegistrations($event);
 
-        return view('events.registrations', compact('event', 'registrations', 'status', 'search', 'categoryField', 'genderField'));
+        return view('events.registrations', compact('event', 'registrations', 'status', 'search', 'categoryField', 'genderField', 'possibleDuplicates'));
+    }
+
+    /**
+     * Attendees who share a name but, unlike a phone/email match, were never automatically
+     * merged into one participant record — grouped so a manager can review and cancel the
+     * extra entry by hand instead of the system guessing wrong and merging unrelated people.
+     */
+    private function possibleDuplicateRegistrations(Event $event)
+    {
+        $duplicateNames = $event->registrations()
+            ->join('participants', 'participants.id', '=', 'event_registrations.participant_id')
+            ->where('event_registrations.status', '!=', EventRegistration::STATUS_CANCELLED)
+            ->where('participants.is_support_staff', false)
+            ->selectRaw('LOWER(TRIM(participants.name)) as normalized_name')
+            ->groupBy('normalized_name')
+            ->havingRaw('COUNT(DISTINCT participants.id) > 1')
+            ->pluck('normalized_name');
+
+        if ($duplicateNames->isEmpty()) {
+            return collect();
+        }
+
+        return $event->registrations()
+            ->with('participant')
+            ->where('status', '!=', EventRegistration::STATUS_CANCELLED)
+            ->whereHas('participant', function ($query) use ($duplicateNames): void {
+                $query->where('is_support_staff', false)
+                    ->whereIn(DB::raw('LOWER(TRIM(name))'), $duplicateNames->all());
+            })
+            ->get()
+            ->groupBy(fn ($registration) => Str::of($registration->participant->name)->lower()->squish()->toString());
     }
 
     public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse
@@ -158,6 +190,7 @@ class EventRegistrationFormController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
+            'secondary_phone' => ['nullable', 'string', 'max:30'],
             'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
             'category' => $this->categoryRule($event),
             'member_id' => ['nullable', 'string', 'max:255'],

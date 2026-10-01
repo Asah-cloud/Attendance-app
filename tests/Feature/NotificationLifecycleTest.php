@@ -124,6 +124,30 @@ it('sends Arkesel requests with normalized Ghana numbers', function () {
         && $request['sandbox'] === true);
 });
 
+it('sends one Arkesel request to both numbers when a participant has a secondary phone', function () {
+    config()->set('services.arkesel', [
+        'enabled' => true,
+        'key' => 'test-key',
+        'sender' => 'Attendance',
+        'url' => 'https://sms.arkesel.test/api/v2/sms/send',
+        'callback_url' => 'https://example.com/sms/callback',
+        'sandbox' => true,
+    ]);
+    Http::fake(['sms.arkesel.test/*' => Http::response(['status' => 'success'], 200)]);
+    $participant = Participant::create(['name' => 'Two Numbers', 'phone' => '0201234567', 'secondary_phone' => '0244123456']);
+    $notification = new class extends Notification
+    {
+        public function toArkesel(object $notifiable): string
+        {
+            return 'Test lifecycle message';
+        }
+    };
+
+    app(ArkeselChannel::class)->send($participant, $notification);
+
+    Http::assertSent(fn ($request) => $request['recipients'] === ['233201234567', '233244123456']);
+});
+
 it('alerts admins once when Arkesel reports an insufficient balance, then stays quiet for a while', function () {
     Cache::flush();
     Role::findOrCreate('admin');

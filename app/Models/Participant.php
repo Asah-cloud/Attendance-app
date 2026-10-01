@@ -13,9 +13,13 @@ class Participant extends Model
 {
     use Notifiable;
 
-    public function routeNotificationForArkesel(): ?string
+    /** @return array<int, string> up to two Arkesel-ready numbers: primary and secondary phone. */
+    public function routeNotificationForArkesel(): array
     {
-        return PhoneNumberService::toArkeselFormat($this->phone);
+        return array_values(array_filter([
+            PhoneNumberService::toArkeselFormat($this->phone),
+            PhoneNumberService::toArkeselFormat($this->secondary_phone),
+        ]));
     }
 
     public function isNumberedParticipantStaff(): bool
@@ -24,7 +28,7 @@ class Participant extends Model
             && preg_match('/^participant\s+\d+$/i', trim($this->name)) === 1;
     }
 
-    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group'];
+    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'secondary_phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group'];
 
     protected function casts(): array
     {

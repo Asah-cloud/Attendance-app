@@ -257,6 +257,48 @@ it('renders the manager attendee list with gender and category columns', functio
         ->assertSee('Gender');
 });
 
+it('flags attendees sharing a name but no phone or email as possible duplicates', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $first = Participant::create(['company_id' => $event->company_id, 'name' => 'John Mensah', 'category' => 'Guest']);
+    $second = Participant::create(['company_id' => $event->company_id, 'name' => '  john mensah  ', 'category' => 'Guest']);
+    $distinct = Participant::create(['company_id' => $event->company_id, 'name' => 'Ama Boateng', 'category' => 'Guest']);
+    $cancelledDuplicate = Participant::create(['company_id' => $event->company_id, 'name' => 'Cancelled Twin', 'category' => 'Guest']);
+    $cancelledDuplicateTwin = Participant::create(['company_id' => $event->company_id, 'name' => 'Cancelled Twin', 'category' => 'Guest']);
+
+    $event->registrations()->create(['participant_id' => $first->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $second->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $distinct->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $cancelledDuplicate->id, 'status' => 'confirmed']);
+    $event->registrations()->create(['participant_id' => $cancelledDuplicateTwin->id, 'status' => 'cancelled']);
+
+    $content = $this->actingAs($manager)->get(route('events.registrations.index', $event))
+        ->assertOk()
+        ->assertSee('Possible duplicate attendees')
+        ->getContent();
+
+    // "Cancel this one" only renders inside the duplicates panel, so its count confirms
+    // exactly the two John Mensah entries were flagged, not the unique or cancelled ones.
+    // Each attendee row also repeats its name once more in a hidden edit-form input value.
+    expect(substr_count($content, 'Cancel this one'))->toBe(2)
+        ->and(substr_count($content, 'Ama Boateng'))->toBe(2)
+        ->and(substr_count($content, 'Cancelled Twin'))->toBe(4);
+});
+
+it('does not flag a single attendee with a unique name as a possible duplicate', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create(['company_id' => $event->company_id, 'name' => 'Solo Guest', 'category' => 'Guest']);
+    $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))
+        ->assertOk()
+        ->assertDontSee('Possible duplicate attendees');
+});
+
 it('lets a manager search the attendee list and combine it with the status filter', function () {
     $event = publicRegistrationEvent();
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
