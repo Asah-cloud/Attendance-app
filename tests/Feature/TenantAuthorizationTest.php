@@ -236,6 +236,25 @@ it('matches an existing participant by their secondary phone on a later import',
     expect(Participant::where('company_id', $company->id)->count())->toBe(1);
 });
 
+it('normalizes a 00-prefixed international Ghana number the same as its local and +233 forms', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Import Event', 'event_date' => now()]);
+
+    (new UsersImport($event))->importRow(['1', 'Emmanuel Donkor', 'Male', 'Madina-Dodowa', 'PARTICIPANT', '00233244979354', ''], 2);
+    (new UsersImport($event))->importRow(['2', 'Emmanuel Donkor', 'Male', '', 'PARTICIPANT', '+233 24 497 9354', 'bkingsley875@gmail.com'], 2);
+
+    $participants = Participant::where('company_id', $company->id)->where('name', 'Emmanuel Donkor')->get();
+    expect($participants)->toHaveCount(1)
+        ->and($participants->first()->phone)->toBe('244979354')
+        ->and($participants->first()->email)->toBe('bkingsley875@gmail.com');
+});
+
+it('leaves a foreign number\'s own 00 dialing prefix untouched', function () {
+    $service = app(App\Services\ParticipantRegistrationService::class);
+
+    expect($service->normalizePhone('004471234567'))->toBe('4471234567');
+});
+
 it('keeps family members who share one phone number as separate participants by gender', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Family Event', 'event_date' => now()]);

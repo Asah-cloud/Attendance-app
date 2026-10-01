@@ -97,6 +97,15 @@ class ParticipantRegistrationService
     {
         $phone = preg_replace('/[^0-9]/', '', $phone ?? '') ?? '';
 
+        // The "00" international dialing prefix in front of the Ghana country code (e.g.
+        // "00233247207499") is otherwise left as part of the digits, so the same number
+        // written as "00233..." and "+233..."/"0..." would normalize to different stored
+        // values and fail to match each other. Scoped to "00233" specifically — a foreign
+        // number dialed as "00<their country code>..." is left untouched.
+        if (str_starts_with($phone, '00233')) {
+            $phone = substr($phone, 2);
+        }
+
         if (str_starts_with($phone, '233')) {
             $phone = substr($phone, 3);
         }
