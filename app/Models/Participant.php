@@ -28,6 +28,14 @@ class Participant extends Model
             && preg_match('/^participant\s+\d+$/i', trim($this->name)) === 1;
     }
 
+    /** Whether any notification channel could actually reach this person right now. */
+    public function hasReachableContact(): bool
+    {
+        return ($this->email && ! str_ends_with($this->email, '@example.invalid'))
+            || (bool) $this->phone
+            || (bool) $this->secondary_phone;
+    }
+
     protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'secondary_phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group'];
 
     protected function casts(): array

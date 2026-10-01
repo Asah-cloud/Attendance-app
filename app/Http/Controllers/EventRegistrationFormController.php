@@ -568,8 +568,8 @@ class EventRegistrationFormController extends Controller
     public function resend(Event $event, EventRegistration $registration): RedirectResponse
     {
         $this->authorizeRegistration($event, $registration);
-        if (! $registration->participant->email) {
-            return back()->withErrors(['registration' => 'This attendee does not have an email address.']);
+        if (! $registration->participant->hasReachableContact()) {
+            return back()->withErrors(['registration' => 'This attendee does not have a real email or phone number on file.']);
         }
         $this->sendConfirmation($registration);
 
@@ -747,7 +747,7 @@ class EventRegistrationFormController extends Controller
     private function sendConfirmation(EventRegistration $registration): void
     {
         $registration->loadMissing(['event', 'participant']);
-        if ($registration->participant->email || $registration->participant->phone) {
+        if ($registration->participant->hasReachableContact()) {
             NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration), $registration->event->attendeeNotificationChannels());
         }
     }

@@ -265,6 +265,8 @@
                 <span x-show="summary.skipped > 0" class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700" x-text="summary.skipped + ' can\'t be reached'"></span>
                 <span x-show="summary.sms > 0 && smsInfo.parts > 0" class="rounded-full bg-slate-200 px-2.5 py-1 text-slate-600" x-text="'≈ ' + (summary.sms * smsInfo.parts) + ' SMS credit' + (summary.sms * smsInfo.parts === 1 ? '' : 's')" title="An estimate: one credit per message part per person texted"></span>
                 <span x-show="fileName || seedCount > 0" class="rounded-full bg-slate-200 px-2.5 py-1 text-slate-600">+ file &amp; earlier recipients counted on send</span>
+                <button type="button" x-show="list.length > 0" @click="openBreakdown()" class="rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-300 transition hover:bg-slate-100">View as table ↗</button>
+                <button type="button" x-show="list.length > 0" @click="downloadBreakdown()" class="rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-300 transition hover:bg-slate-100">Download CSV</button>
             </div>
             <div class="flex items-center gap-3">
                 <button type="button" @click="showPreview = !showPreview" :aria-pressed="showPreview.toString()"
@@ -473,6 +475,40 @@
                         channels.forEach(c => counts[c]++);
                     });
                     return counts;
+                },
+                // One row per recipient with the channel(s) they're about to get, for the
+                // breakdown table/CSV — kept here rather than recomputed in two places.
+                get breakdownRows() {
+                    return this.list.map(p => {
+                        const channels = this.channelsFor(p);
+                        const label = channels.length === 0 ? "Can't be reached" : channels.map(c => c === 'mail' ? 'Email' : 'SMS').join(' + ');
+                        return { name: p.name, email: p.email || '', phone: p.phone || '', channel: label };
+                    });
+                },
+                openBreakdown() {
+                    const win = window.open('', '_blank');
+                    if (!win) return;
+                    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                    const rows = this.breakdownRows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${esc(r.phone)}</td><td>${esc(r.channel)}</td></tr>`).join('');
+                    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Message breakdown — ${esc(this.cfg.eventTitle)}</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;padding:24px;color:#0f172a}h1{font-size:16px;margin:0 0 4px}p{color:#64748b;font-size:13px;margin:0 0 16px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e2e8f0;padding:8px 12px;text-align:left;font-size:13px}th{background:#f1f5f9;text-transform:uppercase;font-size:11px;letter-spacing:.05em;color:#64748b}tr:nth-child(even){background:#f8fafc}</style>
+</head><body><h1>${esc(this.cfg.eventTitle)}</h1><p>${this.breakdownRows.length} people — ${this.summary.mail} email, ${this.summary.sms} SMS, ${this.summary.skipped} can't be reached</p>
+<table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Channel</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+                    win.document.close();
+                },
+                downloadBreakdown() {
+                    const esc = s => '"' + String(s).replace(/"/g, '""') + '"';
+                    const lines = [['Name', 'Email', 'Phone', 'Channel'].map(esc).join(',')]
+                        .concat(this.breakdownRows.map(r => [r.name, r.email, r.phone, r.channel].map(esc).join(',')));
+                    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = (this.cfg.eventTitle || 'message').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-recipients.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
                 },
                 get canSend() {
                     return (this.recipientTotal > 0 || this.fileName !== '')

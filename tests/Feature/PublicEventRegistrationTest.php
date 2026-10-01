@@ -243,6 +243,27 @@ it('lets organizers manage registrations, export them, and resend confirmations'
         ->assertOk()->assertDownload();
 });
 
+it('refuses to resend and hides the button for an attendee with only a system-generated email', function () {
+    Notification::fake();
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $participant = Participant::create([
+        'company_id' => $event->company_id,
+        'name' => 'No Real Contact',
+        'email' => 'company'.$event->company_id.'_event'.$event->id.'_member9@example.invalid',
+    ]);
+    $registration = $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))
+        ->assertOk()
+        ->assertDontSee(route('events.registrations.resend', [$event, $registration]), false);
+
+    $this->actingAs($manager)->post(route('events.registrations.resend', [$event, $registration]))
+        ->assertSessionHasErrors('registration');
+    Notification::assertNothingSent();
+});
+
 it('renders the manager attendee list with gender and category columns', function () {
     $event = publicRegistrationEvent();
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);

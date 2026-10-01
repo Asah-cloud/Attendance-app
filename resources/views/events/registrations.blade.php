@@ -99,7 +99,7 @@
                         @if(in_array($registration->status, ['pending','waitlisted','rejected','cancelled']))<form method="POST" action="{{ route('events.registrations.approve', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-emerald-700">Approve</button></form>@endif
                         @if(!in_array($registration->status, ['rejected','cancelled']))<form method="POST" action="{{ route('events.registrations.reject', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-amber-700">Reject</button></form>@endif
                         @if($registration->status !== 'cancelled')<form method="POST" action="{{ route('events.registrations.cancel', [$event, $registration]) }}">@csrf @method('PATCH')<button class="text-xs font-bold text-red-700">Cancel</button></form>@endif
-                        @if($registration->participant->email)<form method="POST" action="{{ route('events.registrations.resend', [$event, $registration]) }}">@csrf<button class="text-xs font-bold text-blue-700">Resend</button></form>@endif
+                        @if($registration->participant->hasReachableContact())<form method="POST" action="{{ route('events.registrations.resend', [$event, $registration]) }}">@csrf<button class="text-xs font-bold text-blue-700">Resend</button></form>@endif
                     </div></td></tr>
                 <tr id="edit-participant-{{ $registration->id }}" class="hidden bg-slate-50">
                     <td colspan="7" class="px-5 py-5">
