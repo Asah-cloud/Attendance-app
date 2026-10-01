@@ -255,6 +255,30 @@ it('leaves a foreign number\'s own 00 dialing prefix untouched', function () {
     expect($service->normalizePhone('004471234567'))->toBe('4471234567');
 });
 
+it('resolves a shared household email without error when phone and gender identify the right spouse', function () {
+    $company = Company::create(['name' => 'One']);
+    $priorEvent = Event::create(['company_id' => $company->id, 'title' => 'Prior Wives Conference', 'event_date' => now()]);
+    $newEvent = Event::create(['company_id' => $company->id, 'title' => 'World Conference', 'event_date' => now()->addDay()]);
+
+    // She already attended a prior event under a generated placeholder email.
+    $wife = Participant::create([
+        'company_id' => $company->id,
+        'name' => 'Mercy Terkie Djaba',
+        'gender' => 'Female',
+        'phone' => '246795800',
+        'email' => 'company'.$company->id.'_event'.$priorEvent->id.'_member135@example.invalid',
+    ]);
+
+    // The husband's row is imported first and claims the shared email.
+    (new UsersImport($newEvent))->importRow(['153', 'Jerry Joseph Kwesi Djaba', 'Male', 'Tema', 'PARTICIPANT', '00233242543724', 'pastorjerrydjaba@gmail.com'], 2);
+    // Her row shares that email but her own phone still points at her own record.
+    (new UsersImport($newEvent))->importRow(['155', 'Mercy Terkie Djaba', 'Female', 'Tema', 'PARTICIPANT', '00233246795800', 'pastorjerrydjaba@gmail.com'], 3);
+
+    expect(Participant::where('company_id', $company->id)->where('name', 'like', '%Djaba%')->count())->toBe(2)
+        ->and($wife->fresh()->email)->toBe('pastorjerrydjaba@gmail.com')
+        ->and($newEvent->registrations()->where('participant_id', $wife->id)->exists())->toBeTrue();
+});
+
 it('keeps family members who share one phone number as separate participants by gender', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Family Event', 'event_date' => now()]);

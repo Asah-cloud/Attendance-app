@@ -143,7 +143,7 @@ class ParticipantRegistrationService
         $phones = array_values(array_filter([$phone, $secondaryPhone]));
 
         $contactMatches = collect([
-            $emails !== [] ? Participant::query()->where('company_id', $companyId)->whereIn('email', $emails)->first() : null,
+            $this->findByEmail($emails, $companyId, $gender),
             $this->findByPhone($phones, $companyId, $gender),
         ])->filter()->unique('id')->values();
 
@@ -172,6 +172,27 @@ class ParticipantRegistrationService
         }
 
         return $contactMatch ?? $memberMatch;
+    }
+
+    /**
+     * A household often shares one email address (commonly the husband's) across its
+     * members, so an email match alone isn't proof of identity the way it is for an
+     * individual's own address — same disambiguation as findByPhone() below, and for the
+     * same reason: a spouse of a different, known gender is a distinct person, not a match.
+     */
+    private function findByEmail(array $emails, ?int $companyId, ?string $gender): ?Participant
+    {
+        if ($emails === []) {
+            return null;
+        }
+
+        $candidates = Participant::query()->where('company_id', $companyId)->whereIn('email', $emails)->get();
+
+        if ($gender === null) {
+            return $candidates->first();
+        }
+
+        return $candidates->first(fn (Participant $candidate) => $candidate->gender === null || $candidate->gender === $gender);
     }
 
     /**
