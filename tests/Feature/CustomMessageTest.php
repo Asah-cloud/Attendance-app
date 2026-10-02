@@ -493,6 +493,37 @@ it('retries only the failed deliveries of a message', function () {
         ->and($message->recipients()->whereNotNull('error_message')->count())->toBe(0);
 });
 
+it('refreshes a failed recipient\'s contact info from the participant before retrying', function () {
+    Notification::fake();
+    $company = Company::create(['name' => 'Refresh Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'Caleb Mensah', 'email' => 'broken@@old.com']);
+    $message = $event->customMessages()->create([
+        'company_id' => $event->company_id,
+        'subject' => 'Subject',
+        'email_body' => 'Body',
+        'mode' => 'smart',
+        'recipient_count' => 1,
+    ]);
+    $recipient = $message->recipients()->create([
+        'participant_id' => $participant->id,
+        'name' => 'Caleb Mensah',
+        'email' => 'broken@@old.com',
+        'channel' => 'mail',
+        'status' => 'failed',
+        'error_message' => 'Email does not comply with addr-spec of RFC 2822.',
+    ]);
+
+    // The typo gets fixed on the participant's record after the failed send.
+    $participant->update(['email' => 'caleb.fixed@example.com']);
+
+    $this->actingAs($manager)->post(route('events.messages.retry', [$event, $message]));
+
+    expect($recipient->fresh()->email)->toBe('caleb.fixed@example.com')
+        ->and($recipient->fresh()->status)->toBe('sent');
+});
+
 it('keeps message progress, retry and the inbox away from other companies and ushers', function () {
     $company = Company::create(['name' => 'Private Co']);
     $other = Company::create(['name' => 'Snoop Co']);

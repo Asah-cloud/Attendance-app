@@ -261,10 +261,24 @@ class CustomMessageController extends Controller
         $this->authorize('manageMessages', $event);
         abort_unless($message->event_id === $event->id, 404);
 
-        $failed = $message->recipients()->where('status', CustomMessageRecipient::STATUS_FAILED)->get();
+        $failed = $message->recipients()->where('status', CustomMessageRecipient::STATUS_FAILED)->with('participant')->get();
 
         foreach ($failed as $recipient) {
-            $recipient->update(['status' => CustomMessageRecipient::STATUS_PENDING, 'error_message' => null]);
+            // A failed delivery's saved name/email/phone is a snapshot from when it was first
+            // sent, not proof the contact info was ever right — re-sending to that exact value
+            // would just fail again the same way. Pull the participant's current details (if
+            // this row is tied to one) before retrying, so a manager fixing a typo and hitting
+            // Retry actually reaches them instead of repeating the same broken address.
+            $updates = ['status' => CustomMessageRecipient::STATUS_PENDING, 'error_message' => null];
+            if ($recipient->participant) {
+                $updates += [
+                    'name' => $recipient->participant->name,
+                    'email' => $recipient->participant->email,
+                    'phone' => $recipient->participant->phone,
+                    'secondary_phone' => $recipient->participant->secondary_phone,
+                ];
+            }
+            $recipient->update($updates);
             SendCustomAttendeeMessageJob::dispatch($recipient->id);
         }
 
