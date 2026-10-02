@@ -168,6 +168,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::delete('/events/{event}/message-templates/{template}', [MessageTemplateController::class, 'destroy'])->name('events.message-templates.destroy');
         Route::get('/events/{event}/messages/{message}/progress', [CustomMessageController::class, 'progress'])->name('events.messages.progress');
         Route::post('/events/{event}/messages/{message}/retry', [CustomMessageController::class, 'retryFailed'])->name('events.messages.retry');
+        Route::get('/events/{event}/messages/{message}/report', [CustomMessageController::class, 'report'])->name('events.messages.report');
+        Route::get('/events/{event}/messages/{message}/report.csv', [CustomMessageController::class, 'reportCsv'])->name('events.messages.report.csv');
     });
     // Reporting & Exports — the live report view is standard, exports are the paid advanced_reports feature
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');

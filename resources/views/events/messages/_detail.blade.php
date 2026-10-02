@@ -11,6 +11,8 @@
             @if($selected->failed_count)
                 <form method="POST" action="{{ route('events.messages.retry', [$event, $selected]) }}">@csrf<button class="rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-rose-700">Retry {{ $selected->failed_count }} failed</button></form>
             @endif
+            <a href="{{ route('events.messages.report', [$event, $selected]) }}" target="_blank" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black uppercase tracking-wide text-slate-700 hover:bg-slate-50">Full report &#8599;</a>
+            <a href="{{ route('events.messages.report.csv', [$event, $selected]) }}" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black uppercase tracking-wide text-slate-700 hover:bg-slate-50">Download CSV</a>
             <a href="{{ route('events.messages.edit', [$event, $selected]) }}" class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black uppercase tracking-wide text-slate-700 hover:bg-slate-50">Edit &amp; resend</a>
         </div>
     </div>

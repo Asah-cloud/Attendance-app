@@ -537,7 +537,28 @@ it('keeps message progress, retry and the inbox away from other companies and us
         $this->actingAs($user)->get(route('events.messages.index', $event))->assertForbidden();
         $this->actingAs($user)->getJson(route('events.messages.progress', [$event, $message]))->assertForbidden();
         $this->actingAs($user)->post(route('events.messages.retry', [$event, $message]))->assertForbidden();
+        $this->actingAs($user)->get(route('events.messages.report', [$event, $message]))->assertForbidden();
+        $this->actingAs($user)->get(route('events.messages.report.csv', [$event, $message]))->assertForbidden();
     }
+});
+
+it('shows a full delivery report for a sent message, viewable and as a CSV download', function () {
+    $company = Company::create(['name' => 'Report Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    $message = inboxMessage($event, ['subject' => 'Reminder'], ['sent', 'sent', 'failed', 'skipped']);
+    $message->recipients()->where('status', 'failed')->update(['error_message' => 'Mailbox unavailable']);
+
+    $this->actingAs($manager)->get(route('events.messages.report', [$event, $message]))
+        ->assertOk()
+        ->assertSee('Reminder')
+        ->assertSee('Mailbox unavailable')
+        ->assertSeeInOrder(['2', 'Sent', '1', 'Failed', '1', 'Skipped']);
+
+    $response = $this->actingAs($manager)->get(route('events.messages.report.csv', [$event, $message]))->assertOk();
+    $csv = $response->streamedContent();
+    expect($csv)->toContain('Name,Email,Phone,Channel,Status,Error')
+        ->and(substr_count($csv, "\n"))->toBe(5); // header + 4 recipients
 });
 
 it('shows a message from another event as not found instead of leaking it', function () {

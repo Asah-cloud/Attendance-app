@@ -24,6 +24,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomMessageController extends Controller
 {
@@ -254,6 +255,57 @@ class CustomMessageController extends Controller
             'skipped' => (int) ($counts[CustomMessageRecipient::STATUS_SKIPPED] ?? 0),
             'pending' => (int) ($counts[CustomMessageRecipient::STATUS_PENDING] ?? 0),
         ]);
+    }
+
+    /** A full, printable delivery report for one sent message, meant to be opened in its own tab. */
+    public function report(Event $event, CustomMessage $message): View
+    {
+        $this->authorize('manageMessages', $event);
+        abort_unless($message->event_id === $event->id, 404);
+
+        $recipients = $message->recipients()->orderBy('name')->get();
+        $counts = $recipients->countBy('status');
+        $channelCounts = $recipients->where('status', CustomMessageRecipient::STATUS_SENT)->countBy('channel');
+
+        return view('events.messages.report', [
+            'event' => $event,
+            'message' => $message,
+            'recipients' => $recipients,
+            'counts' => [
+                'sent' => $counts[CustomMessageRecipient::STATUS_SENT] ?? 0,
+                'failed' => $counts[CustomMessageRecipient::STATUS_FAILED] ?? 0,
+                'skipped' => $counts[CustomMessageRecipient::STATUS_SKIPPED] ?? 0,
+                'pending' => $counts[CustomMessageRecipient::STATUS_PENDING] ?? 0,
+            ],
+            'channelCounts' => ['mail' => $channelCounts['mail'] ?? 0, 'sms' => $channelCounts['sms'] ?? 0],
+        ]);
+    }
+
+    /** The same report as a downloadable CSV, one row per recipient/channel delivery. */
+    public function reportCsv(Event $event, CustomMessage $message): StreamedResponse
+    {
+        $this->authorize('manageMessages', $event);
+        abort_unless($message->event_id === $event->id, 404);
+
+        $filename = Str::slug($event->title.'-'.($message->subject ?: 'message-'.$message->id)).'-report.csv';
+
+        return response()->streamDownload(function () use ($message): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Name', 'Email', 'Phone', 'Channel', 'Status', 'Error']);
+            $message->recipients()->orderBy('name')->chunk(250, function ($recipients) use ($handle): void {
+                foreach ($recipients as $recipient) {
+                    fputcsv($handle, [
+                        $recipient->name,
+                        $recipient->email,
+                        $recipient->phone,
+                        $recipient->channel === 'mail' ? 'Email' : ($recipient->channel === 'sms' ? 'SMS' : ($recipient->channel ?: '—')),
+                        ucfirst($recipient->status),
+                        $recipient->error_message,
+                    ]);
+                }
+            });
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function retryFailed(Event $event, CustomMessage $message): RedirectResponse
