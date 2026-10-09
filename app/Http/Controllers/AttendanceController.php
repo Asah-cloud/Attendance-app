@@ -33,12 +33,18 @@ class AttendanceController extends Controller
         return $event->activeAttendanceSession();
     }
 
+    private function getEventSession(Request $request): int
+    {
+        return (int) $request->input('session', 1);
+    }
+
     public function show(Request $request, Event $event)
     {
         $this->authorize('view', $event);
 
         $currentDay = $this->getEventDay($request, $event);
-        $stats = $this->cache->rememberEvent($event->id, "attendance-stats:v4:day:{$currentDay}", function () use ($event, $currentDay) {
+        $currentSession = $this->getEventSession($request);
+        $stats = $this->cache->rememberEvent($event->id, "attendance-stats:v5:day:{$currentDay}:session:{$currentSession}", function () use ($event, $currentDay, $currentSession) {
             $participantStaffIds = $event->persistentParticipantStaffIds();
             $participantStaffCount = $participantStaffIds->count();
 
@@ -48,6 +54,7 @@ class AttendanceController extends Controller
                 'presentCount' => Attendance::query()
                     ->where('event_id', '=', $event->id)
                     ->where('day', '=', $currentDay)
+                    ->where('session', '=', $currentSession)
                     ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
                     ->count('id') + $participantStaffCount,
             ];
@@ -86,12 +93,14 @@ class AttendanceController extends Controller
         $request->validate(['participant_id' => 'required|integer']);
         $targetParticipant = $event->attendanceEligibleParticipants()->findOrFail($request->integer('participant_id'));
         $currentDay = $this->getEventDay($request, $event);
+        $currentSession = $this->getEventSession($request);
         $this->ensureAttendanceCanBeMarked($event, $currentDay);
 
         $attendance = Attendance::query()->createOrFirst([
             'event_id' => $event->id,
             'participant_id' => $targetParticipant->id,
             'day' => $currentDay,
+            'session' => $currentSession,
         ], [
             'status' => 'present',
             'marked_by' => Auth::id(),
@@ -114,12 +123,14 @@ class AttendanceController extends Controller
         $event->attendanceEligibleParticipants()->findOrFail($participant_id);
 
         $currentDay = $this->getEventDay($request, $event);
+        $currentSession = $this->getEventSession($request);
         $this->ensureAttendanceCanBeMarked($event, $currentDay);
 
         Attendance::query()
             ->where('event_id', '=', $event->id)
             ->where('participant_id', '=', $participant_id)
             ->where('day', '=', $currentDay)
+            ->where('session', '=', $currentSession)
             ->delete();
 
         $this->cache->invalidateEvent($event->id, $event->company_id);
@@ -217,6 +228,7 @@ class AttendanceController extends Controller
             'event_id' => $event->id,
             'participant_id' => $registration->participant_id,
             'day' => $day,
+            'session' => $this->getEventSession($request),
         ], [
             'status' => 'present',
             'marked_by' => $marker?->can('scanAttendance', $event) ? $marker->id : null,
@@ -304,6 +316,7 @@ class AttendanceController extends Controller
             'event_id' => $event->id,
             'participant_id' => $registration->participant_id,
             'day' => $day,
+            'session' => $this->getEventSession($request),
         ], [
             'status' => 'present',
             'marked_by' => Auth::id(),

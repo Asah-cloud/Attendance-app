@@ -334,13 +334,15 @@ class Event extends Model
         return max(1, min($this->totalDays(), $session));
     }
 
-    public function attendanceSessionLabel(int|string $session): string
+    public function attendanceSessionLabel(int|string $day, int $session = 1): string
     {
-        if ($session === 'all') {
+        if ($day === 'all') {
             return 'All sessions';
         }
 
-        return (int) $session === 0 ? 'Arrival' : 'Day '.(int) $session;
+        $label = (int) $day === 0 ? 'Arrival' : 'Day '.(int) $day;
+
+        return $session > 1 ? $label.' · Session '.$session : $label;
     }
 
     public function canMarkAttendanceForDay(int $day): bool
