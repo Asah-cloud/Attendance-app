@@ -10,8 +10,12 @@ use Illuminate\Support\Collection;
 class AttendanceReportData
 {
     /** @return array{presentUsers: Collection, absentUsers: Collection, totalExpected: int} */
-    public function forPeriod(Event $event, int|string $day): array
+    public function forPeriod(Event $event, int|string $day, ?int $session = null): array
     {
+        // A session filter only ever narrows a specific numbered program day (day >= 1);
+        // arrival and the "all days" view always mean "present at any session".
+        $session = $day === 'all' || (int) $day < 1 ? null : $session;
+
         $eligible = $day === 'all' || (int) $day === 0
             ? $event->confirmedParticipants()
             : $event->attendanceEligibleParticipants();
@@ -21,6 +25,7 @@ class AttendanceReportData
             ->where('event_id', $event->id)
             ->whereIn('participant_id', $eligibleIds)
             ->when($day === 'all', fn ($query) => $query->where('day', '>=', 1), fn ($query) => $query->where('day', $day))
+            ->when($session !== null, fn ($query) => $query->where('session', $session))
             ->distinct()
             ->pluck('participant_id');
 
@@ -31,13 +36,18 @@ class AttendanceReportData
 
         $presentUsers = Participant::query()
             ->whereIn('id', $presentIds)
-            ->with(['attendances' => function ($query) use ($event, $day): void {
+            ->with(['attendances' => function ($query) use ($event, $day, $session): void {
                 $query->where('event_id', $event->id)
-                    ->where(function ($query) use ($day): void {
+                    ->where(function ($query) use ($day, $session): void {
                         if ($day === 'all') {
                             $query->where('day', '>=', 1)->orWhere('day', -1);
                         } else {
-                            $query->where('day', $day)->orWhere('day', -1);
+                            $query->where(function ($query) use ($day, $session): void {
+                                $query->where('day', $day);
+                                if ($session !== null) {
+                                    $query->where('session', $session);
+                                }
+                            })->orWhere('day', -1);
                         }
                     })
                     ->orderBy('day');

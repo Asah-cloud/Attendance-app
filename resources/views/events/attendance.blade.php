@@ -56,6 +56,7 @@
                             </button>
                         @endcan
                         @can('update', $event)
+                            <a href="{{ route('events.sessions.index', $event) }}" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100">Manage sessions</a>
                             <form method="POST" action="{{ route('events.cache.clear', $event) }}">
                                 @csrf
                                 <button class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100" onclick="return confirm('Clear cached totals for this event?')">
@@ -83,7 +84,7 @@
                         </div>
                         <div>
                             <span class="block text-[10px] uppercase font-black text-blue-200 tracking-[0.2em] leading-none mb-1">Live Tracking Enabled</span>
-                            <span class="text-xl font-black italic">{{ $event->attendanceSessionLabel($currentDay) }}</span>
+                            <span class="text-xl font-black italic">{{ $event->attendanceSessionLabel($currentDay, $currentSession) }}</span>
                         </div>
                     </div>
                    
@@ -105,7 +106,7 @@
                         <p class="mt-3 text-sm leading-6 text-slate-600">{{ $event->has_arrival_session ? 'Only members who completed Arrival check-in appear here. Mark their attendance separately for each program day.' : 'Members can use phone or QR check-in, while staff can use the scanner or manual registry.' }}</p>
                     </div>
 
-                    <livewire:attendance-stats :event="$event" :day="$currentDay" :key="'attendance-stats-'.$currentDay" />
+                    <livewire:attendance-stats :event="$event" :day="$currentDay" :session="$currentSession" :key="'attendance-stats-'.$currentDay.'-'.$currentSession" />
                 </div>
 
                 {{-- Right Side Search --}}
@@ -115,7 +116,7 @@
                             <h3 class="font-black text-gray-900 tracking-tight uppercase text-xs">Manual Registry</h3>
                         </div>
                         <div class="p-6">
-                            <livewire:attendance-search :event="$event" :day="$currentDay" :key="'attendance-search-'.$currentDay" />
+                            <livewire:attendance-search :event="$event" :day="$currentDay" :session="$currentSession" :key="'attendance-search-'.$currentDay.'-'.$currentSession" />
                         </div>
                     </div>
                 </div>

@@ -12,6 +12,7 @@ use App\Http\Controllers\CustomMessageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventBillingController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\EventSessionController;
 use App\Http\Controllers\EventFormController;
 use App\Http\Controllers\EventRegistrationFormController;
 use App\Http\Controllers\MealDistributionController;
@@ -151,6 +152,9 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
             ->middleware('throttle:120,1')->name('events.meals.issue');
     });
     Route::patch('/events/{event}/update-day', [EventController::class, 'updateDay'])->name('events.update-day');
+    Route::get('/events/{event}/sessions', [EventSessionController::class, 'index'])->name('events.sessions.index');
+    Route::post('/events/{event}/sessions', [EventSessionController::class, 'store'])->name('events.sessions.store');
+    Route::delete('/events/{event}/sessions/{eventSession}', [EventSessionController::class, 'destroy'])->name('events.sessions.destroy');
     // Custom attendee messages — paid feature: custom_messages
     Route::middleware('event.feature:custom_messages')->group(function () {
         Route::get('/events/{event}/messages', [CustomMessageController::class, 'index'])->name('events.messages.index');

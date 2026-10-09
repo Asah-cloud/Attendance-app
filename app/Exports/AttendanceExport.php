@@ -17,17 +17,20 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
 
     protected $area;
 
+    protected $session;
+
     // 1. Accept BOTH the event and the day
-    public function __construct(Event $event, $day = 'all', ?string $area = null)
+    public function __construct(Event $event, $day = 'all', ?string $area = null, ?int $session = null)
     {
         $this->event = $event;
         $this->day = $day;
         $this->area = $area;
+        $this->session = $session;
     }
 
     public function collection(): Enumerable
     {
-        $presentUsers = app(AttendanceReportData::class)->forPeriod($this->event, $this->day)['presentUsers'];
+        $presentUsers = app(AttendanceReportData::class)->forPeriod($this->event, $this->day, $this->session)['presentUsers'];
 
         if ($this->area === null) {
             return $presentUsers;
@@ -59,7 +62,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
             $attendance ? $attendance->created_at->format('d-m-Y h:i A') : 'N/A',
             $user->isNumberedParticipantStaff()
                 ? 'Staff check-in (all event days)'
-                : $this->event->attendanceSessionLabel($attendance ? $attendance->day : $this->day),
+                : $this->event->attendanceSessionLabel($attendance ? $attendance->day : $this->day, $attendance->session ?? 1),
         ];
     }
 }

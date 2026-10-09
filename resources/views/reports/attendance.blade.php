@@ -18,7 +18,7 @@
             
             <div class="flex items-center gap-3 print:hidden">
                 
-                <a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" 
+                <a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession ?? null]) }}"
                    class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-700 transition-all shadow-lg shadow-green-100 active:scale-95">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Excel
@@ -36,8 +36,8 @@
     <div class="py-12 bg-gray-50/50 min-h-screen">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="mb-6 flex flex-col justify-between gap-4 print:hidden sm:flex-row sm:items-center">
-                <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance report</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">{{ $selectedDay === 'all' ? 'All days: each person is counted once, even if they attended several days.' : 'Showing attendance for '.$event->attendanceSessionLabel($selectedDay).'.' }} Numbered participant staff are included; other staff are in the staff report.</p></div>
-                <div data-tour="event-reports-export" class="flex flex-wrap gap-2"><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
+                <div><p class="text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">Attendance report</p><h2 class="mt-1 text-2xl font-black text-slate-950">{{ $event->title }}</h2><p class="mt-1 text-sm text-slate-500">{{ $selectedDay === 'all' ? 'All days: each person is counted once, even if they attended several days.' : 'Showing attendance for '.$event->attendanceSessionLabel($selectedDay, $selectedSession ?? 1).'.' }} Numbered participant staff are included; other staff are in the staff report.</p></div>
+                <div data-tour="event-reports-export" class="flex flex-wrap gap-2"><a href="{{ route('reports.excel', ['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession ?? null]) }}" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700">Export Excel</a><a href="{{ route('reports.pdf', ['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession ?? null]) }}" class="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-red-700">Export PDF</a><button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Print / PDF</button></div>
             </div>
             
             {{-- Print-Only Header (Hidden on Web) --}}
@@ -65,7 +65,7 @@
                 
                 {{-- Day Selection Navigation --}}
                 <div class="print:hidden w-full md:w-auto">
-                    <x-day-selector :event="$event" :selectedDay="$selectedDay" />
+                    <x-day-selector :event="$event" :selectedDay="$selectedDay" :selectedSession="$selectedSession ?? null" />
                 </div>
             </div>
 
@@ -101,10 +101,10 @@
             </div>
 
             <div class="mb-12 rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="text-xs font-black uppercase tracking-widest text-blue-700">Present people by area</h3><a href="{{ route('reports.area-summary', ['event' => $event, 'day' => $selectedDay]) }}" class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white">Download area summary</a></div>
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="text-xs font-black uppercase tracking-widest text-blue-700">Present people by area</h3><a href="{{ route('reports.area-summary', ['event' => $event, 'day' => $selectedDay, 'session' => $selectedSession ?? null]) }}" class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white">Download area summary</a></div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @forelse($areaBreakdown as $label => $count)
-                        <a href="{{ route('reports.area-detail', ['event' => $event, 'area' => $label, 'day' => $selectedDay]) }}" title="Download list of people in {{ $label }}" class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3 hover:bg-blue-100 transition-colors"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></a>
+                        <a href="{{ route('reports.area-detail', ['event' => $event, 'area' => $label, 'day' => $selectedDay, 'session' => $selectedSession ?? null]) }}" title="Download list of people in {{ $label }}" class="flex items-center justify-between rounded-2xl bg-blue-50 px-4 py-3 hover:bg-blue-100 transition-colors"><span class="text-sm font-bold text-slate-700">{{ $label }}</span><span class="rounded-full bg-blue-700 px-3 py-1 text-xs font-black text-white">{{ number_format($count) }}</span></a>
                     @empty
                         <p class="text-sm text-gray-400">No attendance yet.</p>
                     @endforelse

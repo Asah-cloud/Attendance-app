@@ -13,16 +13,19 @@ class AttendanceStats extends Component
 
     public int $day;
 
+    public int $session = 1;
+
     protected $listeners = [
         'attendanceStatsChanged' => '$refresh',
     ];
 
-    public function mount(Event $event, int $day): void
+    public function mount(Event $event, int $day, int $session = 1): void
     {
         Gate::authorize('view', $event);
 
         $this->event = $event;
         $this->day = $day;
+        $this->session = $session;
     }
 
     public function render()
@@ -34,6 +37,7 @@ class AttendanceStats extends Component
         $dailyAttendeeCount = Attendance::query()
             ->where('event_id', $this->event->id)
             ->where('day', $this->day)
+            ->where('session', $this->session)
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->distinct('participant_id')
             ->count('participant_id');

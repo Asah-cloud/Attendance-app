@@ -33,9 +33,9 @@ class AttendanceController extends Controller
         return $event->activeAttendanceSession();
     }
 
-    private function getEventSession(Request $request): int
+    private function getEventSession(Request $request, Event $event): int
     {
-        return (int) $request->input('session', 1);
+        return $request->has('session') ? (int) $request->input('session') : $event->activeSessionNumber();
     }
 
     public function show(Request $request, Event $event)
@@ -43,7 +43,7 @@ class AttendanceController extends Controller
         $this->authorize('view', $event);
 
         $currentDay = $this->getEventDay($request, $event);
-        $currentSession = $this->getEventSession($request);
+        $currentSession = $this->getEventSession($request, $event);
         $stats = $this->cache->rememberEvent($event->id, "attendance-stats:v5:day:{$currentDay}:session:{$currentSession}", function () use ($event, $currentDay, $currentSession) {
             $participantStaffIds = $event->persistentParticipantStaffIds();
             $participantStaffCount = $participantStaffIds->count();
@@ -63,7 +63,7 @@ class AttendanceController extends Controller
         ['totalMembers' => $totalMembers, 'presentCount' => $presentCount, 'participantStaffCount' => $participantStaffCount] = $stats;
 
         return view('events.attendance', compact(
-            'event', 'totalMembers', 'presentCount', 'participantStaffCount', 'currentDay'
+            'event', 'totalMembers', 'presentCount', 'participantStaffCount', 'currentDay', 'currentSession'
         ));
     }
 
@@ -93,7 +93,7 @@ class AttendanceController extends Controller
         $request->validate(['participant_id' => 'required|integer']);
         $targetParticipant = $event->attendanceEligibleParticipants()->findOrFail($request->integer('participant_id'));
         $currentDay = $this->getEventDay($request, $event);
-        $currentSession = $this->getEventSession($request);
+        $currentSession = $this->getEventSession($request, $event);
         $this->ensureAttendanceCanBeMarked($event, $currentDay);
 
         $attendance = Attendance::query()->createOrFirst([
@@ -111,10 +111,10 @@ class AttendanceController extends Controller
         }
 
         if (! $attendance->wasRecentlyCreated) {
-            return back()->with('info', 'Member already marked present for '.$event->attendanceSessionLabel($currentDay).'.');
+            return back()->with('info', 'Member already marked present for '.$event->attendanceSessionLabel($currentDay, $currentSession).'.');
         }
 
-        return back()->with('success', 'Attendance marked for '.$event->attendanceSessionLabel($currentDay).'!');
+        return back()->with('success', 'Attendance marked for '.$event->attendanceSessionLabel($currentDay, $currentSession).'!');
     }
 
     public function destroy(Request $request, Event $event, int $participant_id)
@@ -123,7 +123,7 @@ class AttendanceController extends Controller
         $event->attendanceEligibleParticipants()->findOrFail($participant_id);
 
         $currentDay = $this->getEventDay($request, $event);
-        $currentSession = $this->getEventSession($request);
+        $currentSession = $this->getEventSession($request, $event);
         $this->ensureAttendanceCanBeMarked($event, $currentDay);
 
         Attendance::query()
@@ -135,7 +135,7 @@ class AttendanceController extends Controller
 
         $this->cache->invalidateEvent($event->id, $event->company_id);
 
-        return back()->with('success', 'Attendance removed for '.$event->attendanceSessionLabel($currentDay).'.');
+        return back()->with('success', 'Attendance removed for '.$event->attendanceSessionLabel($currentDay, $currentSession).'.');
     }
 
     public function personalCheckIn(string $code)
@@ -224,11 +224,12 @@ class AttendanceController extends Controller
         }
 
         $marker = $request->user();
+        $currentSession = $this->getEventSession($request, $event);
         $attendance = Attendance::query()->createOrFirst([
             'event_id' => $event->id,
             'participant_id' => $registration->participant_id,
             'day' => $day,
-            'session' => $this->getEventSession($request),
+            'session' => $currentSession,
         ], [
             'status' => 'present',
             'marked_by' => $marker?->can('scanAttendance', $event) ? $marker->id : null,
@@ -236,7 +237,7 @@ class AttendanceController extends Controller
 
         $this->cache->invalidateEvent($event->id, $event->company_id);
 
-        $session = $event->attendanceSessionLabel($day);
+        $session = $event->attendanceSessionLabel($day, $currentSession);
         $message = $attendance->wasRecentlyCreated
             ? "Welcome, {$registration->participant->name}! Your {$session} check-in is complete."
             : "{$registration->participant->name} is already checked in for {$session}.";
@@ -312,11 +313,12 @@ class AttendanceController extends Controller
             return response()->json(['message' => "{$registration->participant->name} has not completed Arrival check-in yet."], 422);
         }
 
+        $currentSession = $this->getEventSession($request, $event);
         $attendance = Attendance::query()->createOrFirst([
             'event_id' => $event->id,
             'participant_id' => $registration->participant_id,
             'day' => $day,
-            'session' => $this->getEventSession($request),
+            'session' => $currentSession,
         ], [
             'status' => 'present',
             'marked_by' => Auth::id(),
@@ -327,8 +329,8 @@ class AttendanceController extends Controller
         }
 
         $message = $attendance->wasRecentlyCreated
-            ? "Welcome, {$registration->participant->name}! Your {$event->attendanceSessionLabel($day)} check-in is complete. We are happy to have you here."
-            : "Welcome back, {$registration->participant->name}! You are already checked in for {$event->attendanceSessionLabel($day)}. Enjoy the event.";
+            ? "Welcome, {$registration->participant->name}! Your {$event->attendanceSessionLabel($day, $currentSession)} check-in is complete. We are happy to have you here."
+            : "Welcome back, {$registration->participant->name}! You are already checked in for {$event->attendanceSessionLabel($day, $currentSession)}. Enjoy the event.";
         $room = $day === 0 && $event->accommodation_published ? $registration->roomAssignment?->room : null;
         if ($room) {
             $message .= ' Your room is '.$room->label().'.';
@@ -339,6 +341,7 @@ class AttendanceController extends Controller
             'already_present' => ! $attendance->wasRecentlyCreated,
             'name' => $registration->participant->name,
             'day' => $day,
+            'session' => $currentSession,
             'room' => $room?->label(),
             'message' => $message,
         ]);

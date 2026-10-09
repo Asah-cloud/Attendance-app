@@ -11,11 +11,11 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class AreaAttendanceSummaryExport implements FromCollection, WithHeadings, WithMapping
 {
-    public function __construct(private readonly Event $event, private readonly int|string $day) {}
+    public function __construct(private readonly Event $event, private readonly int|string $day, private readonly ?int $session = null) {}
 
     public function collection(): Enumerable
     {
-        return app(AttendanceReportData::class)->forPeriod($this->event, $this->day)['presentUsers']
+        return app(AttendanceReportData::class)->forPeriod($this->event, $this->day, $this->session)['presentUsers']
             ->countBy(fn ($participant) => $participant->room_group ?: ($participant->department ?: 'Area not specified'))
             ->sortDesc()
             ->map(fn ($count, $area) => ['area' => $area, 'present' => $count])

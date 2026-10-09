@@ -28,6 +28,8 @@ class AttendanceSearch extends Component
 
     public $selectedDay = 1; // This is the property name we must use everywhere
 
+    public int $selectedSession = 1;
+
     public string $mode = 'attendance';
 
     public ?int $editingStaffId = null;
@@ -38,6 +40,7 @@ class AttendanceSearch extends Component
 
     protected $queryString = [
         'selectedDay' => ['except' => 1],
+        'selectedSession' => ['except' => 1],
         'search' => ['except' => ''],
     ];
 
@@ -45,7 +48,7 @@ class AttendanceSearch extends Component
         'refreshAttendeeList' => '$refresh',
     ];
 
-    public function mount($event, ?int $day = null, string $mode = 'attendance')
+    public function mount($event, ?int $day = null, ?int $session = null, string $mode = 'attendance')
     {
         $this->event = $event instanceof Event
             ? $event
@@ -55,6 +58,7 @@ class AttendanceSearch extends Component
 
         $this->mode = $mode;
         $this->selectedDay = $mode === 'staff' ? self::STAFF_CHECKIN_DAY : ($day ?? (int) request()->query('day', 1));
+        $this->selectedSession = $mode === 'staff' ? 1 : ($session ?? (int) request()->query('session', 1));
         $this->loadAttendedUserIds();
     }
 
@@ -89,6 +93,9 @@ class AttendanceSearch extends Component
         // Changed $this->day to $this->selectedDay
         if ($this->selectedDay !== 'all') {
             $query->where('day', $this->selectedDay);
+            if ((int) $this->selectedDay >= 1) {
+                $query->where('session', $this->selectedSession);
+            }
         }
 
         $this->attendedUserIds = $query->pluck('participant_id')->toArray();
@@ -125,6 +132,7 @@ class AttendanceSearch extends Component
 
         // Changed $this->day to $this->selectedDay
         $currentDay = $this->selectedDay;
+        $currentSession = (int) $currentDay >= 1 ? $this->selectedSession : 1;
 
         $query = Attendance::query()
             ->where('event_id', $this->event->id)
@@ -132,6 +140,9 @@ class AttendanceSearch extends Component
 
         if ($currentDay !== 'all') {
             $query->where('day', $currentDay);
+            if ((int) $currentDay >= 1) {
+                $query->where('session', $currentSession);
+            }
         }
 
         $attendance = $query->first();
@@ -143,6 +154,7 @@ class AttendanceSearch extends Component
                 'event_id' => $this->event->id,
                 'participant_id' => $participantId,
                 'day' => $currentDay,
+                'session' => $currentSession,
             ]);
             if ($this->mode === 'staff' || ((int) $currentDay === 1 && $this->participantsQuery()->findOrFail($participantId)->isNumberedParticipantStaff())) {
                 app(StaffCheckInService::class)->checkIn($participantId, auth()->id());

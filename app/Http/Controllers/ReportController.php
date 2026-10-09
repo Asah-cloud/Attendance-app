@@ -16,11 +16,12 @@ class ReportController extends Controller
 {
     public function __construct(private readonly ApplicationCache $cache, private readonly AttendanceReportData $attendanceReport) {}
 
-    public function show(Event $event, $day = 1)
+    public function show(Request $request, Event $event, $day = 1)
     {
         $this->authorize('view', $event);
         // Use the route parameter directly instead of request query
         $selectedDay = $this->validatedDay($event, $day);
+        $selectedSession = $this->validatedSession($event, $selectedDay, $request->query('session'));
 
         [
             'presentUsers' => $presentUsers,
@@ -29,7 +30,7 @@ class ReportController extends Controller
             'categoryBreakdown' => $categoryBreakdown,
             'genderBreakdown' => $genderBreakdown,
             'areaBreakdown' => $areaBreakdown,
-        ] = $this->reportData($event, $selectedDay);
+        ] = $this->reportData($event, $selectedDay, $selectedSession);
 
         $reportParticipants = $presentUsers->merge($absentUsers);
 
@@ -61,69 +62,74 @@ class ReportController extends Controller
         }
 
         return view('reports.attendance', compact(
-            'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay',
+            'event', 'presentUsers', 'absentUsers', 'totalExpected', 'selectedDay', 'selectedSession',
             'categoryBreakdown', 'genderBreakdown', 'areaBreakdown', 'filterCategory', 'filterGender', 'filterArea',
             'availableCategories', 'availableGenders', 'availableAreas'
         ));
     }
 
-    public function exportExcel(Event $event, $day = 'all')
+    public function exportExcel(Request $request, Event $event, $day = 'all')
     {
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
+        $session = $this->validatedSession($event, $day, $request->query('session'));
         // Accepts route parameter directly to match Excel route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.xlsx';
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.xlsx';
 
-        return Excel::download(new AttendanceExport($event, $day), $fileName);
+        return Excel::download(new AttendanceExport($event, $day, null, $session), $fileName);
     }
 
-    public function exportCsv(Event $event, $day = 'all')
+    public function exportCsv(Request $request, Event $event, $day = 'all')
     {
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
+        $session = $this->validatedSession($event, $day, $request->query('session'));
         // Accepts route parameter directly to match CSV route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.csv';
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.csv';
 
-        return Excel::download(new AttendanceExport($event, $day), $fileName, \Maatwebsite\Excel\Excel::CSV);
+        return Excel::download(new AttendanceExport($event, $day, null, $session), $fileName, \Maatwebsite\Excel\Excel::CSV);
     }
 
-    public function exportAreaSummary(Event $event, $day = 'all')
+    public function exportAreaSummary(Request $request, Event $event, $day = 'all')
     {
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
-        $fileName = 'Area_Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.xlsx';
+        $session = $this->validatedSession($event, $day, $request->query('session'));
+        $fileName = 'Area_Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.xlsx';
 
-        return Excel::download(new AreaAttendanceSummaryExport($event, $day), $fileName);
+        return Excel::download(new AreaAttendanceSummaryExport($event, $day, $session), $fileName);
     }
 
-    public function exportAreaDetail(Event $event, string $area, $day = 'all')
+    public function exportAreaDetail(Request $request, Event $event, string $area, $day = 'all')
     {
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
-        $fileName = 'Area_'.str_replace(' ', '_', $area).'_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day)).'.xlsx';
+        $session = $this->validatedSession($event, $day, $request->query('session'));
+        $fileName = 'Area_'.str_replace(' ', '_', $area).'_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.xlsx';
 
-        return Excel::download(new AttendanceExport($event, $day, $area), $fileName);
+        return Excel::download(new AttendanceExport($event, $day, $area, $session), $fileName);
     }
 
-    public function exportPdf(Event $event, $day = 'all')
+    public function exportPdf(Request $request, Event $event, $day = 'all')
     {
         $this->authorize('view', $event);
         $selectedDay = $this->validatedDay($event, $day);
-        $reportData = $this->reportData($event, $selectedDay);
+        $selectedSession = $this->validatedSession($event, $selectedDay, $request->query('session'));
+        $reportData = $this->reportData($event, $selectedDay, $selectedSession);
 
         $pdf = Pdf::loadView('reports.attendance-pdf', array_merge(
-            ['event' => $event, 'selectedDay' => $selectedDay],
+            ['event' => $event, 'selectedDay' => $selectedDay, 'selectedSession' => $selectedSession],
             $reportData
         ))->setPaper('a4');
 
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($selectedDay)).'.pdf';
+        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($selectedDay, $selectedSession ?? 1)).'.pdf';
 
         return $pdf->download($fileName);
     }
 
-    private function reportData(Event $event, int|string $selectedDay): array
+    private function reportData(Event $event, int|string $selectedDay, ?int $selectedSession = null): array
     {
-        $data = $this->cache->rememberEvent($event->id, "attendance-report:v3:{$selectedDay}", fn (): array => $this->attendanceReport->forPeriod($event, $selectedDay), ApplicationCache::REPORT_TTL);
+        $data = $this->cache->rememberEvent($event->id, "attendance-report:v4:{$selectedDay}:{$selectedSession}", fn (): array => $this->attendanceReport->forPeriod($event, $selectedDay, $selectedSession), ApplicationCache::REPORT_TTL);
 
         $data['categoryBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->category ?: 'Unspecified')->sortDesc();
         $data['genderBreakdown'] = $data['presentUsers']->countBy(fn ($user) => $user->gender ?: 'Unspecified')->sortDesc();
@@ -152,5 +158,21 @@ class ReportController extends Controller
         }
 
         return $day;
+    }
+
+    /** A session filter only applies to a specific numbered day; returns null (all sessions) otherwise. */
+    private function validatedSession(Event $event, int|string $day, mixed $session): ?int
+    {
+        if ($session === null || $session === '' || $day === 'all' || (int) $day < 1) {
+            return null;
+        }
+
+        $session = filter_var($session, FILTER_VALIDATE_INT);
+        $maxSessions = $event->sessionCountForDay((int) $day);
+        if ($session === false || $session < 1 || $session > $maxSessions) {
+            throw ValidationException::withMessages(['session' => 'The selected session is invalid.']);
+        }
+
+        return $session;
     }
 }

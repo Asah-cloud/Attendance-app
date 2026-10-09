@@ -1,4 +1,4 @@
-@props(['event', 'selectedDay'])
+@props(['event', 'selectedDay', 'selectedSession' => null])
 
 @php
     $totalDays = $event->days_count ?? $event->day;
@@ -69,14 +69,27 @@
                         </a>
                     @endif
                     @for($i = 1; $i <= $totalDays; $i++)
-                        <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $i]) }}" 
+                        @php($sessionsForDay = $event->sessionsForDay($i))
+                        <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $i]) }}"
                            class="flex items-center justify-between px-4 py-2.5 text-xs font-semibold transition-colors
-                                  {{ (string)$selectedDay === (string)$i ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-50' }}">
+                                  {{ (string)$selectedDay === (string)$i && ! $selectedSession ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span>Day {{ $i }}</span>
-                            @if((string)$selectedDay === (string)$i)
+                            @if((string)$selectedDay === (string)$i && ! $selectedSession)
                                 <span class="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
                             @endif
                         </a>
+                        @if($sessionsForDay->count() > 1)
+                            @foreach($sessionsForDay as $s)
+                                <a href="{{ route('reports.event', ['event' => $event->id, 'day' => $i, 'session' => $s['session']]) }}"
+                                   class="flex items-center justify-between px-6 py-2 text-[11px] font-semibold transition-colors
+                                          {{ (string)$selectedDay === (string)$i && (int)$selectedSession === $s['session'] ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:bg-gray-50' }}">
+                                    <span>{{ $s['label'] ?: 'Session '.$s['session'] }}</span>
+                                    @if((string)$selectedDay === (string)$i && (int)$selectedSession === $s['session'])
+                                        <span class="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+                                    @endif
+                                </a>
+                            @endforeach
+                        @endif
                     @endfor
                 </div>
             </div>

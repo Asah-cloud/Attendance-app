@@ -205,9 +205,12 @@ class EventController extends Controller
             'day' => ['required', 'integer', 'min:1', 'max:'.$maxDays],
         ]);
 
-        $event->update(['day' => $validated['day']]);
+        $maxSessions = $event->sessionCountForDay((int) $validated['day']);
+        $session = min($maxSessions, max(1, (int) $request->input('session', 1)));
 
-        return back()->with('success', 'Active check-in session switched to '.$event->attendanceSessionLabel($validated['day']).'.');
+        $event->update(['day' => $validated['day'], 'session' => $session]);
+
+        return back()->with('success', 'Active check-in session switched to '.$event->attendanceSessionLabel($validated['day'], $session).'.');
     }
 
     public function edit(Event $event)

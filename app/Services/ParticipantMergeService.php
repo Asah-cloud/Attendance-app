@@ -49,6 +49,7 @@ class ParticipantMergeService
                 $conflict = $primary->attendances()
                     ->where('event_id', $attendance->event_id)
                     ->where('day', $attendance->day)
+                    ->where('session', $attendance->session)
                     ->exists();
 
                 if ($conflict) {

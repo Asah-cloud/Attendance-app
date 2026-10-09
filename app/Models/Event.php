@@ -41,6 +41,7 @@ class Event extends Model
         'title',
         'slug',
         'day',
+        'session',
         'event_date',
         'end_date',
         'has_arrival_session',
@@ -104,6 +105,42 @@ class Event extends Model
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    public function eventSessions(): HasMany
+    {
+        return $this->hasMany(EventSession::class);
+    }
+
+    /**
+     * Every session that exists for a given day, always including the implicit
+     * session 1 (which has no stored row). Stored rows only ever represent
+     * additional sessions (session number >= 2).
+     *
+     * @return Collection<int, array{session: int, label: ?string}>
+     */
+    public function sessionsForDay(int $day): Collection
+    {
+        $stored = $this->eventSessions()
+            ->where('day', $day)
+            ->orderBy('session')
+            ->get(['session', 'label']);
+
+        return collect([['session' => 1, 'label' => null]])
+            ->concat($stored->map(fn (EventSession $s) => ['session' => $s->session, 'label' => $s->label]))
+            ->unique('session')
+            ->sortBy('session')
+            ->values();
+    }
+
+    public function sessionCountForDay(int $day): int
+    {
+        return max(1, (int) ($this->eventSessions()->where('day', $day)->max('session') ?? 1));
+    }
+
+    public function activeSessionNumber(): int
+    {
+        return max(1, min($this->sessionCountForDay($this->activeAttendanceSession()), (int) ($this->session ?? 1)));
     }
 
     public function company(): BelongsTo
