@@ -7,6 +7,7 @@ use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\EventRegistrationSubmitted;
+use App\Services\ParticipantRegistrationService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -250,7 +251,7 @@ it('normalizes a 00-prefixed international Ghana number the same as its local an
 });
 
 it('leaves a foreign number\'s own 00 dialing prefix untouched', function () {
-    $service = app(App\Services\ParticipantRegistrationService::class);
+    $service = app(ParticipantRegistrationService::class);
 
     expect($service->normalizePhone('004471234567'))->toBe('4471234567');
 });

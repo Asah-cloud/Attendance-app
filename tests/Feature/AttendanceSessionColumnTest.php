@@ -4,6 +4,7 @@ use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
+use Illuminate\Database\QueryException;
 
 function sessionColumnEvent(): array
 {
@@ -63,7 +64,7 @@ it('still enforces one attendance row per day when the session matches', functio
         'day' => 1,
         'session' => 1,
         'status' => 'present',
-    ]))->toThrow(\Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });
 
 it('defaults new attendance rows to session 1', function () {

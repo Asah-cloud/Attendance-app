@@ -8,6 +8,7 @@ use App\Models\EventRegistration;
 use App\Services\ApplicationCache;
 use App\Services\EventRegistrationResolver;
 use App\Services\ParticipantRegistrationService;
+use App\Services\StaffCheckInService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -325,7 +326,7 @@ class AttendanceController extends Controller
         ]);
 
         if ($day === 1 && $registration->participant->isNumberedParticipantStaff()) {
-            app(\App\Services\StaffCheckInService::class)->checkIn($registration->participant_id, Auth::id());
+            app(StaffCheckInService::class)->checkIn($registration->participant_id, Auth::id());
         }
 
         $message = $attendance->wasRecentlyCreated

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\StaffCheckInService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -72,8 +73,8 @@ class EventRegistration extends Model
                 return;
             }
 
-            if (\App\Models\Attendance::query()->where('participant_id', $registration->participant_id)->where('day', -1)->exists()) {
-                app(\App\Services\StaffCheckInService::class)->checkIn($registration->participant_id);
+            if (Attendance::query()->where('participant_id', $registration->participant_id)->where('day', -1)->exists()) {
+                app(StaffCheckInService::class)->checkIn($registration->participant_id);
             }
         });
     }

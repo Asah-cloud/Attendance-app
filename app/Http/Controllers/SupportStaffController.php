@@ -8,12 +8,13 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Participant;
-use App\Services\ApplicationCache;
 use App\Services\EventRegistrationResolver;
 use App\Services\ParticipantRosterService;
+use App\Services\StaffCheckInService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -139,7 +140,7 @@ class SupportStaffController extends Controller
             'marked_by' => Auth::id(),
         ]);
 
-        app(\App\Services\StaffCheckInService::class)->checkIn($registration->participant_id, Auth::id());
+        app(StaffCheckInService::class)->checkIn($registration->participant_id, Auth::id());
 
         $message = $attendance->wasRecentlyCreated
             ? "Welcome, {$registration->participant->name}! Badge check-in complete."
@@ -181,7 +182,7 @@ class SupportStaffController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
-    /** @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection} */
+    /** @return array{0: Collection, 1: Collection, 2: Collection} */
     private function reportData(Event $event): array
     {
         $staff = $event->confirmedStaff()
