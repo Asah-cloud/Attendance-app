@@ -128,10 +128,19 @@
                                 <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs">
                                     <span class="font-bold text-slate-500" x-text="matches.length + ' of ' + totalParticipants + ' registrants'"></span>
                                     <span class="flex gap-3">
-                                        <button type="button" class="font-bold text-blue-700" @click="addAll()" x-text="search.trim() ? 'Add all ' + matches.length + ' matching' : 'Add everyone'"></button>
+                                        <button type="button" class="font-bold text-blue-700" @click="addAll()" x-text="(search.trim() || phoneFilter !== 'all') ? 'Add all ' + matches.length + ' matching' : 'Add everyone'"></button>
                                         <button type="button" class="font-bold text-slate-500" @click="clearAll()">Clear</button>
                                         <button type="button" class="font-bold text-slate-500" @click="pickerOpen = false">Done</button>
                                     </span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-3 py-2 text-[11px]">
+                                    <span class="font-bold text-slate-400">Phone:</span>
+                                    @foreach(['all' => 'All', 'ghana' => 'Ghana', 'foreign' => 'Foreign', 'none' => 'No phone'] as $value => $label)
+                                        <button type="button" @click="phoneFilter = '{{ $value }}'"
+                                                class="rounded-full px-2.5 py-0.5 font-bold transition"
+                                                :class="phoneFilter === '{{ $value }}' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                                x-text="'{{ $label }} (' + {{ $value === 'all' ? 'totalParticipants' : 'phoneCounts.'.$value }} + ')'"></button>
+                                    @endforeach
                                 </div>
                                 <div class="max-h-56 divide-y divide-slate-50 overflow-y-auto">
                                     <template x-for="p in shown" :key="p.id">
@@ -314,7 +323,9 @@
             const participants = config.participants.map(p => Object.assign({}, p, {
                 haystack: [p.name, p.email || '', p.phone || ''].join(' ').toLowerCase(),
                 digits: (p.phone || '').replace(/\D+/g, ''),
+                phoneKind: p.ghana ? 'ghana' : (p.phone ? 'foreign' : 'none'),
             }));
+            const phoneCounts = participants.reduce((counts, p) => (counts[p.phoneKind]++, counts), { ghana: 0, foreign: 0, none: 0 });
             const cfg = {
                 organization: config.organization,
                 eventTitle: config.eventTitle,
@@ -335,6 +346,8 @@
                 showPreview: false,
                 selected: new Set(init.selected),
                 search: '',
+                phoneFilter: 'all',
+                phoneCounts: phoneCounts,
                 pickerOpen: false,
                 tab: (!init.email_body && init.sms_body) ? 'sms' : 'email',
                 mode: init.mode,
@@ -382,8 +395,9 @@
                     // Every word typed must appear somewhere in the name, email or phone, in any order;
                     // a typed phone number also matches with or without spaces, dashes or a leading zero.
                     const words = this.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-                    if (words.length === 0) return participants;
-                    return participants.filter(p => words.every(w => {
+                    const pool = this.phoneFilter === 'all' ? participants : participants.filter(p => p.phoneKind === this.phoneFilter);
+                    if (words.length === 0) return pool;
+                    return pool.filter(p => words.every(w => {
                         if (p.haystack.includes(w)) return true;
                         const digits = w.replace(/\D+/g, '');
                         return digits.length >= 3 && p.digits.includes(digits.replace(/^0/, ''));
