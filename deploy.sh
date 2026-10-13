@@ -14,7 +14,7 @@ echo "==> Installing PHP dependencies"
 composer install --no-dev --optimize-autoloader
 
 echo "==> Installing and building frontend assets"
-npm install
+npm ci
 npm run build
 
 echo "==> Running database migrations"
