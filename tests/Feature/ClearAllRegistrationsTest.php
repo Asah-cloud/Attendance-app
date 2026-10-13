@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
+use App\Services\ApplicationCache;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -38,6 +39,10 @@ it('deletes every registration for the event except checked-in attendees', funct
     $room = $site->blocks()->create(['name' => 'B'])->floors()->create(['name' => 'F'])->rooms()->create(['name' => 'R1', 'capacity' => 2]);
     $assignmentId = $withRoom->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual'])->id;
     Attendance::create(['event_id' => $event->id, 'participant_id' => $checkedIn->participant_id, 'day' => 1, 'status' => 'present']);
+    app(ApplicationCache::class)->rememberEvent($event->id, 'attendance-stats:v2:day:1', fn () => [
+        'totalMembers' => 626,
+        'presentCount' => 0,
+    ]);
 
     $this->actingAs($manager)
         ->delete(route('events.registrations.destroy-all', $event), ['confirm_title' => 'Annual Summit'])
@@ -51,6 +56,11 @@ it('deletes every registration for the event except checked-in attendees', funct
     $this->assertDatabaseMissing('room_assignments', ['id' => $assignmentId]);
     expect(AccommodationRoom::find($room->id))->not->toBeNull();
     expect(Participant::find($plain->participant_id))->not->toBeNull();
+
+    $this->get(route('events.attendance', $event))
+        ->assertOk()
+        ->assertSee('>1<', false)
+        ->assertDontSee('>626<', false);
 });
 
 it('does nothing when the typed title does not match', function () {
