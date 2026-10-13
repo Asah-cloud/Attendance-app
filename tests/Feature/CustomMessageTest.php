@@ -335,6 +335,26 @@ it('lets a manager add new registrants when editing and resending a message', fu
         ->and($original->fresh()->recipients()->count())->toBe(1);
 });
 
+it('offers a phone filter in the recipient picker that matches the server\'s Ghana check', function () {
+    $company = Company::create(['name' => 'Filter Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    foreach ([['Ghana Person', '0241234567'], ['Foreign Person', '+447700900123'], ['No Phone Person', null]] as [$name, $phone]) {
+        $participant = Participant::create(['company_id' => $company->id, 'name' => $name, 'email' => str($name)->slug().'@example.com', 'phone' => $phone]);
+        $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+    }
+
+    $this->actingAs($manager)->get(route('events.messages.create', $event))
+        ->assertOk()
+        ->assertSee('phoneFilter', false)
+        ->assertSeeInOrder(['Phone:', 'All', 'Ghana', 'Foreign', 'No phone'])
+        ->assertViewHas('composeConfig', fn (array $config) => collect($config['participants'])->pluck('ghana', 'name')->all() === [
+            'Foreign Person' => false,
+            'Ghana Person' => true,
+            'No Phone Person' => false,
+        ]);
+});
+
 it('keeps recipients from the original upload when resending and lets the manager untick them', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Upload Resend Co']);
