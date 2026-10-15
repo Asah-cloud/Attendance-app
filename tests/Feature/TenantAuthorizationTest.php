@@ -200,6 +200,29 @@ it('prefers a contact match when a trusted import row id collides with another p
         ->and($wrongIdOwner->registrations()->exists())->toBeFalse();
 });
 
+it('adds a later list whose row numbers restart as new people instead of renaming earlier ones', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Import Event', 'event_date' => now()]);
+
+    $first = new UsersImport($event);
+    $first->importRow(['2', 'Issac Kwabia', 'Male', 'Achimota', 'Participant', '0545829491', 'kwabiaisaac87@gmail.com'], 3);
+    $second = new UsersImport($event);
+    $second->importRow(['2', 'Duncan Amissah', 'Male', 'Kumasi North', 'Participant', '0249437600'], 3);
+    // The same row imported again still finds Duncan rather than adding him twice.
+    $second->importRow(['2', 'Duncan Amissah', 'Male', 'Kumasi North', 'Participant', '0249437600'], 3);
+    $second->importRow(['2', 'duncan  AMISSAH', 'Male', 'Kumasi North', 'Participant', null], 3);
+
+    $issac = Participant::where('email', 'kwabiaisaac87@gmail.com')->firstOrFail();
+    $duncan = Participant::where('phone', '249437600')->firstOrFail();
+    expect($issac->name)->toBe('Issac Kwabia')
+        ->and($issac->phone)->toBe('545829491')
+        ->and($issac->room_group)->toBe('Achimota')
+        ->and($duncan->id)->not->toBe($issac->id)
+        ->and($duncan->phone)->toBe('249437600')
+        ->and($duncan->room_group)->toBe('Kumasi North')
+        ->and($event->confirmedParticipants()->count())->toBe(2);
+});
+
 it('imports every row as a distinct participant when the id column is blank, and skips only the header', function () {
     $company = Company::create(['name' => 'One']);
     $event = Event::create([

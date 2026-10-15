@@ -53,7 +53,7 @@ class ParticipantRegistrationService
         // Scoped to this event's company: the same person attending events run by two
         // different companies gets an independent participant record in each, rather
         // than being treated as one shared identity (or blocked outright).
-        $user = $this->findExistingUser($lookupEmails, $phone, $secondaryPhone, $memberId, $event->company_id, $trusted, $gender);
+        $user = $this->findExistingUser($lookupEmails, $phone, $secondaryPhone, $memberId, $event->company_id, $trusted, $gender, $data['name'] ?? null);
 
         if (! $user) {
             return Participant::create([
@@ -138,7 +138,7 @@ class ParticipantRegistrationService
         return [$numbers->get(0), $numbers->get(1)];
     }
 
-    private function findExistingUser(array $emails, ?string $phone, ?string $secondaryPhone, ?string $memberId, ?int $companyId, bool $trusted, ?string $gender): ?Participant
+    private function findExistingUser(array $emails, ?string $phone, ?string $secondaryPhone, ?string $memberId, ?int $companyId, bool $trusted, ?string $gender, ?string $name): ?Participant
     {
         $phones = array_values(array_filter([$phone, $secondaryPhone]));
 
@@ -154,8 +154,13 @@ class ParticipantRegistrationService
         }
 
         $contactMatch = $contactMatches->first();
+        // An imported member ID is usually just the row number in column A, and a later list
+        // for the same event numbers its rows from 1 again. So an ID alone only re-finds the
+        // same person when the name agrees too; a different name is a new person who happens
+        // to share the row number, not a rename of whoever had it before.
         $memberMatch = $memberId
-            ? Participant::query()->where('company_id', $companyId)->where('member_id', $memberId)->first()
+            ? Participant::query()->where('company_id', $companyId)->where('member_id', $memberId)->get()
+                ->first(fn (Participant $candidate) => $this->sameName($candidate->name, $name))
             : null;
 
         // Spreadsheet/PDF IDs are often row numbers local to one list, not permanent
@@ -218,6 +223,14 @@ class ParticipantRegistrationService
         }
 
         return $candidates->first(fn (Participant $candidate) => $candidate->gender === null || $candidate->gender === $gender);
+    }
+
+    /** Names compared ignoring case, spacing and punctuation ("Kumi-Asare" = "kumi asare"). */
+    private function sameName(?string $a, ?string $b): bool
+    {
+        $normalize = fn (?string $value) => trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower((string) $value)) ?? '');
+
+        return $normalize($a) !== '' && $normalize($a) === $normalize($b);
     }
 
     private function usableEmail(?string $email): ?string
