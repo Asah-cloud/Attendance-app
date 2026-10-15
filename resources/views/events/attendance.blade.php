@@ -189,5 +189,86 @@
             </div>
         </div>
     </div>
+
+    @php($importReview = session('participant-import-review.'.$event->id))
+    @if($importReview)
+        {{-- Rows of an uploaded list that would rename someone already registered; nothing is saved until the manager confirms. --}}
+        <div id="importReviewModal" x-data="{ open: true }" x-show="open" class="fixed inset-0 z-[70] overflow-y-auto">
+            <div class="flex min-h-screen items-center justify-center px-4 py-8">
+                <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm"></div>
+                <form action="{{ route('events.import.confirm', $event) }}" method="POST" x-ref="form"
+                      class="relative w-full max-w-4xl rounded-3xl border border-gray-100 bg-white p-6 text-left shadow-2xl sm:p-8">
+                    @csrf
+                    <h3 class="text-xl font-black text-gray-900">Check {{ count($importReview['rows']) }} {{ Str::plural('row', count($importReview['rows'])) }} before importing</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        In <strong>{{ $importReview['file_name'] }}</strong>, these rows share a phone or email with someone already registered under a different name.
+                        Choose <strong>Update</strong> if it's the same person, <strong>New person</strong> to keep both, or <strong>Skip</strong> to leave the row out.
+                        Nothing has been imported yet.
+                    </p>
+
+                    <div class="mt-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-widest">
+                        <button type="button" class="rounded-xl bg-blue-50 px-3 py-2 text-blue-700 hover:bg-blue-100"
+                                @click="$refs.form.querySelectorAll('input[value=update]').forEach(i => i.checked = true)">Update all</button>
+                        <button type="button" class="rounded-xl bg-gray-100 px-3 py-2 text-gray-700 hover:bg-gray-200"
+                                @click="$refs.form.querySelectorAll('input[value=new]').forEach(i => i.checked = true)">All new people</button>
+                        <button type="button" class="rounded-xl bg-gray-100 px-3 py-2 text-gray-700 hover:bg-gray-200"
+                                @click="$refs.form.querySelectorAll('input[value=skip]').forEach(i => i.checked = true)">Skip all</button>
+                    </div>
+
+                    <div class="mt-4 max-h-[55vh] overflow-auto rounded-2xl border border-gray-100">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
+                            <thead class="sticky top-0 bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">Row</th>
+                                    <th class="px-3 py-2 text-left">In your file</th>
+                                    <th class="px-3 py-2 text-left">Already registered</th>
+                                    <th class="px-3 py-2 text-left">Choice</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                @foreach($importReview['rows'] as $row)
+                                    <tr class="align-top">
+                                        <td class="px-3 py-3 font-bold text-gray-400">{{ $row['row'] }}</td>
+                                        <td class="px-3 py-3">
+                                            <div class="font-bold text-gray-900">{{ $row['name'] }}</div>
+                                            <div class="text-xs text-gray-500">{{ $row['phone'] ?: '—' }} · {{ $row['email'] ?: '—' }}</div>
+                                        </td>
+                                        <td class="px-3 py-3">
+                                            <div class="font-bold text-gray-900">{{ $row['existing_name'] }}</div>
+                                            <div class="text-xs text-gray-500">{{ $row['existing_phone'] ?: '—' }} · {{ $row['existing_email'] ?: '—' }}</div>
+                                            <div class="mt-1 text-[11px] font-bold text-amber-700">Same {{ $row['matched_by'] }}</div>
+                                        </td>
+                                        <td class="px-3 py-3">
+                                            <div class="flex flex-col gap-1 text-xs font-bold text-gray-700">
+                                                @foreach(['update' => 'Update', 'new' => 'New person', 'skip' => 'Skip'] as $value => $label)
+                                                    <label class="flex cursor-pointer items-center gap-2">
+                                                        <input type="radio" name="decisions[{{ $row['row'] }}]" value="{{ $value }}" @checked($value === 'new')
+                                                               class="border-gray-300 text-blue-600 focus:ring-blue-500">
+                                                        {{ $label }}
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="mt-3 text-xs text-gray-500">The other rows in the file are imported as usual.</p>
+
+                    <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="submit" form="importReviewCancel" class="rounded-2xl px-5 py-3 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700">
+                            Cancel import
+                        </button>
+                        <button type="submit" class="rounded-2xl bg-blue-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg hover:bg-blue-700">
+                            Import with these choices
+                        </button>
+                    </div>
+                </form>
+                <form id="importReviewCancel" action="{{ route('events.import.cancel', $event) }}" method="POST" class="hidden">@csrf</form>
+            </div>
+        </div>
+    @endif
     @endcan
 </x-app-layout>

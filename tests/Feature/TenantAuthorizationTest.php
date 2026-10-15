@@ -353,7 +353,7 @@ it('sends notifications after a registered participant import when requested', f
             'file' => $file,
             'send_notifications' => '1',
         ])
-        ->assertSessionHas('success', 'Participants imported successfully! Email and SMS notifications are being sent.');
+        ->assertSessionHas('success', 'Import complete: 1 added, 0 updated. Email and SMS notifications are being sent.');
 
     $participant = Participant::where('member_id', $company->id.':event'.$event->id.':42')->firstOrFail();
     Notification::assertSentTo($participant, EventRegistrationSubmitted::class);
