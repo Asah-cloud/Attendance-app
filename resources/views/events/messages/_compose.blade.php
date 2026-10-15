@@ -141,6 +141,14 @@
                                                 :class="phoneFilter === '{{ $value }}' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                                                 x-text="'{{ $label }} (' + {{ $value === 'all' ? 'totalParticipants' : 'phoneCounts.'.$value }} + ')'"></button>
                                     @endforeach
+                                    <select x-show="countryOptions.length" @change="phoneFilter = $event.target.value || 'all'"
+                                            class="rounded-full border-0 py-0.5 pl-2.5 pr-7 text-[11px] font-bold focus:ring-blue-500"
+                                            :class="phoneFilter.startsWith('country:') ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'">
+                                        <option value="" :selected="!phoneFilter.startsWith('country:')">By country…</option>
+                                        <template x-for="c in countryOptions" :key="c.code">
+                                            <option :value="'country:' + c.code" :selected="phoneFilter === 'country:' + c.code" x-text="c.name + ' (' + c.count + ')'"></option>
+                                        </template>
+                                    </select>
                                 </div>
                                 <div class="max-h-56 divide-y divide-slate-50 overflow-y-auto">
                                     <template x-for="p in shown" :key="p.id">
@@ -324,8 +332,17 @@
                 haystack: [p.name, p.email || '', p.phone || ''].join(' ').toLowerCase(),
                 digits: (p.phone || '').replace(/\D+/g, ''),
                 phoneKind: p.ghana ? 'ghana' : (p.phone ? 'foreign' : 'none'),
+                countryCode: p.country ? p.country[0] : (p.phone ? '?' : ''),
             }));
             const phoneCounts = participants.reduce((counts, p) => (counts[p.phoneKind]++, counts), { ghana: 0, foreign: 0, none: 0 });
+            // One entry per country found among the registrants' phones, largest first, with
+            // numbers whose country can't be told (PhoneNumberService::countryOf()) last.
+            const countryOptions = Object.values(participants.reduce((byCode, p) => {
+                if (!p.countryCode) return byCode;
+                byCode[p.countryCode] = byCode[p.countryCode] || { code: p.countryCode, name: p.country ? p.country[1] : 'Unrecognised country', count: 0 };
+                byCode[p.countryCode].count++;
+                return byCode;
+            }, {})).sort((a, b) => (a.code === '?') - (b.code === '?') || b.count - a.count || a.name.localeCompare(b.name));
             const cfg = {
                 organization: config.organization,
                 eventTitle: config.eventTitle,
@@ -348,6 +365,7 @@
                 search: '',
                 phoneFilter: 'all',
                 phoneCounts: phoneCounts,
+                countryOptions: countryOptions,
                 pickerOpen: false,
                 tab: (!init.email_body && init.sms_body) ? 'sms' : 'email',
                 mode: init.mode,
@@ -395,7 +413,10 @@
                     // Every word typed must appear somewhere in the name, email or phone, in any order;
                     // a typed phone number also matches with or without spaces, dashes or a leading zero.
                     const words = this.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-                    const pool = this.phoneFilter === 'all' ? participants : participants.filter(p => p.phoneKind === this.phoneFilter);
+                    const filter = this.phoneFilter;
+                    const pool = filter === 'all' ? participants : participants.filter(p => filter.startsWith('country:')
+                        ? p.countryCode === filter.slice('country:'.length)
+                        : p.phoneKind === filter);
                     if (words.length === 0) return pool;
                     return pool.filter(p => words.every(w => {
                         if (p.haystack.includes(w)) return true;

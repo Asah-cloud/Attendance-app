@@ -634,6 +634,7 @@ class CustomMessageController extends Controller
                 'phone' => $participant->phone,
                 'hasEmail' => filled($participant->email) && ! str_ends_with($participant->email, '@example.invalid'),
                 'ghana' => PhoneNumberService::isGhanaNumber($participant->phone),
+                'country' => PhoneNumberService::countryOf($participant->phone),
             ])->values()->all(),
         ];
     }
