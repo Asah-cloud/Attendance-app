@@ -62,6 +62,23 @@ it('treats Ghana numbers whose leading zero was dropped by a spreadsheet as Ghan
         ->and(PhoneNumberService::isGhanaNumber('24123456'))->toBeFalse();
 });
 
+it('names the country of a phone number from its dialling code', function () {
+    $country = fn (?string $phone) => PhoneNumberService::countryOf($phone)[0] ?? null;
+
+    expect($country('0241234567'))->toBe('GH')
+        ->and($country('509651270'))->toBe('GH')
+        ->and($country('+234 803 123 4567'))->toBe('NG')
+        ->and($country('2348031234567'))->toBe('NG')
+        ->and($country('08031234567'))->toBe('NG')
+        ->and($country('00447700900123'))->toBe('GB')
+        ->and($country('+14155552671'))->toBe('US')
+        ->and($country('+22890123456'))->toBe('TG')
+        ->and(PhoneNumberService::countryOf('+2348031234567'))->toBe(['NG', 'Nigeria'])
+        ->and($country('+999123456789'))->toBeNull()
+        ->and($country('0123456'))->toBeNull()
+        ->and($country(null))->toBeNull();
+});
+
 it('routes Ghana numbers to SMS and foreign numbers to email in smart mode', function () {
     Notification::fake();
     $company = Company::create(['name' => 'Smart Co']);
@@ -352,6 +369,26 @@ it('offers a phone filter in the recipient picker that matches the server\'s Gha
             'Foreign Person' => false,
             'Ghana Person' => true,
             'No Phone Person' => false,
+        ]);
+});
+
+it('tells the recipient picker which country each registrant\'s phone is from', function () {
+    $company = Company::create(['name' => 'Country Co']);
+    $manager = customMessageManager($company);
+    $event = customMessageEvent($company);
+    foreach ([['Ghana Person', '0241234567'], ['Nigeria Person', '+2348031234567'], ['Unknown Person', '+999123456789'], ['No Phone Person', null]] as [$name, $phone]) {
+        $participant = Participant::create(['company_id' => $company->id, 'name' => $name, 'email' => str($name)->slug().'@example.com', 'phone' => $phone]);
+        $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+    }
+
+    $this->actingAs($manager)->get(route('events.messages.create', $event))
+        ->assertOk()
+        ->assertSee('By country', false)
+        ->assertViewHas('composeConfig', fn (array $config) => collect($config['participants'])->pluck('country', 'name')->all() === [
+            'Ghana Person' => ['GH', 'Ghana'],
+            'Nigeria Person' => ['NG', 'Nigeria'],
+            'No Phone Person' => null,
+            'Unknown Person' => null,
         ]);
 });
 
