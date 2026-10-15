@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\Participant;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
@@ -20,10 +21,40 @@ class UsersImport implements OnEachRow
     /** @var array<int, int> */
     private array $newRegistrationIds = [];
 
-    public function __construct(Event $event, bool $needsRoom = false)
+    /**
+     * Rows that would rename an existing participant, collected for the manager to review.
+     *
+     * @var list<array<string, mixed>>
+     */
+    private array $reviewRows = [];
+
+    /** @var array<string, int> */
+    private array $counts = ['added' => 0, 'updated' => 0, 'skipped' => 0];
+
+    /**
+     * @param  array<int|string, string>|null  $decisions  The manager's choice per row number for rows
+     *                                                     that would rename someone: 'update', 'new' or 'skip'.
+     *                                                     A row needing a choice but given none is added as a
+     *                                                     new person. Null (no review step) updates them as before.
+     * @param  bool  $trial  A dry run inside a transaction the caller rolls back: rooms are not
+     *                       allocated, since that can message attendees immediately.
+     */
+    public function __construct(Event $event, bool $needsRoom = false, private ?array $decisions = null, private bool $trial = false)
     {
         $this->event = $event;
         $this->needsRoom = $needsRoom;
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function reviewRows(): array
+    {
+        return $this->reviewRows;
+    }
+
+    /** @return array<string, int> */
+    public function counts(): array
+    {
+        return $this->counts;
     }
 
     public function onRow(Row $row): void
@@ -60,7 +91,8 @@ class UsersImport implements OnEachRow
         $companyMemberId = $this->event->company_id.':event'.$this->event->id.':'.$id;
         $companyEmail = 'company'.$this->event->company_id.'_event'.$this->event->id.'_member'.$id.'@example.invalid';
 
-        [, $registration] = app(ParticipantRegistrationService::class)->register($this->event, [
+        $service = app(ParticipantRegistrationService::class);
+        $details = [
             'name' => $name,
             'email' => $rawEmail,
             'phone' => $rawPhone,
@@ -72,16 +104,51 @@ class UsersImport implements OnEachRow
             // Matching them can connect a reused row number from a new list to the wrong person.
             'lookup_emails' => array_filter([$rawEmail]),
             'generated_email' => $companyEmail,
-        ], 'import');
+        ];
+
+        // A row whose phone or email belongs to someone with a different name would rename
+        // them. That is often right (a corrected name) but can be a different person sharing
+        // a phone or email, so the manager decides - and until they have, it's a new person.
+        $match = $service->findMatch($this->event, $details);
+        if ($match && ! $service->sameName($match->name, $name)) {
+            $this->reviewRows[] = [
+                'row' => $rowIndex,
+                'name' => $name,
+                'phone' => $rawPhone,
+                'email' => $rawEmail,
+                'existing_id' => $match->id,
+                'existing_name' => $match->name,
+                'existing_phone' => $match->phone,
+                'existing_email' => str_ends_with((string) $match->email, '@example.invalid') ? null : $match->email,
+                'matched_by' => $this->matchedBy($match, $rawEmail),
+            ];
+
+            $decision = $this->decisions === null ? 'update' : ($this->decisions[$rowIndex] ?? 'new');
+            if ($decision === 'skip') {
+                $this->counts['skipped']++;
+
+                return;
+            }
+            $details['force_new'] = $decision !== 'update';
+        }
+
+        [$participant, $registration] = $service->register($this->event, $details, 'import');
+        $this->counts[$participant->wasRecentlyCreated ? 'added' : 'updated']++;
 
         if ($registration->wasRecentlyCreated) {
             $this->newRegistrationIds[] = $registration->id;
 
-            if ($this->needsRoom && $this->event->accommodation_enabled) {
+            if ($this->needsRoom && $this->event->accommodation_enabled && ! $this->trial) {
                 $registration->update(['accommodation_required' => true]);
                 app(RegistrationLifecycleService::class)->allocateAccommodation($registration);
             }
         }
+    }
+
+    /** A row ID only re-finds someone of the same name, so a rename match is by email or phone. */
+    private function matchedBy(Participant $match, ?string $email): string
+    {
+        return $email !== null && strcasecmp((string) $match->email, $email) === 0 ? 'email' : 'phone';
     }
 
     public function sendNotifications(): void

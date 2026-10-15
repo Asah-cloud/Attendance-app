@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
@@ -59,62 +60,166 @@ class EventController extends Controller
     }
 
     /**
-     * Handle the Excel Import
+     * Import a participant list. The file is first imported as a trial that is rolled back;
+     * if any row would rename an existing participant, the manager reviews those rows before
+     * anything is saved. Otherwise the import goes straight through.
      */
     public function import(Request $request, Event $event, PdfParticipantListParser $pdfParser)
     {
         $this->authorize('manageWhenOpen', $event);
 
-        // 1. Validate the file
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv,pdf|max:10240',
             'send_notifications' => ['nullable', 'boolean'],
             'needs_room' => ['nullable', 'boolean'],
         ]);
 
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $path = $file->storeAs('participant-imports', Str::uuid().'.'.$extension, 'local');
+        $options = [
+            'send_notifications' => $request->boolean('send_notifications'),
+            'needs_room' => $event->accommodation_enabled && $request->boolean('needs_room'),
+        ];
+
         try {
-            // 2. Run the import using your UsersImport class
-            $import = new UsersImport($event, $event->accommodation_enabled && $request->boolean('needs_room'));
-            DB::transaction(function () use ($import, $pdfParser, $request): void {
-                $file = $request->file('file');
-                if (strtolower($file->getClientOriginalExtension()) === 'pdf') {
-                    foreach ($pdfParser->parse($file->getRealPath()) as $index => $row) {
-                        $import->importRow($row, $index + 2);
-                    }
-                } else {
-                    Excel::import($import, $file);
+            $trial = $this->runImport($event, $pdfParser, $path, $options['needs_room'], [], true);
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($path);
+
+            return $this->importFailed($event, $exception, $extension);
+        }
+
+        if ($trial->reviewRows() === []) {
+            return $this->completeImport($event, $pdfParser, $path, $options, []);
+        }
+
+        $request->session()->put($this->reviewKey($event), [
+            'path' => $path,
+            'file_name' => $file->getClientOriginalName(),
+            'options' => $options,
+            'rows' => $trial->reviewRows(),
+        ]);
+
+        return back()->with('import_review', true);
+    }
+
+    /** Finish an import the manager has reviewed, applying their choice for each flagged row. */
+    public function confirmImport(Request $request, Event $event, PdfParticipantListParser $pdfParser)
+    {
+        $this->authorize('manageWhenOpen', $event);
+
+        $review = $request->session()->pull($this->reviewKey($event));
+        if (! $review || ! Storage::disk('local')->exists($review['path'])) {
+            return back()->with('error', 'That import has expired. Please upload the file again.');
+        }
+
+        $validated = $request->validate([
+            'decisions' => ['nullable', 'array'],
+            'decisions.*' => ['in:update,new,skip'],
+        ]);
+
+        return $this->completeImport($event, $pdfParser, $review['path'], $review['options'], $validated['decisions'] ?? []);
+    }
+
+    /** Drop a reviewed import without saving anything. */
+    public function cancelImport(Request $request, Event $event)
+    {
+        $this->authorize('manageWhenOpen', $event);
+
+        if ($review = $request->session()->pull($this->reviewKey($event))) {
+            Storage::disk('local')->delete($review['path']);
+        }
+
+        return back()->with('success', 'Import cancelled. Nothing was changed.');
+    }
+
+    /** @param  array{send_notifications: bool, needs_room: bool}  $options */
+    private function completeImport(Event $event, PdfParticipantListParser $pdfParser, string $path, array $options, array $decisions)
+    {
+        try {
+            $import = $this->runImport($event, $pdfParser, $path, $options['needs_room'], $decisions, false);
+        } catch (\Throwable $exception) {
+            return $this->importFailed($event, $exception, pathinfo($path, PATHINFO_EXTENSION));
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        if ($options['send_notifications']) {
+            $import->sendNotifications();
+        }
+
+        $counts = $import->counts();
+        $message = "Import complete: {$counts['added']} added, {$counts['updated']} updated"
+            .($counts['skipped'] ? ", {$counts['skipped']} skipped" : '').'.';
+        $message .= $options['send_notifications']
+            ? ' Email and SMS notifications are being sent.'
+            : ' No email or SMS notifications were sent.';
+        if ($options['needs_room']) {
+            $message .= ' They were marked as needing a room.';
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Run the stored file through UsersImport. A trial runs inside a transaction that is always
+     * rolled back, so it reports what would happen - including rows that match people added by
+     * earlier rows of the same file - without saving anything.
+     */
+    private function runImport(Event $event, PdfParticipantListParser $pdfParser, string $path, bool $needsRoom, array $decisions, bool $trial): UsersImport
+    {
+        $import = new UsersImport($event, $needsRoom, $decisions, $trial);
+        $run = function () use ($import, $pdfParser, $path): void {
+            if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'pdf') {
+                foreach ($pdfParser->parse(Storage::disk('local')->path($path)) as $index => $row) {
+                    $import->importRow($row, $index + 2);
                 }
-            });
-
-            if ($request->boolean('send_notifications')) {
-                $import->sendNotifications();
+            } else {
+                Excel::import($import, $path, 'local');
             }
+        };
 
-            $message = $request->boolean('send_notifications')
-                ? 'Participants imported successfully! Email and SMS notifications are being sent.'
-                : 'Participants imported successfully! No email or SMS notifications were sent.';
-            if ($event->accommodation_enabled && $request->boolean('needs_room')) {
-                $message .= ' They were marked as needing a room.';
-            }
+        if (! $trial) {
+            DB::transaction($run);
 
-            return back()->with('success', $message);
-        } catch (ValidationException $exception) {
+            return $import;
+        }
+
+        DB::beginTransaction();
+        try {
+            $run();
+        } finally {
+            DB::rollBack();
+        }
+
+        return $import;
+    }
+
+    private function importFailed(Event $event, \Throwable $exception, string $extension)
+    {
+        if ($exception instanceof ValidationException) {
             Log::warning('Participant import contained conflicting records.', [
                 'event_id' => $event->id,
                 'errors' => $exception->errors(),
             ]);
 
             return back()->with('error', collect($exception->errors())->flatten()->first());
-        } catch (\Throwable $exception) {
-            Log::error('Participant import failed.', [
-                'event_id' => $event->id,
-                'exception' => $exception,
-            ]);
-
-            return back()->with('error', $request->file('file')?->getClientOriginalExtension() === 'pdf'
-                ? $exception->getMessage()
-                : 'The import could not be completed. Check the file format and try again.');
         }
+
+        Log::error('Participant import failed.', [
+            'event_id' => $event->id,
+            'exception' => $exception,
+        ]);
+
+        return back()->with('error', strtolower($extension) === 'pdf'
+            ? $exception->getMessage()
+            : 'The import could not be completed. Check the file format and try again.');
+    }
+
+    private function reviewKey(Event $event): string
+    {
+        return 'participant-import-review.'.$event->id;
     }
 
     public function show(Event $event)

@@ -320,6 +320,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         // Participant imports are company-scoped by the event policy, so managers
         // can import into their own events while admins retain global access.
         Route::post('/events/{event}/import', [EventController::class, 'import'])->name('events.import.store');
+        Route::post('/events/{event}/import/confirm', [EventController::class, 'confirmImport'])->name('events.import.confirm');
+        Route::post('/events/{event}/import/cancel', [EventController::class, 'cancelImport'])->name('events.import.cancel');
 
         // Hard-copy attendees: import a contact list, customize the welcome
         // message, and bulk-send confirmation requests via email/SMS.

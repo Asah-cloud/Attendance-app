@@ -35,6 +35,9 @@ class ParticipantRegistrationService
      * When $trusted is false (unauthenticated public registration), an existing
      * match's profile fields are only filled in when blank, never overwritten —
      * matching by phone/email alone isn't proof the submitter owns that profile.
+     *
+     * $data['force_new'] skips the lookup and always creates a new participant, for an
+     * import row the manager has said is a different person from the record it matches.
      */
     public function resolveParticipant(Event $event, array $data, bool $trusted = true): Participant
     {
@@ -42,18 +45,8 @@ class ParticipantRegistrationService
         $email = $this->usableEmail($data['email'] ?? null);
         $memberId = $this->usableString($data['member_id'] ?? null);
         $gender = $this->usableString($data['gender'] ?? null);
-        $lookupEmails = collect($data['lookup_emails'] ?? [])
-            ->prepend($email)
-            ->filter()
-            ->map(fn ($value) => strtolower((string) $value))
-            ->unique()
-            ->values()
-            ->all();
 
-        // Scoped to this event's company: the same person attending events run by two
-        // different companies gets an independent participant record in each, rather
-        // than being treated as one shared identity (or blocked outright).
-        $user = $this->findExistingUser($lookupEmails, $phone, $secondaryPhone, $memberId, $event->company_id, $trusted, $gender, $data['name'] ?? null);
+        $user = empty($data['force_new']) ? $this->findMatch($event, $data, $trusted) : null;
 
         if (! $user) {
             return Participant::create([
@@ -91,6 +84,38 @@ class ParticipantRegistrationService
         ])->save();
 
         return $user;
+    }
+
+    /**
+     * The existing participant resolveParticipant() would update for these details, without
+     * changing anything - so an import can show a manager who a row is about to overwrite.
+     */
+    public function findMatch(Event $event, array $data, bool $trusted = true): ?Participant
+    {
+        [$phone, $secondaryPhone] = $this->splitPhones($data['phone'] ?? null);
+        $lookupEmails = collect($data['lookup_emails'] ?? [])
+            ->prepend($this->usableEmail($data['email'] ?? null))
+            ->filter()
+            ->map(fn ($value) => strtolower((string) $value))
+            ->unique()
+            ->values()
+            ->all();
+
+        // Scoped to this event's company: the same person attending events run by two
+        // different companies gets an independent participant record in each, rather
+        // than being treated as one shared identity (or blocked outright).
+        return $this->findExistingUser(
+            $lookupEmails, $phone, $secondaryPhone, $this->usableString($data['member_id'] ?? null),
+            $event->company_id, $trusted, $this->usableString($data['gender'] ?? null), $data['name'] ?? null,
+        );
+    }
+
+    /** Names compared ignoring case, spacing and punctuation ("Kumi-Asare" = "kumi asare"). */
+    public function sameName(?string $a, ?string $b): bool
+    {
+        $normalize = fn (?string $value) => trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower((string) $value)) ?? '');
+
+        return $normalize($a) !== '' && $normalize($a) === $normalize($b);
     }
 
     public function normalizePhone(?string $phone): ?string
@@ -223,14 +248,6 @@ class ParticipantRegistrationService
         }
 
         return $candidates->first(fn (Participant $candidate) => $candidate->gender === null || $candidate->gender === $gender);
-    }
-
-    /** Names compared ignoring case, spacing and punctuation ("Kumi-Asare" = "kumi asare"). */
-    private function sameName(?string $a, ?string $b): bool
-    {
-        $normalize = fn (?string $value) => trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower((string) $value)) ?? '');
-
-        return $normalize($a) !== '' && $normalize($a) === $normalize($b);
     }
 
     private function usableEmail(?string $email): ?string
