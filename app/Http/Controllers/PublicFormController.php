@@ -52,7 +52,7 @@ class PublicFormController extends Controller
 
     private function findForm(string $eventSlug, string $formSlug): Form
     {
-        $event = Event::where('slug', $eventSlug)->firstOrFail();
+        $event = Event::findBySlug($eventSlug) ?? abort(404);
 
         return $event->forms()->where('slug', $formSlug)->firstOrFail();
     }
