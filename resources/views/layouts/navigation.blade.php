@@ -5,6 +5,13 @@
         ['label' => 'Events', 'route' => 'events.index', 'active' => ['events.*', 'reports.*'], 'icon' => 'M6 2v3m12-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z', 'tour' => 'nav-events'],
     ];
 
+    // An account that only sees shared form responses gets just that page.
+    if ($user->isFormViewerOnly()) {
+        $items = [['label' => 'Shared forms', 'route' => 'shared-forms.index', 'active' => 'shared-forms.*', 'icon' => 'M9 12h6m-6 4h6M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z']];
+    } elseif ($user->sharedForms()->exists()) {
+        $items[] = ['label' => 'Shared forms', 'route' => 'shared-forms.index', 'active' => 'shared-forms.*', 'icon' => 'M9 12h6m-6 4h6M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z'];
+    }
+
     if ($user->hasAnyRole(['admin', 'manager'])) {
         $items[] = ['label' => 'Team', 'route' => 'admin.users.index', 'active' => ['admin.users.*', 'admin.register-*'], 'icon' => 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.26a4 4 0 0 1 0 7.75', 'tour' => 'nav-team'];
     }

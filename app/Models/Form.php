@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -59,6 +60,12 @@ class Form extends Model
             'opens_at' => 'datetime',
             'closes_at' => 'datetime',
         ];
+    }
+
+    /** People allowed to see and export this form's responses (see FormViewerController). */
+    public function viewers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'form_viewers')->withPivot('invited_by')->withTimestamps();
     }
 
     public function event(): BelongsTo

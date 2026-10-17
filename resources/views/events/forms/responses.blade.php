@@ -1,12 +1,19 @@
+@php
+    // The same page serves managers and people the form was shared with (SharedFormController).
+    $exportExcelUrl ??= route('events.forms.responses.export', [$event, $form]);
+    $exportPdfUrl ??= route('events.forms.responses.pdf', [$event, $form]);
+    $backUrl ??= route('events.forms.edit', [$event, $form]);
+    $backLabel ??= 'Back to form';
+@endphp
 <x-app-layout>
     <x-slot name="header">{{ $form->title }} · Responses</x-slot>
     <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div><h1 class="text-2xl font-black text-slate-900">Responses</h1><p class="text-sm text-slate-500">{{ $form->title }} · {{ $responses->total() }} response(s)</p></div>
             <div class="flex flex-wrap gap-2">
-                <a href="{{ route('events.forms.responses.export', [$event, $form]) }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export Excel</a>
-                <a href="{{ route('events.forms.responses.pdf', [$event, $form]) }}" class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export PDF</a>
-                <a href="{{ route('events.forms.edit', [$event, $form]) }}" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Back to form</a>
+                <a href="{{ $exportExcelUrl }}" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export Excel</a>
+                <a href="{{ $exportPdfUrl }}" class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Export PDF</a>
+                <a href="{{ $backUrl }}" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">{{ $backLabel }}</a>
             </div>
         </div>
 

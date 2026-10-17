@@ -67,6 +67,21 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsToMany(MealStation::class, 'meal_station_staff')->withTimestamps();
     }
 
+    /** Forms whose responses have been shared with this user. */
+    public function sharedForms(): BelongsToMany
+    {
+        return $this->belongsToMany(Form::class, 'form_viewers')->withTimestamps();
+    }
+
+    /**
+     * An account that exists only to see shared form responses. It is kept to those pages
+     * (see ConfineFormViewers); anyone with another role keeps their usual access.
+     */
+    public function isFormViewerOnly(): bool
+    {
+        return $this->hasRole('form_viewer') && $this->getRoleNames()->count() === 1;
+    }
+
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_staff')->withTimestamps();

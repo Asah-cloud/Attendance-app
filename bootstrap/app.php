@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ConfineFormViewers;
 use App\Http\Middleware\EnsureCompanyIsActive;
 use App\Http\Middleware\EnsureEventFeature;
 use App\Http\Middleware\RequirePasswordChange;
@@ -17,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->web(append: [RequirePasswordChange::class]);
+        $middleware->web(append: [RequirePasswordChange::class, ConfineFormViewers::class]);
         $middleware->validateCsrfTokens(except: ['webhooks/paystack']);
         $middleware->alias([
             'company.active' => EnsureCompanyIsActive::class,
