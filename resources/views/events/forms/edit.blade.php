@@ -29,6 +29,36 @@
         </section>
 
         <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
+            <h3 class="text-lg font-black">Who can see responses</h3>
+            <p class="mt-1 text-sm text-gray-500">People added here can sign in to view this form's responses and export them as Excel or PDF. They can't see anything else, or change or delete anything.</p>
+
+            <div class="mt-5 divide-y divide-gray-100 rounded-2xl border border-gray-100">
+                @forelse($form->viewers()->orderBy('form_viewers.created_at')->get() as $viewer)
+                    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                        <div class="min-w-0">
+                            <p class="truncate font-bold text-gray-900">{{ $viewer->name }}</p>
+                            <p class="truncate text-xs text-gray-500">{{ $viewer->email }} · added {{ $viewer->pivot->created_at?->format('M j, Y') }}</p>
+                        </div>
+                        <form method="POST" action="{{ route('events.forms.viewers.destroy', [$event, $form, $viewer]) }}" onsubmit="return confirm('Stop sharing these responses with {{ e($viewer->email) }}?')">
+                            @csrf @method('DELETE')
+                            <button class="text-xs font-bold text-red-600">Remove access</button>
+                        </form>
+                    </div>
+                @empty
+                    <p class="px-4 py-4 text-sm text-gray-500">Only you and other managers can see the responses.</p>
+                @endforelse
+            </div>
+
+            <form method="POST" action="{{ route('events.forms.viewers.store', [$event, $form]) }}" class="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                @csrf
+                <div><label class="text-xs font-black uppercase text-gray-500">Name (optional)</label><input name="viewer_name" value="{{ old('viewer_name') }}" class="mt-2 w-full rounded-xl border-gray-200"></div>
+                <div><label class="text-xs font-black uppercase text-gray-500">Email</label><input type="email" name="viewer_email" value="{{ old('viewer_email') }}" required class="mt-2 w-full rounded-xl border-gray-200"></div>
+                <button class="rounded-xl bg-blue-900 px-5 py-3 font-bold text-white">Share responses</button>
+                <div class="md:col-span-3"><x-input-error :messages="$errors->get('viewer_email')" /></div>
+            </form>
+        </section>
+
+        <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <h3 class="text-lg font-black">Form settings</h3>
             <form method="POST" action="{{ route('events.forms.update', [$event, $form]) }}" enctype="multipart/form-data" class="mt-6 grid gap-5 md:grid-cols-2">@csrf @method('PATCH')
                 <div class="md:col-span-2"><label class="text-xs font-black uppercase text-gray-500">Title</label><input name="title" value="{{ old('title', $form->title) }}" required class="mt-2 w-full rounded-xl border-gray-200"><x-input-error :messages="$errors->get('title')" class="mt-1.5" /></div>

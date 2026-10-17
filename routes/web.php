@@ -15,6 +15,7 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventFormController;
 use App\Http\Controllers\EventRegistrationFormController;
 use App\Http\Controllers\EventSessionController;
+use App\Http\Controllers\FormViewerController;
 use App\Http\Controllers\MealDistributionController;
 use App\Http\Controllers\MessageTemplateController;
 use App\Http\Controllers\OnboardingController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\SharedFormController;
 use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
@@ -121,6 +123,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // 3. AUTHENTICATED ROUTES
 Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
+
+    // Form responses shared by email with people outside the team: view and export only.
+    Route::prefix('shared-forms')->name('shared-forms.')->group(function () {
+        Route::get('/', [SharedFormController::class, 'index'])->name('index');
+        Route::get('/{form}', [SharedFormController::class, 'show'])->name('show');
+        Route::get('/{form}/export', [SharedFormController::class, 'exportExcel'])->name('export');
+        Route::get('/{form}/pdf', [SharedFormController::class, 'exportPdf'])->name('pdf');
+    });
 
     // --- SHARED ROUTES (Admins, Managers & Markers) ---
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
@@ -297,6 +307,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'updateField'])->name('events.forms.fields.update');
         Route::delete('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'destroyField'])->name('events.forms.fields.destroy');
         Route::get('/events/{event}/forms/{form}/responses', [EventFormController::class, 'responses'])->name('events.forms.responses');
+        Route::post('/events/{event}/forms/{form}/viewers', [FormViewerController::class, 'store'])->middleware('throttle:20,1')->name('events.forms.viewers.store');
+        Route::delete('/events/{event}/forms/{form}/viewers/{viewer}', [FormViewerController::class, 'destroy'])->name('events.forms.viewers.destroy');
         Route::get('/events/{event}/forms/{form}/responses/export', [EventFormController::class, 'exportExcel'])->name('events.forms.responses.export');
         Route::get('/events/{event}/forms/{form}/responses/pdf', [EventFormController::class, 'exportPdf'])->name('events.forms.responses.pdf');
         Route::get('/events/{event}/forms/{form}/print-qr', [EventFormController::class, 'printQr'])->name('events.forms.print-qr');
