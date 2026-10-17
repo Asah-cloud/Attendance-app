@@ -38,7 +38,25 @@ it('lets a manager add flyers that show above the questions on the public form',
 
     $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))
         ->assertOk()
-        ->assertSeeInOrder([Storage::url($flyers[0]), Storage::url($flyers[1]), 'Submit'], false);
+        ->assertSeeInOrder([Storage::url($flyers[0]), Storage::url($flyers[1]), 'Submit'], false)
+        ->assertSee('lg:grid-cols-2', false)
+        ->assertSee('aria-roledescription="carousel"', false)
+        ->assertSee('aria-label="Next flyer"', false);
+});
+
+it('keeps the single-column form when there are no flyers', function () {
+    $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))
+        ->assertOk()
+        ->assertDontSee('aria-roledescription="carousel"', false)
+        ->assertSee('max-w-2xl', false);
+});
+
+it('does not show slide controls for a single flyer', function () {
+    $this->actingAs($this->manager)->patch(route('events.forms.update', [$this->event, $this->form]), flyerSettings(['flyers' => [UploadedFile::fake()->image('a.jpg')]]));
+
+    $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))
+        ->assertSee('aria-roledescription="carousel"', false)
+        ->assertDontSee('aria-label="Next flyer"', false);
 });
 
 it('removes a chosen flyer and keeps the rest in order', function () {

@@ -1,7 +1,67 @@
 <x-public-layout :title="$form->title" :noindex="true">
-    <section class="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-32">
-        <div class="mx-auto max-w-2xl">
+    @php($flyers = $form->flyers())
+    <section class="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-28 sm:pt-32">
+        {{-- With flyers the page splits in two: flyers on one side, the form on the other (stacked on phones). --}}
+        <div class="mx-auto {{ $flyers ? 'grid max-w-7xl grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12' : 'max-w-2xl' }}">
 
+            @if($flyers)
+                <div class="lg:sticky lg:top-28">
+                    <div x-data="{
+                            current: 0,
+                            count: {{ count($flyers) }},
+                            paused: false,
+                            start() {
+                                if (this.count < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                                setInterval(() => { if (! this.paused && ! document.hidden) this.next() }, 5000);
+                            },
+                            next() { this.current = (this.current + 1) % this.count },
+                            prev() { this.current = (this.current + this.count - 1) % this.count },
+                         }"
+                         x-init="start()"
+                         @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false"
+                         class="group relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-2xl shadow-slate-300/60 transition duration-500 hover:-translate-y-1 hover:shadow-blue-300/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:aspect-auto lg:h-[calc(100vh-9rem)]"
+                         role="region" aria-roledescription="carousel" aria-label="{{ $form->title }} flyers">
+                        @foreach($flyers as $index => $flyer)
+                            <a href="{{ Storage::url($flyer) }}" target="_blank" rel="noopener"
+                               x-show="current === {{ $index }}" @if($index > 0) x-cloak @endif
+                               x-transition:enter="transition duration-700 ease-out motion-reduce:transition-none"
+                               x-transition:enter-start="opacity-0 translate-x-16"
+                               x-transition:enter-end="opacity-100 translate-x-0"
+                               x-transition:leave="transition duration-500 ease-in motion-reduce:transition-none"
+                               x-transition:leave-start="opacity-100 translate-x-0"
+                               x-transition:leave-end="opacity-0 -translate-x-16"
+                               class="absolute inset-0 flex items-center justify-center p-3 sm:p-4"
+                               aria-label="Open flyer {{ $index + 1 }} of {{ count($flyers) }} full size">
+                                {{-- A blurred copy fills the frame behind flyers that aren't the frame's shape. --}}
+                                <img src="{{ Storage::url($flyer) }}" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl">
+                                <img src="{{ Storage::url($flyer) }}" alt="{{ $form->title }} flyer{{ count($flyers) > 1 ? ' '.($index + 1) : '' }}"
+                                     class="relative max-h-full max-w-full rounded-2xl object-contain shadow-xl transition duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+                            </a>
+                        @endforeach
+
+                        @if(count($flyers) > 1)
+                            <button type="button" @click="prev()" aria-label="Previous flyer"
+                                    class="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-slate-900 shadow-lg backdrop-blur transition hover:bg-white focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <button type="button" @click="next()" aria-label="Next flyer"
+                                    class="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-slate-900 shadow-lg backdrop-blur transition hover:bg-white focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                            <div class="absolute inset-x-0 bottom-4 flex justify-center gap-2">
+                                @foreach($flyers as $index => $flyer)
+                                    <button type="button" @click="current = {{ $index }}" aria-label="Show flyer {{ $index + 1 }}"
+                                            class="h-2.5 rounded-full bg-white shadow transition-all duration-300"
+                                            :class="current === {{ $index }} ? 'w-8 opacity-100' : 'w-2.5 opacity-60 hover:opacity-90'"></button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                    <p class="mt-3 text-center text-xs font-semibold text-slate-400">Tap a flyer to view it full size.</p>
+                </div>
+            @endif
+
+            <div class="min-w-0">
             <div class="mb-8 flex flex-col items-center gap-5 text-center sm:flex-row sm:text-left">
                 <div>
                     <p class="text-xs font-black uppercase tracking-widest text-blue-600">{{ $event->title }}</p>
@@ -9,17 +69,6 @@
                     @if($form->description)<p class="mt-2 text-sm font-semibold text-slate-500">{{ $form->description }}</p>@endif
                 </div>
             </div>
-
-            @if($form->flyers())
-                <div class="mb-8 space-y-4">
-                    @foreach($form->flyers() as $index => $flyer)
-                        <a href="{{ Storage::url($flyer) }}" target="_blank" rel="noopener" class="block overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-200/70">
-                            <img src="{{ Storage::url($flyer) }}" alt="{{ $form->title }} flyer{{ count($form->flyers()) > 1 ? ' '.($index + 1) : '' }}" class="block h-auto w-full">
-                        </a>
-                    @endforeach
-                    <p class="text-center text-xs font-semibold text-slate-400">Tap a flyer to view it full size.</p>
-                </div>
-            @endif
 
             @if(!$isOpen)
                 <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center font-bold text-amber-900 shadow-sm">This form is not currently accepting responses.</div>
@@ -71,6 +120,7 @@
                     </button>
                 </form>
             @endif
+            </div>
         </div>
     </section>
 </x-public-layout>
