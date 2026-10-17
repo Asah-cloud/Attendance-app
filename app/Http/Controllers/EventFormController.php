@@ -10,6 +10,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -69,9 +70,30 @@ class EventFormController extends Controller
             'is_open' => ['required', 'boolean'],
             'opens_at' => ['nullable', 'date'],
             'closes_at' => ['nullable', 'date', 'after:opens_at'],
+            'flyers' => ['nullable', 'array'],
+            'flyers.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'remove_flyers' => ['nullable', 'array'],
+            'remove_flyers.*' => ['string'],
+        ], [
+            // A file over the server's own upload limit never reaches the image check.
+            'flyers.*.uploaded' => 'Each flyer must be an image of 5 MB or less.',
+            'flyers.*.max' => 'Each flyer must be an image of 5 MB or less.',
         ]);
 
-        $form->update($validated);
+        $remove = array_intersect($form->flyers(), $validated['remove_flyers'] ?? []);
+        $kept = array_values(array_diff($form->flyers(), $remove));
+        $uploads = $request->file('flyers', []);
+        if (count($kept) + count($uploads) > Form::MAX_FLYERS) {
+            return back()->withInput()->withErrors(['flyers' => 'A form can show up to '.Form::MAX_FLYERS.' flyers. Remove one before adding another.']);
+        }
+
+        foreach ($uploads as $upload) {
+            $kept[] = $upload->store('form-flyers', 'public');
+        }
+        Storage::disk('public')->delete($remove);
+
+        unset($validated['flyers'], $validated['remove_flyers']);
+        $form->update($validated + ['flyer_paths' => $kept ?: null]);
 
         return back()->with('success', 'Form settings updated.');
     }

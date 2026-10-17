@@ -10,6 +10,17 @@
                 </div>
             </div>
 
+            @if($form->flyers())
+                <div class="mb-8 space-y-4">
+                    @foreach($form->flyers() as $index => $flyer)
+                        <a href="{{ Storage::url($flyer) }}" target="_blank" rel="noopener" class="block overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-200/70">
+                            <img src="{{ Storage::url($flyer) }}" alt="{{ $form->title }} flyer{{ count($form->flyers()) > 1 ? ' '.($index + 1) : '' }}" class="block h-auto w-full">
+                        </a>
+                    @endforeach
+                    <p class="text-center text-xs font-semibold text-slate-400">Tap a flyer to view it full size.</p>
+                </div>
+            @endif
+
             @if(!$isOpen)
                 <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center font-bold text-amber-900 shadow-sm">This form is not currently accepting responses.</div>
             @else

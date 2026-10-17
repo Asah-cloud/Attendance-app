@@ -30,9 +30,28 @@
 
         <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <h3 class="text-lg font-black">Form settings</h3>
-            <form method="POST" action="{{ route('events.forms.update', [$event, $form]) }}" class="mt-6 grid gap-5 md:grid-cols-2">@csrf @method('PATCH')
+            <form method="POST" action="{{ route('events.forms.update', [$event, $form]) }}" enctype="multipart/form-data" class="mt-6 grid gap-5 md:grid-cols-2">@csrf @method('PATCH')
                 <div class="md:col-span-2"><label class="text-xs font-black uppercase text-gray-500">Title</label><input name="title" value="{{ old('title', $form->title) }}" required class="mt-2 w-full rounded-xl border-gray-200"><x-input-error :messages="$errors->get('title')" class="mt-1.5" /></div>
                 <div class="md:col-span-2"><label class="text-xs font-black uppercase text-gray-500">Description</label><textarea name="description" rows="3" class="mt-2 w-full rounded-xl border-gray-200">{{ old('description', $form->description) }}</textarea><x-input-error :messages="$errors->get('description')" class="mt-1.5" /></div>
+                <div class="md:col-span-2">
+                    <label class="text-xs font-black uppercase text-gray-500">Flyers</label>
+                    <p class="mt-1 text-xs text-gray-500">Shown at the top of the form, above the questions. Up to {{ App\Models\Form::MAX_FLYERS }} images (JPG, PNG or WebP, 5 MB each).</p>
+                    @if($form->flyers())
+                        <div class="mt-3 flex flex-wrap gap-3">
+                            @foreach($form->flyers() as $index => $flyer)
+                                <div class="w-32">
+                                    <a href="{{ Storage::url($flyer) }}" target="_blank"><img src="{{ Storage::url($flyer) }}" alt="Flyer {{ $index + 1 }}" class="h-32 w-32 rounded-xl border border-gray-200 object-cover"></a>
+                                    <label class="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-red-600"><input type="checkbox" name="remove_flyers[]" value="{{ $flyer }}" class="rounded border-gray-300 text-red-600"> Remove</label>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                    @if(count($form->flyers()) < App\Models\Form::MAX_FLYERS)
+                        <input type="file" name="flyers[]" multiple accept=".jpg,.jpeg,.png,.webp"
+                               class="mt-3 block w-full rounded-xl border border-gray-200 p-2 text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-black file:text-blue-700">
+                    @endif
+                    <x-input-error :messages="collect($errors->get('flyers'))->merge(collect($errors->get('flyers.*'))->flatten())->unique()->all()" class="mt-1.5" />
+                </div>
                 <label class="flex items-center gap-3 rounded-2xl bg-gray-50 p-4 md:col-span-2"><input type="hidden" name="is_open" value="0"><input type="checkbox" name="is_open" value="1" @checked(old('is_open', $form->is_open))><span class="font-bold">Accepting responses</span></label>
                 <div><label class="text-xs font-black uppercase text-gray-500">Opens at</label><input type="datetime-local" name="opens_at" value="{{ old('opens_at', $form->opens_at?->format('Y-m-d\TH:i')) }}" class="mt-2 w-full rounded-xl border-gray-200"></div>
                 <div><label class="text-xs font-black uppercase text-gray-500">Closes at</label><input type="datetime-local" name="closes_at" value="{{ old('closes_at', $form->closes_at?->format('Y-m-d\TH:i')) }}" class="mt-2 w-full rounded-xl border-gray-200"><x-input-error :messages="$errors->get('closes_at')" class="mt-1.5" /></div>

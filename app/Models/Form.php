@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Form extends Model
@@ -24,6 +25,19 @@ class Form extends Model
             }
             $form->slug = $slug;
         });
+
+        static::deleted(function (Form $form): void {
+            Storage::disk('public')->delete($form->flyers());
+        });
+    }
+
+    /** Most flyers a form can show. */
+    public const MAX_FLYERS = 5;
+
+    /** @return list<string> Stored paths (public disk) of the form's flyers, in display order. */
+    public function flyers(): array
+    {
+        return array_values($this->flyer_paths ?? []);
     }
 
     protected $fillable = [
@@ -31,6 +45,7 @@ class Form extends Model
         'title',
         'slug',
         'description',
+        'flyer_paths',
         'is_open',
         'opens_at',
         'closes_at',
@@ -40,6 +55,7 @@ class Form extends Model
     {
         return [
             'is_open' => 'boolean',
+            'flyer_paths' => 'array',
             'opens_at' => 'datetime',
             'closes_at' => 'datetime',
         ];
