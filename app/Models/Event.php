@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -22,18 +23,67 @@ class Event extends Model
     protected static function booted(): void
     {
         static::creating(function (Event $event): void {
-            if ($event->slug) {
+            $event->slug ??= static::uniqueSlug($event->title);
+        });
+
+        // The public link name follows the title, so a renamed event's links don't keep
+        // its old name. The old link name is kept as a redirect (see findBySlug()).
+        static::updating(function (Event $event): void {
+            if ($event->isDirty('title') && ! $event->isDirty('slug')) {
+                $event->slug = static::uniqueSlug($event->title, $event->id);
+            }
+        });
+
+        static::updated(function (Event $event): void {
+            $old = $event->getOriginal('slug');
+            if (! $event->wasChanged('slug') || blank($old)) {
                 return;
             }
 
-            $base = Str::slug($event->title) ?: 'event';
-            $slug = $base;
-            $suffix = 2;
-            while (static::query()->where('slug', $slug)->exists()) {
-                $slug = $base.'-'.$suffix++;
-            }
-            $event->slug = $slug;
+            EventSlugRedirect::updateOrCreate(['slug' => $old], ['event_id' => $event->id]);
+            EventSlugRedirect::where('slug', $event->slug)->delete();
         });
+    }
+
+    /** A link name made from the title that no other event uses now or used before a rename. */
+    public static function uniqueSlug(?string $title, ?int $ignoreId = null): string
+    {
+        $base = Str::slug((string) $title) ?: 'event';
+        $slug = $base;
+        $suffix = 2;
+        while (static::query()->where('slug', $slug)->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))->exists()
+            || EventSlugRedirect::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('event_id', '!=', $ignoreId))->exists()) {
+            $slug = $base.'-'.$suffix++;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * The event with this link name. An old link name from before a rename finds the event
+     * too: a page visit is redirected to the same page under the current name, and anything
+     * else (such as a form submitted from a page opened before the rename) just proceeds.
+     */
+    public static function findBySlug(string $slug): ?self
+    {
+        if ($event = static::where('slug', $slug)->first()) {
+            return $event;
+        }
+
+        $event = EventSlugRedirect::where('slug', $slug)->first()?->event;
+        if ($event && request()->isMethod('GET')) {
+            $segments = array_map(fn (string $segment) => $segment === $slug ? $event->slug : $segment, request()->segments());
+            $query = request()->getQueryString();
+
+            throw new HttpResponseException(redirect()->to(url(implode('/', $segments)).($query ? '?'.$query : ''), 301));
+        }
+
+        return $event;
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        return $field === 'slug' ? static::findBySlug((string) $value) : parent::resolveRouteBinding($value, $field);
     }
 
     protected $fillable = [
