@@ -131,3 +131,19 @@ it('falls back to the site preview image when a form has no flyers', function ()
         ->assertSee('og-asah-apex-attendance', false)
         ->assertSee('<meta property="og:description" content="Apostolic World Conference 2026">', false);
 });
+
+it('shows form pages under the organiser\'s name with only a powered-by line from Asah Apex', function () {
+    $this->event->company->update(['logo_path' => 'company-logos/church.png']);
+
+    foreach ([route('forms.show', [$this->event->slug, $this->form->slug]), route('forms.thank-you', [$this->event->slug, $this->form->slug])] as $page) {
+        $this->get($page)
+            ->assertOk()
+            ->assertSee('Flyer Co')
+            ->assertSee(Storage::url('company-logos/church.png'), false)
+            ->assertSee('Powered by')
+            ->assertDontSee('Get started')
+            ->assertDontSee('Better events begin with a clearer headcount.');
+    }
+
+    $this->get(route('home'))->assertOk()->assertSee('Get started')->assertDontSee('Powered by');
+});

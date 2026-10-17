@@ -43,6 +43,20 @@
 </head>
 <body class="bg-[#f7f8fb] text-slate-950 antialiased" style="font-family: Manrope, sans-serif">
     <x-toast />
+    @if($brandedFor)
+        @php
+            $brandLogo = $brandedFor->logo_path ?: $brandedFor->company?->logo_path;
+            $brandName = $brandedFor->company?->name ?: $brandedFor->title;
+        @endphp
+        <header class="border-b border-slate-200/70 bg-white/80 backdrop-blur">
+            <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-5 lg:px-8">
+                @if($brandLogo)
+                    <img src="{{ Storage::url($brandLogo) }}" alt="{{ $brandName }}" class="h-10 w-10 shrink-0 rounded-xl object-contain">
+                @endif
+                <span class="truncate text-sm font-extrabold text-slate-900">{{ $brandName }}</span>
+            </div>
+        </header>
+    @else
     <header x-data="{ mobileMenuOpen: false }" @keydown.escape.window="mobileMenuOpen = false" class="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#071426]/90 text-white backdrop-blur-xl">
         <nav class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8" aria-label="Main navigation">
             <a href="{{ route('home') }}" class="flex items-center gap-3" aria-label="Asah Apex Attendance home">
@@ -101,9 +115,15 @@
             </div>
         </div>
     </header>
+    @endif
 
     <main>{{ $slot }}</main>
 
+    @if($brandedFor)
+        <footer class="border-t border-slate-200/70 bg-white px-5 py-6 text-center text-xs font-semibold text-slate-400">
+            Powered by <a href="{{ route('home') }}" class="font-extrabold text-slate-600 transition hover:text-blue-600">Asah Apex Attendance</a>
+        </footer>
+    @else
     <footer class="bg-[#071426] text-slate-300">
         <div class="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:grid-cols-[1.5fr_1fr_1fr] lg:px-8">
             <div>
@@ -126,5 +146,6 @@
         </div>
         <div class="border-t border-white/10 px-5 py-6 text-center text-xs text-slate-500">&copy; {{ now()->year }} Asah Apex. All rights reserved.</div>
     </footer>
+    @endif
 </body>
 </html>

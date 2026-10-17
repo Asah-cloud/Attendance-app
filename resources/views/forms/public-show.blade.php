@@ -1,14 +1,14 @@
 {{-- Shared links preview with the form's first flyer and its own description, not the site's default card. --}}
-<x-public-layout :title="$form->title" :noindex="true"
+<x-public-layout :title="$form->title" :noindex="true" :branded-for="$event"
                  :description="$form->description ?: $event->title"
                  :image="$form->flyers() ? url(Storage::url($form->flyers()[0])) : null">
     @php($flyers = $form->flyers())
-    <section class="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-28 sm:pt-32">
+    <section class="min-h-[calc(100vh-8.5rem)] bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-8 sm:pt-12">
         {{-- With flyers the page splits in two: flyers on one side, the form on the other (stacked on phones). --}}
         <div class="mx-auto {{ $flyers ? 'grid max-w-7xl grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12' : 'max-w-2xl' }}">
 
             @if($flyers)
-                <div class="lg:sticky lg:top-28">
+                <div class="lg:sticky lg:top-8">
                     <div x-data="{
                             current: 0,
                             count: {{ count($flyers) }},
@@ -22,7 +22,7 @@
                          }"
                          x-init="start()"
                          @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false"
-                         class="group relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-2xl shadow-slate-300/60 transition duration-500 hover:-translate-y-1 hover:shadow-blue-300/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:aspect-auto lg:h-[calc(100vh-9rem)]"
+                         class="group relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-2xl shadow-slate-300/60 transition duration-500 hover:-translate-y-1 hover:shadow-blue-300/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0 lg:aspect-auto lg:h-[calc(100vh-8.5rem)]"
                          role="region" aria-roledescription="carousel" aria-label="{{ $form->title }} flyers">
                         @foreach($flyers as $index => $flyer)
                             <a href="{{ Storage::url($flyer) }}" target="_blank" rel="noopener"
