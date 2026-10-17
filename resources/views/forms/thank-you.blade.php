@@ -1,5 +1,6 @@
 <x-public-layout :title="$form->title.' - Thank you'" :noindex="true" :branded-for="$event">
-    <section class="min-h-[calc(100vh-8.5rem)] bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-12 sm:pt-16">
+    <section class="relative isolate min-h-[calc(100vh-8.5rem)] px-5 pb-20 pt-12 sm:pt-16">
+        @include('forms.partials.backdrop')
         <div class="mx-auto max-w-lg text-center">
             <div class="rounded-3xl border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/70">
                 <p class="text-xs font-black uppercase tracking-widest text-blue-600">{{ $event->title }}</p>

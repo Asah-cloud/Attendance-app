@@ -3,7 +3,8 @@
                  :description="$form->description ?: $event->title"
                  :image="$form->flyers() ? url(Storage::url($form->flyers()[0])) : null">
     @php($flyers = $form->flyers())
-    <section class="min-h-[calc(100vh-8.5rem)] bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-8 sm:pt-12">
+    <section class="relative isolate min-h-[calc(100vh-8.5rem)] px-5 pb-20 pt-8 sm:pt-12">
+        @include('forms.partials.backdrop')
         {{-- With flyers the page splits in two: flyers on one side, the form on the other (stacked on phones). --}}
         <div class="mx-auto {{ $flyers ? 'grid max-w-7xl grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12' : 'max-w-2xl' }}">
 
@@ -33,7 +34,7 @@
                                x-transition:leave="transition duration-500 ease-in motion-reduce:transition-none"
                                x-transition:leave-start="opacity-100 translate-x-0"
                                x-transition:leave-end="opacity-0 -translate-x-16"
-                               class="absolute inset-0 flex items-center justify-center p-3 sm:p-4"
+                               class="absolute inset-0 flex items-center justify-center p-3 sm:p-4 {{ count($flyers) > 1 ? 'pb-11 sm:pb-12' : '' }}"
                                aria-label="Open flyer {{ $index + 1 }} of {{ count($flyers) }} full size">
                                 {{-- A blurred copy fills the frame behind flyers that aren't the frame's shape. --}}
                                 <img src="{{ Storage::url($flyer) }}" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl">

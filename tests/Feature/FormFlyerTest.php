@@ -147,3 +147,17 @@ it('shows form pages under the organiser\'s name with only a powered-by line fro
 
     $this->get(route('home'))->assertOk()->assertSee('Get started')->assertDontSee('Powered by');
 });
+
+it('colours the form page background from its first flyer, with soft colour glows when it has none', function () {
+    $page = route('forms.show', [$this->event->slug, $this->form->slug]);
+    $this->get($page)->assertSee('bg-violet-400/20', false);
+
+    $this->actingAs($this->manager)->patch(route('events.forms.update', [$this->event, $this->form]), flyerSettings(['flyers' => [UploadedFile::fake()->image('a.jpg')]]));
+    $flyer = Storage::url($this->form->fresh()->flyers()[0]);
+
+    foreach ([$page, route('forms.thank-you', [$this->event->slug, $this->form->slug])] as $url) {
+        $this->get($url)
+            ->assertSee('<img src="'.$flyer.'" alt="" class="absolute inset-0 h-full w-full scale-125 object-cover opacity-90 blur-3xl saturate-150">', false)
+            ->assertDontSee('bg-violet-400/20', false);
+    }
+});
