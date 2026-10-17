@@ -1,4 +1,7 @@
-<x-public-layout :title="$form->title" :noindex="true">
+{{-- Shared links preview with the form's first flyer and its own description, not the site's default card. --}}
+<x-public-layout :title="$form->title" :noindex="true"
+                 :description="$form->description ?: $event->title"
+                 :image="$form->flyers() ? url(Storage::url($form->flyers()[0])) : null">
     @php($flyers = $form->flyers())
     <section class="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-blue-50/50 px-5 pb-20 pt-28 sm:pt-32">
         {{-- With flyers the page splits in two: flyers on one side, the form on the other (stacked on phones). --}}

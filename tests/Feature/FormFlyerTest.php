@@ -111,3 +111,23 @@ it('shows the flyer upload on the form settings page', function () {
         ->assertSee('enctype="multipart/form-data"', false)
         ->assertSee('name="flyers[]"', false);
 });
+
+it('uses the first flyer and the form\'s own details for the shared-link preview', function () {
+    $this->actingAs($this->manager)->patch(route('events.forms.update', [$this->event, $this->form]), flyerSettings([
+        'description' => 'Choose your tour',
+        'flyers' => [UploadedFile::fake()->image('first.jpg'), UploadedFile::fake()->image('second.jpg')],
+    ]));
+    $first = url(Storage::url($this->form->fresh()->flyers()[0]));
+
+    $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))
+        ->assertSee('<meta property="og:image" content="'.$first.'">', false)
+        ->assertSee('<meta name="twitter:image" content="'.$first.'">', false)
+        ->assertSee('<meta property="og:description" content="Choose your tour">', false)
+        ->assertDontSee('og-asah-apex-attendance', false);
+});
+
+it('falls back to the site preview image when a form has no flyers', function () {
+    $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))
+        ->assertSee('og-asah-apex-attendance', false)
+        ->assertSee('<meta property="og:description" content="Apostolic World Conference 2026">', false);
+});
