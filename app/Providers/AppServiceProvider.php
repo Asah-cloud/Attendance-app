@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Listeners\LogResendEmailEvents;
+use App\Listeners\RecordLoginActivity;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
@@ -37,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         Paginator::useTailwind();
 
         EventFacade::subscribe(LogResendEmailEvents::class);
+        EventFacade::subscribe(RecordLoginActivity::class);
 
         $invalidateEvent = function (Attendance|EventRegistration $record): void {
             $event = Event::query()->find($record->event_id);

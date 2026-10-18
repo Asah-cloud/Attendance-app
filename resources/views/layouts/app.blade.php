@@ -50,6 +50,9 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
+                        @role('admin')
+                            <x-sign-in-bell />
+                        @endrole
                         @if($tourKey && $tourUser?->hasRole('manager'))
                             <button type="button" data-tour-restart class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-sm font-extrabold text-slate-500 transition hover:border-blue-300 hover:text-blue-700" title="Replay this page's tour" aria-label="Replay this page's tour">?</button>
                         @endif

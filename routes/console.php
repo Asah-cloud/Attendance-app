@@ -3,6 +3,7 @@
 use App\Models\BadgeExport;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\LoginActivity;
 use App\Services\ConfirmationReminderSender;
 use App\Services\CustomMessageSender;
 use App\Services\EmailDomainLifecycleManager;
@@ -78,3 +79,7 @@ Schedule::call(function (): void {
         $export->delete();
     });
 })->daily()->name('prune-badge-exports')->withoutOverlapping();
+
+// Sign-in records are kept for LoginActivity::KEEP_DAYS days.
+Schedule::command('model:prune', ['--model' => [LoginActivity::class]])
+    ->dailyAt('03:00')->name('prune-login-activities')->withoutOverlapping();

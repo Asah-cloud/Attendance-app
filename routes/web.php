@@ -29,6 +29,7 @@ use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SharedFormController;
+use App\Http\Controllers\SignInActivityController;
 use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
@@ -364,6 +365,11 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
 
     // --- SUPER ADMIN ONLY ROUTES ---
     Route::middleware(['role:admin'])->group(function () {
+        // Who signed in: the admin sign-in bell (polled for pop-ups) and the full list.
+        Route::get('/admin/sign-ins', [SignInActivityController::class, 'index'])->name('admin.sign-ins.index');
+        Route::get('/admin/sign-ins/feed', [SignInActivityController::class, 'feed'])->middleware('throttle:30,1')->name('admin.sign-ins.feed');
+        Route::post('/admin/sign-ins/seen', [SignInActivityController::class, 'markSeen'])->name('admin.sign-ins.seen');
+
         // Full CRUD Company Tenant Management Resources
         Route::resource('companies', CompanyController::class)->except('show');
         Route::delete('/companies/{company}/participants', [CompanyController::class, 'clearParticipants'])->name('companies.participants.clear');
