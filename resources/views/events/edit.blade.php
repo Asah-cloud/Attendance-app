@@ -85,6 +85,11 @@
                             <span><span class="block text-sm font-black text-indigo-950">Use rooms &amp; accommodation</span><span class="mt-1 block text-xs leading-5 text-indigo-800/70">Let attendees request a room. Set up sites, blocks, and rooms from the Accommodation tab.</span></span>
                         </label>
 
+                        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-6">
+                            <input type="checkbox" name="self_check_in_enabled" value="1" {{ old('self_check_in_enabled', $event->self_check_in_enabled) ? 'checked' : '' }} class="mt-1 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500">
+                            <span><span class="block text-sm font-black text-emerald-950">Let attendees check themselves in</span><span class="mt-1 block text-xs leading-5 text-emerald-800/70">Anyone with the shared check-in link can enter their registered phone number to check in, without an usher. Leave off if only ushers should check people in.</span></span>
+                        </label>
+
                     </div>
 
                     {{-- Description --}}

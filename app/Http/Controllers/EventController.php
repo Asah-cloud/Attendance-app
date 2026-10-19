@@ -260,6 +260,7 @@ class EventController extends Controller
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'accommodation_enabled' => ['nullable', 'boolean'],
+            'self_check_in_enabled' => ['nullable', 'boolean'],
             'food_registration_required' => ['nullable', 'boolean'],
             'automatic_attendee_email' => ['nullable', 'boolean'],
             'automatic_attendee_sms' => ['nullable', 'boolean'],
@@ -290,6 +291,7 @@ class EventController extends Controller
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
         $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
+        $validated['self_check_in_enabled'] = $request->boolean('self_check_in_enabled');
         $validated['food_registration_required'] = false;
         $validated['day'] = 1;
 
@@ -341,6 +343,7 @@ class EventController extends Controller
             'flyer' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_flyer' => ['nullable', 'boolean'],
             'accommodation_enabled' => ['nullable', 'boolean'],
+            'self_check_in_enabled' => ['nullable', 'boolean'],
             'food_registration_required' => ['nullable', 'boolean'],
             'send_update_email' => ['nullable', 'boolean'],
             'send_update_sms' => ['nullable', 'boolean'],
@@ -353,6 +356,7 @@ class EventController extends Controller
         $validated['has_arrival_session'] = $request->boolean('has_arrival_session');
         $validated['arrival_date'] = $validated['has_arrival_session'] ? $validated['arrival_date'] : null;
         $validated['accommodation_enabled'] = $request->boolean('accommodation_enabled');
+        $validated['self_check_in_enabled'] = $request->boolean('self_check_in_enabled');
         $validated['food_registration_required'] = false;
         if (! $validated['has_arrival_session'] && (int) $event->day === 0) {
             $validated['day'] = 1;

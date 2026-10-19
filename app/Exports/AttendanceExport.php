@@ -44,7 +44,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         // 3. Match your headings to your map data
-        return ['Name', 'Phone', 'Area', 'Category', 'Gender', 'Email', 'Date/Time Marked', 'Attendance Session'];
+        return ['Name', 'Phone', 'Area', 'Category', 'Gender', 'Email', 'Date/Time Marked', 'Attendance Session', 'Check-in Method'];
     }
 
     public function map($user): array
@@ -63,6 +63,11 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
             $user->isNumberedParticipantStaff()
                 ? 'Staff check-in (all event days)'
                 : $this->event->attendanceSessionLabel($attendance ? $attendance->day : $this->day, $attendance->session ?? 1),
+            match (true) {
+                ! $attendance => '',
+                $attendance->method === 'self' => 'Self check-in',
+                default => 'By staff',
+            },
         ];
     }
 }
