@@ -77,6 +77,13 @@ Route::get('/events/{event:slug}/public-check-in', [AttendanceController::class,
 Route::post('/events/{event:slug}/public-check-in', [AttendanceController::class, 'checkInByPhone'])
     ->middleware(['auth', 'verified', 'company.active', 'throttle:20,1'])
     ->name('attendance.check');
+// Attendees checking themselves in with their phone number, only for events that switch it on.
+Route::post('/events/{event:slug}/public-check-in/self', [AttendanceController::class, 'selfCheckIn'])
+    ->middleware('throttle:10,1')
+    ->name('attendance.self-check');
+Route::post('/events/{event:slug}/arrival/check-in/self', [AttendanceController::class, 'selfArrivalCheckIn'])
+    ->middleware('throttle:10,1')
+    ->name('arrival.self-check');
 Route::get('/events/{event:slug}/arrival/check-in', [AttendanceController::class, 'publicArrivalCheckIn'])
     ->middleware(['signed', 'throttle:60,1'])
     ->name('arrival.public');

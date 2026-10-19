@@ -192,9 +192,30 @@ class AttendanceController extends Controller
         return $this->checkInByPhoneForSession($request, $event, 0);
     }
 
-    private function checkInByPhoneForSession(Request $request, Event $event, int $day)
+    /** An attendee checking themselves in on the shared link, for events that allow it. */
+    public function selfCheckIn(Request $request, Event $event)
     {
-        $this->authorize('scanAttendance', $event);
+        return $this->checkInByPhoneForSession($request, $event, $event->activeAttendanceSession(), self: true);
+    }
+
+    public function selfArrivalCheckIn(Request $request, Event $event)
+    {
+        abort_unless($event->has_arrival_session, 404);
+
+        return $this->checkInByPhoneForSession($request, $event, 0, self: true);
+    }
+
+    private function checkInByPhoneForSession(Request $request, Event $event, int $day, bool $self = false)
+    {
+        if ($self) {
+            abort_unless($event->self_check_in_enabled, 404);
+            // Nothing about attendees is looked up while attendance is closed.
+            if (! $event->canMarkAttendanceForDay($day)) {
+                return back()->with('error', $this->attendanceClosedMessage($event, $day));
+            }
+        } else {
+            $this->authorize('scanAttendance', $event);
+        }
 
         $validated = $request->validate(['phone' => ['required', 'string', 'max:30']]);
         $phone = $this->registrations->normalizePhone($validated['phone']);
@@ -225,7 +246,8 @@ class AttendanceController extends Controller
         }
 
         $marker = $request->user();
-        $currentSession = $this->getEventSession($request, $event);
+        // An attendee can't pick the session; it's whichever one is running now.
+        $currentSession = $self ? $event->activeSessionNumber() : $this->getEventSession($request, $event);
         $attendance = Attendance::query()->createOrFirst([
             'event_id' => $event->id,
             'participant_id' => $registration->participant_id,
@@ -233,7 +255,8 @@ class AttendanceController extends Controller
             'session' => $currentSession,
         ], [
             'status' => 'present',
-            'marked_by' => $marker?->can('scanAttendance', $event) ? $marker->id : null,
+            'marked_by' => ! $self && $marker?->can('scanAttendance', $event) ? $marker->id : null,
+            'method' => $self ? 'self' : null,
         ]);
 
         $this->cache->invalidateEvent($event->id, $event->company_id);
