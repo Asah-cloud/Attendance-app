@@ -8,18 +8,17 @@ use App\Models\Event;
 use App\Models\EventAttendeeCharge;
 use App\Notifications\Channels\ArkeselChannel;
 use App\Services\EventBillingService;
+use App\Services\ParticipantListImporter;
 use App\Services\PdfParticipantListParser;
 // Added these for the import to work
 use App\Services\RegistrationLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Maatwebsite\Excel\Facades\Excel;
 
 class EventController extends Controller
 {
@@ -162,38 +161,9 @@ class EventController extends Controller
         return back()->with('success', $message);
     }
 
-    /**
-     * Run the stored file through UsersImport. A trial runs inside a transaction that is always
-     * rolled back, so it reports what would happen - including rows that match people added by
-     * earlier rows of the same file - without saving anything.
-     */
     private function runImport(Event $event, PdfParticipantListParser $pdfParser, string $path, bool $needsRoom, array $decisions, bool $trial): UsersImport
     {
-        $import = new UsersImport($event, $needsRoom, $decisions, $trial);
-        $run = function () use ($import, $pdfParser, $path): void {
-            if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'pdf') {
-                foreach ($pdfParser->parse(Storage::disk('local')->path($path)) as $index => $row) {
-                    $import->importRow($row, $index + 2);
-                }
-            } else {
-                Excel::import($import, $path, 'local');
-            }
-        };
-
-        if (! $trial) {
-            DB::transaction($run);
-
-            return $import;
-        }
-
-        DB::beginTransaction();
-        try {
-            $run();
-        } finally {
-            DB::rollBack();
-        }
-
-        return $import;
+        return app(ParticipantListImporter::class)->run($event, $path, $needsRoom, $decisions, $trial);
     }
 
     private function importFailed(Event $event, \Throwable $exception, string $extension)
