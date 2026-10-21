@@ -27,6 +27,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RoomBoardController;
 use App\Http\Controllers\RoomPlanController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SharedFormController;
@@ -290,6 +291,9 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
             Route::patch('/events/{event}/accommodation/rooms/{room}', [AccommodationController::class, 'updateRoom'])->name('events.accommodation.rooms.update');
             Route::patch('/events/{event}/accommodation/registrations/{registration}', [AccommodationController::class, 'updateRequirement'])->name('events.accommodation.requirements.update');
             Route::post('/events/{event}/accommodation/allocate', [AccommodationController::class, 'allocate'])->name('events.accommodation.allocate');
+            // Drag-and-drop room board.
+            Route::get('/events/{event}/accommodation/board', [RoomBoardController::class, 'show'])->name('events.accommodation.board');
+            Route::post('/events/{event}/accommodation/board/move', [RoomBoardController::class, 'move'])->middleware('throttle:120,1')->name('events.accommodation.board.move');
             // Room-plan import: place a listed group of people a set number to a room.
             Route::post('/events/{event}/accommodation/plan', [RoomPlanController::class, 'upload'])->name('events.accommodation.plan.upload');
             Route::get('/events/{event}/accommodation/plan', [RoomPlanController::class, 'show'])->name('events.accommodation.plan.show');
