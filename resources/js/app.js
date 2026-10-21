@@ -7,4 +7,9 @@ import { Alpine, Livewire } from '../../vendor/livewire/livewire/dist/livewire.e
 window.Alpine = Alpine;
 window.loadHtml5Qrcode = () => import('html5-qrcode').then(({ Html5Qrcode }) => Html5Qrcode);
 
+// Only the room board page needs drag and drop, so it loads only there.
+if (document.querySelector('[data-room-board]')) {
+    import('./room-board');
+}
+
 Livewire.start();
