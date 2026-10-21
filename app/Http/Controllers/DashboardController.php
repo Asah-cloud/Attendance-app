@@ -43,13 +43,15 @@ class DashboardController extends Controller
     private function adminDashboard(): View
     {
         $today = now()->toDateString();
-        $data = $this->cache->rememberAdminDashboard('dashboard:'.$today, function () use ($today): array {
+        $data = $this->cache->rememberAdminDashboard('dashboard:v2:'.$today, function () use ($today): array {
             return [
                 'stats' => [
                     'companies' => Company::count(),
                     'activeCompanies' => Company::where('is_active', true)->count(),
                     'events' => Event::whereHas('company')->count(),
-                    'participants' => Participant::whereHas('company')->count(),
+                    // People on at least one event; the directory also keeps records of people on none.
+                    'participants' => Participant::whereHas('company')->whereHas('registrations')->count(),
+                    'participantRecords' => Participant::whereHas('company')->count(),
                     'checkInsToday' => Attendance::whereDate('created_at', $today)->whereHas('event.company')->count(),
                     'revenueMinor' => EventAttendeeCharge::whereIn('status', EventAttendeeCharge::PAID_STATUSES)->whereHas('company')->sum('amount_minor'),
                 ],
@@ -70,7 +72,7 @@ class DashboardController extends Controller
     {
         abort_unless($companyId, 403, 'Your account is not linked to a company.');
         $today = now()->toDateString();
-        $data = $this->cache->rememberCompany($companyId, 'dashboard:'.$today, function () use ($companyId, $today): array {
+        $data = $this->cache->rememberCompany($companyId, 'dashboard:v2:'.$today, function () use ($companyId, $today): array {
             $eventIds = Event::where('company_id', $companyId)->select('id');
 
             return [
@@ -79,7 +81,8 @@ class DashboardController extends Controller
                     'events' => Event::where('company_id', $companyId)->count(),
                     'upcomingEvents' => Event::where('company_id', $companyId)->whereNull('cancelled_at')
                         ->whereDate('event_date', '>=', $today)->count(),
-                    'participants' => Participant::where('company_id', $companyId)->count(),
+                    'participants' => Participant::where('company_id', $companyId)->whereHas('registrations')->count(),
+                    'participantRecords' => Participant::where('company_id', $companyId)->count(),
                     'registrations' => EventRegistration::whereIn('event_id', clone $eventIds)->count(),
                     'checkInsToday' => Attendance::whereIn('event_id', clone $eventIds)->whereDate('created_at', $today)->count(),
                     'pending' => EventRegistration::whereIn('event_id', clone $eventIds)

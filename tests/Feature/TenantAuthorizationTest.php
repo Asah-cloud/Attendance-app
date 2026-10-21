@@ -12,6 +12,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -462,4 +464,51 @@ it('preserves users when an event is deleted at the database level', function ()
 
     expect($participant->fresh())->not->toBeNull()
         ->and($participant->fresh()->registrations()->count())->toBe(0);
+});
+
+it('imports the values Excel shows for formula cells and reports rows it cannot read', function () {
+    Storage::fake('local');
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Formula Event', 'event_date' => now()]);
+
+    $book = new Spreadsheet;
+    $sheet = $book->getActiveSheet();
+    $sheet->fromArray(['ID', 'Name', 'Gender', 'Room Group', 'Category', 'Phone', 'Email'], null, 'A1');
+    $sheet->fromArray([1, null, '=IF(1=1,"Male","")', 'Accra', 'Member', '0201111111'], null, 'A2');
+    $sheet->setCellValue('B2', '=UPPER("kofi mensah")');
+    // Linked to another workbook, as in the 1 Oct list: only the result Excel saved can be used.
+    $sheet->fromArray([2, '=TRIM([1]Registration!B3)', 'Female', 'Accra', 'Member', '0202222222'], null, 'A3');
+    $sheet->fromArray([3, '=TRIM([1]Registration!B4)', 'Female', 'Accra', 'Member', '0203333333'], null, 'A4');
+    $writer = new Xlsx($book);
+    $writer->setPreCalculateFormulas(false);
+    $path = Storage::disk('local')->path('formulas.xlsx');
+    $writer->save($path);
+    // Excel stores each formula's last result next to it; give row 3 one and leave row 4 without.
+    $zip = new ZipArchive;
+    $zip->open($path);
+    $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+    $zip->addFromString('xl/worksheets/sheet1.xml', preg_replace('~<c r="B3"([^>]*)><f>(.*?)</f>(<v></v>)?</c>~', '<c r="B3" t="str"><f>$2</f><v>Ama Serwaa</v></c>', $xml));
+    $zip->close();
+
+    $import = new UsersImport($event);
+    Excel::import($import, 'formulas.xlsx', 'local');
+
+    expect(Participant::orderBy('id')->pluck('name')->all())->toBe(['KOFI MENSAH', 'Ama Serwaa'])
+        ->and(Participant::where('name', 'KOFI MENSAH')->value('gender'))->toBe('Male')
+        ->and(Participant::where('name', 'like', '=%')->exists())->toBeFalse()
+        ->and($import->counts())->toMatchArray(['added' => 2, 'skipped' => 1])
+        ->and(collect($import->rowResults())->firstWhere('status', 'skipped')['row'])->toBe(4);
+});
+
+it('never stores formula text from a CSV cell', function () {
+    $company = Company::create(['name' => 'One']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'CSV Event', 'event_date' => now()]);
+    $import = new UsersImport($event);
+
+    $import->importRow(['1', "=TRIM('[1]Copy of Updated Regisration_280'!B2)", 'Male', '', 'Member', '0201111111'], 2);
+    $import->importRow(['2', 'Real Person', "=IF('[1]Sheet'!E3=\"\",\"\",'[1]Sheet'!E3)", '', 'Member', '0202222222'], 3);
+
+    expect(Participant::pluck('name')->all())->toBe(['Real Person'])
+        ->and(Participant::first()->gender)->toBeNull()
+        ->and($import->counts()['skipped'])->toBe(1);
 });

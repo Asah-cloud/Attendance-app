@@ -74,12 +74,40 @@ class UsersImport implements OnEachRow
 
     public function onRow(Row $row): void
     {
-        $this->importRow($row->toArray(), $row->getIndex());
+        $values = $row->toArray();
+
+        // A formula cell is read as the value it shows in Excel, not its formula text. Formulas
+        // pointing at another workbook can't be recalculated here, but Excel saves the last
+        // result in the file and that is used.
+        $index = 0;
+        foreach ($row->getDelegate()->getCellIterator('A') as $cell) {
+            if ($cell->isFormula()) {
+                try {
+                    $values[$index] = $cell->getCalculatedValue();
+                } catch (\Throwable) {
+                    // No saved result either: keep the formula text so importRow() reports the row.
+                    $values[$index] = $cell->getOldCalculatedValue() ?? $cell->getValue();
+                }
+            }
+            $index++;
+        }
+
+        $this->importRow($values, $row->getIndex());
     }
 
     /** @param array<int, mixed> $data */
     public function importRow(array $data, int $rowIndex): void
     {
+        // Formula text that was never turned into a value (no saved result, or a CSV cell
+        // starting with "=") is never stored. A name like that means the row can't be read.
+        $isFormula = fn ($value) => is_string($value) && str_starts_with(ltrim($value), '=');
+        if ($isFormula($data[1] ?? null)) {
+            $this->counts['skipped']++;
+            $this->rowResults[] = ['row' => $rowIndex, 'name' => 'Unreadable formula in the Name column', 'status' => 'skipped', 'registration_id' => null];
+
+            return;
+        }
+        $data = array_map(fn ($value) => $isFormula($value) ? null : $value, $data);
 
         // Skip empty rows (checking index 1 for Name), and the header row specifically
         // (only on row 1, so a real attendee named e.g. "Staff" is never mistaken for one).
