@@ -17,7 +17,7 @@ class RoomAllocationService
     public function preview(Event $event, ?string $category = null, ?string $gender = null): array
     {
         $rooms = $this->eligibleRooms($event);
-        $occupancy = $rooms->mapWithKeys(fn ($room) => [$room->id => $room->active_assignments_count]);
+        $occupancy = $rooms->mapWithKeys(fn ($room) => [$room->id => (int) $room->active_assignments_count]);
         // Which room_group values already sit in each room — seeded from existing occupants,
         // then updated as this run proposes new placements, so a whole group clusters together
         // even across multiple people processed in the same pass.
@@ -137,6 +137,105 @@ class RoomAllocationService
     }
 
     /**
+     * Place a chosen list of registrations (a room-plan import) at most $perRoom to a room, even
+     * where rooms have more beds; the spare beds stay free for later. People are grouped by
+     * gender, accessibility need and room group, and each group of up to $perRoom goes into an
+     * empty room where one is free, else the compatible room with the most space. A room never
+     * mixes genders. $siteId / $blockId limit the rooms used. People who already have a room
+     * are left where they are.
+     *
+     * @param  Collection<int, EventRegistration>  $registrations
+     * @return array{proposals: Collection, unallocated: Collection, alreadyRoomed: Collection}
+     */
+    public function planBatch(Event $event, Collection $registrations, int $perRoom, ?int $siteId = null, ?int $blockId = null): array
+    {
+        $registrations->loadMissing(['participant', 'roomAssignment.room.floor.block.site']);
+        $alreadyRoomed = $registrations->filter(fn (EventRegistration $registration) => $registration->roomAssignment)->values();
+
+        $rooms = $this->eligibleRooms($event)
+            ->filter(fn (AccommodationRoom $room) => (! $siteId || $room->floor->block->accommodation_site_id === $siteId)
+                && (! $blockId || $room->floor->accommodation_block_id === $blockId))
+            ->values();
+        $occupancy = $rooms->mapWithKeys(fn ($room) => [$room->id => (int) $room->active_assignments_count])->all();
+        $roomGender = $rooms->mapWithKeys(fn ($room) => [$room->id => $this->normalizeGender($room->gender_restriction ?: $room->floor->block->gender_restriction)
+            ?: $room->activeAssignments->map(fn ($assignment) => $this->normalizeGender($assignment->registration?->participant?->gender))->filter()->first()])->all();
+
+        $queue = $registrations->reject(fn (EventRegistration $registration) => $registration->roomAssignment)
+            ->sortBy([
+                fn ($a, $b) => (int) $b->accessibility_required <=> (int) $a->accessibility_required,
+                fn ($a, $b) => (string) $this->normalizeGender($a->participant->gender) <=> (string) $this->normalizeGender($b->participant->gender),
+                fn ($a, $b) => (string) $this->normalizeText($a->participant->room_group) <=> (string) $this->normalizeText($b->participant->room_group),
+                fn ($a, $b) => strcasecmp((string) $a->participant->name, (string) $b->participant->name),
+            ])->values();
+
+        $proposals = collect();
+        $unallocated = collect();
+        $groups = $queue->groupBy(fn ($registration) => $this->normalizeGender($registration->participant->gender).'|'.(int) $registration->accessibility_required)
+            ->flatMap(fn (Collection $bucket) => $bucket->chunk($perRoom)->map->values());
+
+        foreach ($groups as $pending) {
+            while ($pending->isNotEmpty()) {
+                $first = $pending->first();
+                $gender = $this->normalizeGender($first->participant->gender);
+                $candidates = $rooms->filter(fn ($room) => $occupancy[$room->id] < $room->capacity
+                    && $this->matches($first, $room)
+                    && (! $roomGender[$room->id] || ! $gender || $roomGender[$room->id] === $gender));
+
+                $room = $candidates->first(fn ($room) => $occupancy[$room->id] === 0 && $room->capacity >= $pending->count())
+                    ?? $candidates->first(fn ($room) => $room->capacity - $occupancy[$room->id] >= $pending->count())
+                    ?? $candidates->sortByDesc(fn ($room) => $room->capacity - $occupancy[$room->id])->first();
+
+                if (! $room) {
+                    $where = $blockId || $siteId ? ' in the chosen location' : '';
+                    $pending->each(fn ($registration) => $unallocated->push(['registration' => $registration, 'reason' => "No free compatible room{$where}."]));
+
+                    break;
+                }
+
+                $placed = $pending->filter(fn ($registration) => $this->matches($registration, $room))->take($room->capacity - $occupancy[$room->id]);
+                foreach ($placed as $registration) {
+                    $proposals->push(['registration' => $registration, 'room' => $room, 'reason' => "Room plan: up to {$perRoom} per room, ".$this->reason($registration, $room)]);
+                }
+                $occupancy[$room->id] += $placed->count();
+                $roomGender[$room->id] ??= $gender;
+                $placedIds = $placed->pluck('id')->all();
+                $pending = $pending->reject(fn ($registration) => in_array($registration->id, $placedIds, true))->values();
+            }
+        }
+
+        return compact('proposals', 'unallocated', 'alreadyRoomed');
+    }
+
+    /**
+     * Save a planBatch() result, rechecking each room's free beds under a lock.
+     *
+     * @return array{assigned: int, unallocated: int}
+     */
+    public function commitPlan(Event $event, array $plan, ?int $userId): array
+    {
+        return DB::transaction(function () use ($event, $plan, $userId) {
+            Event::query()->lockForUpdate()->findOrFail($event->id);
+            $assigned = 0;
+
+            foreach ($plan['proposals'] as $proposal) {
+                $room = AccommodationRoom::query()->lockForUpdate()->findOrFail($proposal['room']->id);
+                if ($room->activeAssignments()->lockForUpdate()->get()->count() >= $room->capacity) {
+                    continue;
+                }
+
+                RoomAssignment::query()->updateOrCreate(
+                    ['event_registration_id' => $proposal['registration']->id],
+                    ['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'plan',
+                        'allocation_reason' => $proposal['reason'], 'assigned_by' => $userId, 'assigned_at' => now()]
+                );
+                $assigned++;
+            }
+
+            return ['assigned' => $assigned, 'unallocated' => $plan['unallocated']->count() + ($plan['proposals']->count() - $assigned)];
+        });
+    }
+
+    /**
      * Place a single confirmed registration into the best free, compatible room.
      * Cheap enough to run inline on confirmation — unlike commit(), it does not re-scan the whole event.
      */
@@ -154,7 +253,7 @@ class RoomAllocationService
             $candidate = $this->pickRoom(
                 $rooms,
                 $registration,
-                fn ($room) => $room->active_assignments_count,
+                fn ($room) => (int) $room->active_assignments_count,
                 fn ($room) => $this->existingGroups($room)
             );
 

@@ -32,6 +32,15 @@ class UsersImport implements OnEachRow
     private array $counts = ['added' => 0, 'updated' => 0, 'skipped' => 0];
 
     /**
+     * What happened to each row: new_person (created), newly_registered (already in the system,
+     * now added to this event), reconfirmed (was pending or cancelled here), already_registered,
+     * or skipped.
+     *
+     * @var list<array{row: int, name: string, status: string, registration_id: ?int}>
+     */
+    private array $rowResults = [];
+
+    /**
      * @param  array<int|string, string>|null  $decisions  The manager's choice per row number for rows
      *                                                     that would rename someone: 'update', 'new' or 'skip'.
      *                                                     A row needing a choice but given none is added as a
@@ -55,6 +64,12 @@ class UsersImport implements OnEachRow
     public function counts(): array
     {
         return $this->counts;
+    }
+
+    /** @return list<array{row: int, name: string, status: string, registration_id: ?int}> */
+    public function rowResults(): array
+    {
+        return $this->rowResults;
     }
 
     public function onRow(Row $row): void
@@ -126,6 +141,7 @@ class UsersImport implements OnEachRow
             $decision = $this->decisions === null ? 'update' : ($this->decisions[$rowIndex] ?? 'new');
             if ($decision === 'skip') {
                 $this->counts['skipped']++;
+                $this->rowResults[] = ['row' => $rowIndex, 'name' => $name, 'status' => 'skipped', 'registration_id' => null];
 
                 return;
             }
@@ -134,6 +150,12 @@ class UsersImport implements OnEachRow
 
         [$participant, $registration] = $service->register($this->event, $details, 'import');
         $this->counts[$participant->wasRecentlyCreated ? 'added' : 'updated']++;
+        $this->rowResults[] = ['row' => $rowIndex, 'name' => $participant->name, 'registration_id' => $registration->id, 'status' => match (true) {
+            $participant->wasRecentlyCreated => 'new_person',
+            $registration->wasRecentlyCreated => 'newly_registered',
+            $registration->wasChanged('status') => 'reconfirmed',
+            default => 'already_registered',
+        }];
 
         if ($registration->wasRecentlyCreated) {
             $this->newRegistrationIds[] = $registration->id;

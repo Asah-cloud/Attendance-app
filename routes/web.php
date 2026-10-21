@@ -27,6 +27,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RoomPlanController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SharedFormController;
 use App\Http\Controllers\SignInActivityController;
@@ -289,6 +290,12 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
             Route::patch('/events/{event}/accommodation/rooms/{room}', [AccommodationController::class, 'updateRoom'])->name('events.accommodation.rooms.update');
             Route::patch('/events/{event}/accommodation/registrations/{registration}', [AccommodationController::class, 'updateRequirement'])->name('events.accommodation.requirements.update');
             Route::post('/events/{event}/accommodation/allocate', [AccommodationController::class, 'allocate'])->name('events.accommodation.allocate');
+            // Room-plan import: place a listed group of people a set number to a room.
+            Route::post('/events/{event}/accommodation/plan', [RoomPlanController::class, 'upload'])->name('events.accommodation.plan.upload');
+            Route::get('/events/{event}/accommodation/plan', [RoomPlanController::class, 'show'])->name('events.accommodation.plan.show');
+            Route::post('/events/{event}/accommodation/plan/refresh', [RoomPlanController::class, 'refresh'])->name('events.accommodation.plan.refresh');
+            Route::post('/events/{event}/accommodation/plan/confirm', [RoomPlanController::class, 'confirm'])->name('events.accommodation.plan.confirm');
+            Route::post('/events/{event}/accommodation/plan/cancel', [RoomPlanController::class, 'cancel'])->name('events.accommodation.plan.cancel');
             Route::put('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'assign'])->name('events.accommodation.assignments.update');
             Route::delete('/events/{event}/accommodation/registrations/{registration}/assignment', [AccommodationController::class, 'destroyAssignment'])->name('events.accommodation.assignments.destroy');
             Route::post('/events/{event}/accommodation/registrations/{registration}/check-in', [AccommodationController::class, 'checkIn'])->name('events.accommodation.check-in');
