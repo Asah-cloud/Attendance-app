@@ -97,3 +97,24 @@ it('prevents non managers from changing organization branding', function () {
         'name' => 'Unauthorized Change',
     ])->assertForbidden();
 });
+
+it('counts people on events separately from all directory records', function () {
+    $company = Company::create(['name' => 'Count Co', 'subscription_ends_at' => now()->addMonth()]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Counted Event', 'event_date' => now()->addDay()]);
+    foreach (['Registered One', 'Registered Two'] as $name) {
+        $event->registrations()->create(['participant_id' => Participant::create(['company_id' => $company->id, 'name' => $name])->id, 'status' => 'confirmed']);
+    }
+    foreach (range(1, 3) as $i) {
+        Participant::create(['company_id' => $company->id, 'name' => "Directory Only {$i}"]);
+    }
+
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $this->actingAs($manager)->get(route('dashboard'))->assertOk()
+        ->assertSeeInOrder(['People on events', '2', '5 records in the directory']);
+
+    $admin = User::factory()->create(['role' => 'admin']);
+    $admin->assignRole('admin');
+    $this->actingAs($admin)->get(route('dashboard'))->assertOk()
+        ->assertSeeInOrder(['People on events', '2', '5 records in the directory']);
+});

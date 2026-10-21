@@ -12,11 +12,14 @@
                 ['Companies', $stats['companies'], 'bg-blue-50 text-blue-700'],
                 ['Active companies', $stats['activeCompanies'], 'bg-emerald-50 text-emerald-700'],
                 ['Total events', $stats['events'], 'bg-violet-50 text-violet-700'],
-                ['Participants', number_format($stats['participants']), 'bg-amber-50 text-amber-700'],
+                ['People on events', number_format($stats['participants']), 'bg-amber-50 text-amber-700', number_format($stats['participantRecords']).' records in the directory'],
                 ["Today's check-ins", number_format($stats['checkInsToday']), 'bg-cyan-50 text-cyan-700'],
                 ['Revenue collected', ($stats['revenueMinor'] / 100).' GHS', 'bg-rose-50 text-rose-700'],
-            ] as [$label, $value, $tone])
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex items-start justify-between"><div><p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">{{ $label }}</p><p class="mt-3 text-3xl font-black text-slate-950">{{ $value }}</p></div><span class="grid h-10 w-10 place-items-center rounded-xl {{ $tone }}"><span class="h-2.5 w-2.5 rounded-full bg-current"></span></span></div></div>
+            ] as $tile)
+                @php
+                    [$label, $value, $tone] = $tile;
+                @endphp
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex items-start justify-between"><div><p class="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-400">{{ $label }}</p><p class="mt-3 text-3xl font-black text-slate-950">{{ $value }}</p>@isset($tile[3])<p class="mt-1 text-[11px] font-semibold text-slate-400">{{ $tile[3] }}</p>@endisset</div><span class="grid h-10 w-10 place-items-center rounded-xl {{ $tone }}"><span class="h-2.5 w-2.5 rounded-full bg-current"></span></span></div></div>
             @endforeach
         </div>
 
@@ -51,7 +54,7 @@
             @foreach([
                 ['Total events', $stats['events'], 'Event workspace'],
                 ['Upcoming events', $stats['upcomingEvents'], 'Ready to run'],
-                ['Participants', number_format($stats['participants']), 'Company directory'],
+                ['People on events', number_format($stats['participants']), number_format($stats['participantRecords']).' records in the directory'],
                 ['Registrations', number_format($stats['registrations']), 'Across all events'],
                 ["Today's check-ins", number_format($stats['checkInsToday']), 'Recorded today'],
                 ['Pending approval', number_format($stats['pending']), 'Needs your attention'],
