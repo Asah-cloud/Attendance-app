@@ -1,0 +1,259 @@
+@php use App\Support\AccommodationPriority as Priority; @endphp
+<x-app-layout>
+    <x-slot name="header">Buildings &amp; rooms</x-slot>
+    <div class="py-10"><div class="mx-auto max-w-7xl space-y-7 sm:px-6 lg:px-8">
+        @include('accommodation.sections._header', ['title' => 'Buildings &amp; rooms', 'intro' => 'Locations, buildings, floors and rooms, with their beds and restrictions.'])
+        @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ $errors->first() }}</div>@endif
+        @if($cloneableEvents->isNotEmpty())
+        <section class="rounded-3xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm">
+            <h2 class="text-xl font-black text-indigo-900">Copy setup from a previous event</h2>
+            <p class="mt-1 text-sm text-indigo-800">Adds any locations, buildings, floors and rooms that aren't already here by name. Capacities and restrictions come along; assigned occupants never do.</p>
+            <form method="POST" action="{{ route('events.accommodation.clone', $event) }}" class="mt-4 flex flex-wrap items-center gap-2">@csrf
+                <select name="source_event_id" required class="rounded-lg border-indigo-200 text-sm">
+                    <option value="">Choose an event…</option>
+                    @foreach($cloneableEvents as $option)
+                        <option value="{{ $option->id }}">{{ $option->title }} @if($option->event_date)({{ $option->event_date->format('M Y') }})@endif</option>
+                    @endforeach
+                </select>
+                <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Copy inventory</button>
+            </form>
+        </section>
+        @endif
+
+        <section data-tour="event-rooms-inventory" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-xl font-black text-slate-900">Buildings &amp; rooms</h2>
+                <div class="flex flex-wrap gap-2 text-sm">
+                    <details data-acc="addsite">
+                        <summary class="cursor-pointer list-none rounded-xl bg-slate-900 px-4 py-2 font-black text-white">+ Add location</summary>
+                        <form method="POST" action="{{ route('events.accommodation.sites.store', $event) }}" class="mt-2 grid gap-3 rounded-2xl bg-slate-50 p-4 md:grid-cols-4">@csrf
+                            <input name="name" required placeholder="Location name (campus, hotel…)" class="rounded-xl border-slate-300 text-sm">
+                            <input name="address" placeholder="Address" class="rounded-xl border-slate-300 text-sm">
+                            <input name="check_in_instructions" placeholder="Check-in instructions" class="rounded-xl border-slate-300 text-sm">
+                            <button class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">Add location</button>
+                        </form>
+                    </details>
+                    <details data-acc="importrooms">
+                        <summary class="cursor-pointer list-none rounded-xl border border-indigo-200 px-4 py-2 font-black text-indigo-700">Import rooms (CSV)</summary>
+                        <form method="POST" enctype="multipart/form-data" action="{{ route('events.accommodation.import', $event) }}" class="mt-2 flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 p-4">@csrf
+                            <input type="file" name="file" accept=".csv,text/csv" required class="text-sm">
+                            <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Import CSV</button>
+                            <span class="text-xs text-indigo-700">Columns: location, building, floor, room, capacity; optional gender, category, accessible (yes/no for step-free). "site"/"block" also accepted.</span>
+                        </form>
+                    </details>
+                </div>
+            </div>
+
+            @php $autoOpenSites = $errors->any() || $event->accommodationSites->count() <= 1; @endphp
+            <div class="mt-5 space-y-3">
+                @forelse($event->accommodationSites as $site)
+                    @php
+                        $siteFloors = $site->blocks->flatMap->floors;
+                        $siteRooms = $siteFloors->flatMap->rooms;
+                    @endphp
+                    <details data-acc="site-{{ $site->id }}" @if($autoOpenSites) open @endif class="group rounded-2xl border border-slate-200">
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl p-4 hover:bg-slate-50">
+                            <span class="min-w-0">
+                                <span class="block truncate text-base font-black text-slate-900">{{ $site->name }}@unless($site->is_active)<span class="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-black uppercase text-slate-600">Inactive</span>@endunless</span>
+                                <span class="text-xs text-slate-500">{{ $site->blocks->count() }} building(s) · {{ $siteFloors->count() }} floor(s) · {{ $siteRooms->count() }} room(s) · {{ $siteRooms->sum('capacity') }} bed(s)</span>
+                            </span>
+                            <svg class="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </summary>
+                        <div class="space-y-3 border-t border-slate-100 p-4">
+                            <div class="flex flex-wrap gap-2">
+                                <details data-acc="addblock-{{ $site->id }}">
+                                    <summary class="cursor-pointer list-none rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white">+ Add building</summary>
+                                    <form method="POST" action="{{ route('events.accommodation.blocks.store', [$event, $site]) }}" class="mt-2 grid gap-2 md:grid-cols-5">@csrf
+                                        <input name="name" required placeholder="Building name (e.g. Block A)" class="rounded-xl border-slate-300 text-sm">
+                                        <select name="gender_restriction" class="rounded-xl border-slate-300 text-sm"><option value="">Open to anyone</option><option>Male</option><option>Female</option></select>
+                                        <input name="category_restriction" placeholder="Category (optional)" class="rounded-xl border-slate-300 text-sm">
+                                        <select name="priority" class="rounded-xl border-slate-300 text-sm">@foreach(Priority::options(null) as $label => $value)<option value="{{ $value }}" @selected($value === Priority::DEFAULT)>{{ $label }}</option>@endforeach</select>
+                                        <button class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">Add building</button>
+                                    </form>
+                                </details>
+                                <details>
+                                    <summary class="cursor-pointer list-none rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-black text-indigo-700">Edit / delete location</summary>
+                                    <div class="mt-2 flex flex-wrap items-start gap-3">
+                                        <form method="POST" action="{{ route('events.accommodation.sites.update', [$event, $site]) }}" class="grid gap-2">@csrf @method('PATCH')
+                                            <input name="name" value="{{ $site->name }}" required class="rounded-lg border-slate-300 text-xs">
+                                            <input name="address" value="{{ $site->address }}" placeholder="Address" class="rounded-lg border-slate-300 text-xs">
+                                            <input name="check_in_instructions" value="{{ $site->check_in_instructions }}" placeholder="Instructions" class="rounded-lg border-slate-300 text-xs">
+                                            <label class="text-xs"><input type="checkbox" name="is_active" value="1" @checked($site->is_active)> Active</label>
+                                            <button class="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('events.accommodation.inventory.destroy', [$event, 'site', $site->id]) }}">@csrf @method('DELETE')<button class="text-xs font-bold text-red-600">Delete empty location</button></form>
+                                    </div>
+                                </details>
+                            </div>
+
+                            @forelse($site->blocks as $block)
+                                @php $blockRooms = $block->floors->flatMap->rooms; @endphp
+                                <details data-acc="block-{{ $block->id }}" class="group rounded-xl border border-slate-200 bg-slate-50">
+                                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-3 hover:bg-slate-100">
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-black text-slate-800">{{ $block->name }}@unless($block->is_active)<span class="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-black uppercase text-slate-600">Inactive</span>@endunless</span>
+                                            <span class="text-xs text-slate-500">{{ $block->gender_restriction ?: 'Open to anyone' }}{{ $block->category_restriction ? ' · '.$block->category_restriction : '' }} · {{ $block->floors->count() }} floor(s) · {{ $blockRooms->count() }} room(s)</span>
+                                        </span>
+                                        <svg class="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                    </summary>
+                                    <div class="space-y-3 border-t border-slate-200 p-3">
+                                        <div class="flex flex-wrap gap-2">
+                                            <details data-acc="addfloor-{{ $block->id }}">
+                                                <summary class="cursor-pointer list-none rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-black text-white">+ Add floor</summary>
+                                                <form method="POST" action="{{ route('events.accommodation.floors.store', [$event, $block]) }}" class="mt-2 flex flex-wrap gap-2">@csrf
+                                                    <input name="name" required placeholder="Floor name" class="rounded-xl border-slate-300 text-sm">
+                                                    <select name="priority" class="w-40 rounded-xl border-slate-300 text-sm">@foreach(Priority::options(null) as $label => $value)<option value="{{ $value }}" @selected($value === Priority::DEFAULT)>{{ $label }}</option>@endforeach</select>
+                                                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_accessible" value="1"> Step-free access (no stairs)</label>
+                                                    <button class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-black text-white">Add floor</button>
+                                                </form>
+                                            </details>
+                                            <details>
+                                                <summary class="cursor-pointer list-none rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-black text-indigo-700">Edit / delete building</summary>
+                                                <div class="mt-2 flex flex-wrap items-start gap-3">
+                                                    <form method="POST" action="{{ route('events.accommodation.blocks.update', [$event, $block]) }}" class="grid gap-2">@csrf @method('PATCH')
+                                                        <input name="name" value="{{ $block->name }}" required class="rounded-lg border-slate-300 text-xs">
+                                                        <select name="gender_restriction" class="rounded-lg border-slate-300 text-xs"><option value="">Open to anyone</option><option @selected($block->gender_restriction === 'Male')>Male</option><option @selected($block->gender_restriction === 'Female')>Female</option></select>
+                                                        <input name="category_restriction" value="{{ $block->category_restriction }}" placeholder="Category" class="rounded-lg border-slate-300 text-xs">
+                                                        <select name="priority" class="rounded-lg border-slate-300 text-xs">@foreach(Priority::options($block->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $block->priority)>{{ $label }}</option>@endforeach</select>
+                                                        <label class="text-xs"><input type="checkbox" name="is_active" value="1" @checked($block->is_active)> Active</label>
+                                                        <button class="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save</button>
+                                                    </form>
+                                                    <form method="POST" action="{{ route('events.accommodation.inventory.destroy', [$event, 'block', $block->id]) }}">@csrf @method('DELETE')<button class="text-xs font-bold text-red-600">Delete empty building</button></form>
+                                                </div>
+                                            </details>
+                                        </div>
+
+                                        @forelse($block->floors as $floor)
+                                            <details data-acc="floor-{{ $floor->id }}" class="group rounded-xl border border-slate-200 bg-white">
+                                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-3 hover:bg-slate-50">
+                                                    <span class="min-w-0">
+                                                        <span class="block truncate text-sm font-bold text-slate-700">{{ $floor->name }} @if($floor->is_accessible)<span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-black uppercase text-indigo-700">Step-free</span>@endif@unless($floor->is_active)<span class="ml-1 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-black uppercase text-slate-600">Inactive</span>@endunless</span>
+                                                        <span class="text-xs text-slate-500">{{ $floor->rooms->count() }} room(s) · {{ $floor->rooms->sum('active_assignments_count') }}/{{ $floor->rooms->sum('capacity') }} bed(s) filled</span>
+                                                    </span>
+                                                    <svg class="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                                </summary>
+                                                <div class="space-y-3 border-t border-slate-100 p-3">
+                                                    <div class="flex flex-wrap gap-2">
+                                                        <details data-acc="addroom-{{ $floor->id }}">
+                                                            <summary class="cursor-pointer list-none rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-black text-white">+ Add room</summary>
+                                                            <form method="POST" action="{{ route('events.accommodation.rooms.store', [$event, $floor]) }}" class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">@csrf
+                                                                <input name="name" required placeholder="Room name / number" class="rounded-xl border-slate-300 text-sm">
+                                                                <input name="capacity" required type="number" min="1" placeholder="Beds" class="rounded-xl border-slate-300 text-sm">
+                                                                <select name="gender_restriction" class="rounded-xl border-slate-300 text-sm"><option value="">Same as building</option><option>Male</option><option>Female</option></select>
+                                                                <input name="category_restriction" placeholder="Category" class="rounded-xl border-slate-300 text-sm">
+                                                                <select name="priority" class="rounded-xl border-slate-300 text-sm">@foreach(Priority::options(null) as $label => $value)<option value="{{ $value }}" @selected($value === Priority::DEFAULT)>{{ $label }}</option>@endforeach</select>
+                                                                <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_accessible" value="1"> Step-free access (no stairs)</label>
+                                                                <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white sm:col-span-2 lg:col-span-3">Add room</button>
+                                                            </form>
+                                                        </details>
+                                                        <details data-acc="bulkroom-{{ $floor->id }}">
+                                                            <summary class="cursor-pointer list-none rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-black text-indigo-700">Add many rooms at once</summary>
+                                                            <form method="POST" action="{{ route('events.accommodation.rooms.bulk', [$event, $floor]) }}" class="mt-2 flex flex-wrap gap-2 rounded-xl bg-indigo-50 p-3">@csrf
+                                                                <input name="prefix" required placeholder="Prefix (A)" class="w-28 rounded-lg border-indigo-200 text-xs">
+                                                                <input name="start" type="number" min="0" required placeholder="From" class="w-20 rounded-lg border-indigo-200 text-xs">
+                                                                <input name="end" type="number" min="0" required placeholder="To" class="w-20 rounded-lg border-indigo-200 text-xs">
+                                                                <input name="capacity" type="number" min="1" required placeholder="Beds" class="w-20 rounded-lg border-indigo-200 text-xs">
+                                                                <select name="gender_restriction" class="rounded-lg border-indigo-200 text-xs"><option value="">Same as building</option><option>Male</option><option>Female</option></select>
+                                                                <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_accessible" value="1"> Step-free access (no stairs)</label>
+                                                                <button class="rounded-lg bg-indigo-700 px-3 py-2 text-xs font-black text-white">Create range</button>
+                                                            </form>
+                                                        </details>
+                                                        <details>
+                                                            <summary class="cursor-pointer list-none rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-black text-indigo-700">Edit / delete floor</summary>
+                                                            <div class="mt-2 flex flex-wrap items-start gap-3">
+                                                                <form method="POST" action="{{ route('events.accommodation.floors.update', [$event, $floor]) }}" class="grid gap-2">@csrf @method('PATCH')
+                                                                    <input name="name" value="{{ $floor->name }}" required class="rounded-lg border-slate-300 text-xs">
+                                                                    <select name="priority" class="rounded-lg border-slate-300 text-xs">@foreach(Priority::options($floor->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $floor->priority)>{{ $label }}</option>@endforeach</select>
+                                                                    <label class="text-xs"><input type="checkbox" name="is_accessible" value="1" @checked($floor->is_accessible)> Step-free access (no stairs)</label>
+                                                                    <label class="text-xs"><input type="checkbox" name="is_active" value="1" @checked($floor->is_active)> Active</label>
+                                                                    <label class="text-xs font-bold text-slate-700">Set every room on this floor</label>
+                                                                    <select name="room_status" class="rounded-lg border-slate-300 text-xs"><option value="">Keep room statuses</option><option value="reserved">Reserved</option><option value="active">Active</option><option value="closed">Closed</option></select>
+                                                                    <button class="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save</button>
+                                                                </form>
+                                                                <form method="POST" action="{{ route('events.accommodation.inventory.destroy', [$event, 'floor', $floor->id]) }}">@csrf @method('DELETE')<button class="text-xs font-bold text-red-600">Delete empty floor</button></form>
+                                                            </div>
+                                                        </details>
+                                                    </div>
+
+                                                    <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                                        @forelse($floor->rooms as $room)
+                                                            <details data-acc="room-{{ $room->id }}" class="group rounded-xl border border-slate-200 bg-white">
+                                                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-3 hover:bg-slate-50">
+                                                                    <span class="min-w-0">
+                                                                        <span class="block truncate text-sm font-black text-slate-900">Room {{ $room->name }}</span>
+                                                                        <span class="text-xs text-slate-500">{{ $room->active_assignments_count }} of {{ $room->capacity }} bed{{ $room->capacity === 1 ? '' : 's' }} occupied</span>
+                                                                    </span>
+                                                                    <span class="flex items-center gap-2">
+                                                                        @if($room->status !== 'active')<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800">{{ $room->status }}</span>@endif
+                                                                        <svg class="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                                                                    </span>
+                                                                </summary>
+                                                                <div class="border-t border-slate-100 p-3">
+                                                                <form method="POST" action="{{ route('events.accommodation.rooms.update', [$event, $room]) }}">@csrf @method('PATCH')
+                                                                    <div class="flex items-center justify-between gap-2">
+                                                                        <input name="name" value="{{ $room->name }}" required class="w-28 rounded border-slate-300 p-1 text-xs font-bold">
+                                                                        <span class="text-xs font-bold">{{ $room->active_assignments_count }}/<input name="capacity" type="number" min="{{ $room->active_assignments_count }}" value="{{ $room->capacity }}" class="w-16 rounded border-slate-300 p-1 text-xs"></span>
+                                                                    </div>
+                                                                    <div class="mt-2 grid grid-cols-2 gap-2">
+                                                                        <select name="status" class="rounded border-slate-300 p-1 text-xs">@foreach(['active' => 'active', 'reserved' => 'reserved (manual only)', 'closed' => 'closed (out of service)'] as $value => $label)<option value="{{ $value }}" @selected($room->status === $value)>{{ $label }}</option>@endforeach</select>
+                                                                        <select name="gender_restriction" class="rounded border-slate-300 p-1 text-xs"><option value="">Same as building</option><option @selected($room->gender_restriction === 'Male')>Male</option><option @selected($room->gender_restriction === 'Female')>Female</option></select>
+                                                                        <input name="category_restriction" value="{{ $room->category_restriction }}" placeholder="Category" class="rounded border-slate-300 p-1 text-xs">
+                                                                        <select name="priority" class="rounded border-slate-300 p-1 text-xs">@foreach(Priority::options($room->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $room->priority)>{{ $label }}</option>@endforeach</select>
+                                                                    </div>
+                                                                    <label class="mt-2 flex items-center gap-1 text-xs"><input type="checkbox" name="is_accessible" value="1" @checked($room->is_accessible)> Step-free access (no stairs)</label>
+                                                                    <button class="mt-2 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save room</button>
+                                                                </form>
+                                                                <form method="POST" action="{{ route('events.accommodation.inventory.destroy', [$event, 'room', $room->id]) }}">@csrf @method('DELETE')<button class="mt-2 text-xs font-bold text-red-600">Delete empty room</button></form>
+                                                                </div>
+                                                            </details>
+                                                        @empty
+                                                            <p class="text-xs text-slate-400">No rooms yet — use "+ Add room".</p>
+                                                        @endforelse
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        @empty
+                                            <p class="text-xs text-slate-400">No floors yet — use "+ Add floor".</p>
+                                        @endforelse
+                                    </div>
+                                </details>
+                            @empty
+                                <p class="text-xs text-slate-400">No buildings yet — use "+ Add building".</p>
+                            @endforelse
+                        </div>
+                    </details>
+                @empty
+                    <p class="py-8 text-center text-sm text-slate-500">Add a location to begin, then add buildings, floors and rooms inside it.</p>
+                @endforelse
+            </div>
+        </section>
+    </div></div>
+    {{-- Keep expanded panels and scroll position across the form round-trips on this page. --}}
+    <script>
+        (() => {
+            const OPEN = 'acc-open:{{ $event->id }}';
+            const SCROLL = 'acc-scroll:{{ $event->id }}';
+            const read = () => { try { return new Set(JSON.parse(localStorage.getItem(OPEN) || '[]')); } catch (e) { return new Set(); } };
+            const write = (s) => { try { localStorage.setItem(OPEN, JSON.stringify([...s])); } catch (e) {} };
+
+            const remembered = read();
+            document.querySelectorAll('details[data-acc]').forEach((d) => {
+                if (remembered.has(d.dataset.acc)) d.open = true;
+                d.addEventListener('toggle', () => {
+                    const s = read();
+                    if (d.open) s.add(d.dataset.acc); else s.delete(d.dataset.acc);
+                    write(s);
+                });
+            });
+
+            try {
+                if (history.scrollRestoration) history.scrollRestoration = 'manual';
+                const y = sessionStorage.getItem(SCROLL);
+                if (y !== null) { window.scrollTo(0, parseInt(y, 10) || 0); sessionStorage.removeItem(SCROLL); }
+            } catch (e) {}
+            document.querySelectorAll('form').forEach((f) => f.addEventListener('submit', () => {
+                try { sessionStorage.setItem(SCROLL, String(window.scrollY)); } catch (e) {}
+            }));
+        })();
+    </script>
+</x-app-layout>

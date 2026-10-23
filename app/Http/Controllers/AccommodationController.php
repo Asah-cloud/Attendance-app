@@ -22,9 +22,27 @@ use Illuminate\View\View;
 
 class AccommodationController extends Controller
 {
+    /** The accommodation hub: settings, headline numbers, and a card for each area. */
     public function index(Event $event, RoomAllocationService $allocator)
     {
         $this->authorize('update', $event);
+
+        return view('accommodation.index', $this->pageData($event, $allocator));
+    }
+
+    /** One area of the hub on a page of its own. */
+    public function section(Event $event, string $section, RoomAllocationService $allocator)
+    {
+        $this->authorize('update', $event);
+        abort_unless(in_array($section, self::SECTIONS, true), 404);
+
+        return view('accommodation.sections.'.$section, $this->pageData($event, $allocator));
+    }
+
+    public const SECTIONS = ['assign', 'room-plan', 'inventory', 'guests', 'send'];
+
+    private function pageData(Event $event, RoomAllocationService $allocator): array
+    {
         $event->load(['accommodationSites.blocks.floors.rooms' => fn ($query) => $query->withCount('activeAssignments')]);
         $registrations = $event->registrations()->with(['participant', 'roomAssignment.room.floor.block.site'])
             ->where('status', EventRegistration::STATUS_CONFIRMED)
@@ -43,7 +61,7 @@ class AccommodationController extends Controller
             ->orderByDesc('event_date')
             ->get(['id', 'title', 'event_date']);
 
-        return view('accommodation.index', compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount', 'allocationCategories', 'allocationGenders', 'allocationCategory', 'allocationGender', 'cloneableEvents'));
+        return compact('event', 'registrations', 'preview', 'rooms', 'requiredCount', 'assignedCount', 'allocationCategories', 'allocationGenders', 'allocationCategory', 'allocationGender', 'cloneableEvents');
     }
 
     public function cloneFrom(Request $request, Event $event): RedirectResponse

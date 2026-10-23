@@ -8,18 +8,27 @@ const csrf = document.querySelector('meta[name=csrf-token]').content;
 const notify = (message, type = 'success') => window.dispatchEvent(new CustomEvent('notify', { detail: { message, type } }));
 
 function refreshCounts() {
+    let placed = 0;
+    let beds = 0;
     board.querySelectorAll('[data-room-list]').forEach((list) => {
         const used = list.querySelectorAll('[data-registration-id]').length;
         const counter = board.querySelector(`[data-count-for="${list.dataset.roomId}"]`);
-        if (!counter) return;
         if (list.dataset.roomId === '') {
-            counter.textContent = used;
+            if (counter) counter.textContent = used;
             return;
         }
         const capacity = Number(list.dataset.capacity);
-        counter.textContent = `${used} / ${capacity} beds`;
+        placed += used;
+        beds += capacity;
+        if (counter) counter.textContent = `${used} / ${capacity} beds`;
+        const bar = board.querySelector(`[data-bar-for="${list.dataset.roomId}"]`);
+        if (bar) bar.style.width = `${capacity ? Math.min(100, Math.round((used / capacity) * 100)) : 0}%`;
         list.closest('[data-room-card]').classList.toggle('is-full', used >= capacity);
     });
+    const placedTotal = board.querySelector('[data-total-placed]');
+    const freeTotal = board.querySelector('[data-total-free]');
+    if (placedTotal) placedTotal.textContent = placed;
+    if (freeTotal) freeTotal.textContent = Math.max(0, beds - placed);
 }
 
 function putBack(evt) {

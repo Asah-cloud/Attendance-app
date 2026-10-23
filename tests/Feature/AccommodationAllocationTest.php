@@ -406,7 +406,7 @@ it('clones sites, blocks, floors and rooms from a past event without assignments
     $guest = accommodationRegistration($source, 'Past Guest');
     $guest->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
 
-    $this->actingAs($manager)->get(route('events.accommodation.index', $destination))
+    $this->actingAs($manager)->get(route('events.accommodation.section', [$destination, 'inventory']))
         ->assertOk()->assertSee('Copy setup from a previous event')->assertSee('Summit 2025');
 
     $this->actingAs($manager)->post(route('events.accommodation.clone', $destination), ['source_event_id' => $source->id])
@@ -688,4 +688,26 @@ it('sends imported attendees a room-picker link when notified while self-selecti
 
         return true;
     });
+});
+
+it('shows accommodation as cards that each open their own page', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    accommodationRoom($event, 'A01', 6);
+    accommodationRegistration($event, 'Waiting Guest');
+
+    $hub = $this->actingAs($manager)->get(route('events.accommodation.index', $event))->assertOk()
+        ->assertSeeInOrder(['Room board', 'Assign automatically', 'Room plan import', 'Buildings &amp; rooms', 'Who needs a room', 'Send to attendees', 'Reports'], false)
+        ->assertSee('1 rooms · 6 beds')
+        ->assertSee(route('events.accommodation.board', $event), false)
+        ->assertSee('target="_blank"', false)
+        ->assertDontSee('Add many rooms at once');
+
+    foreach (['assign' => 'Assign rooms now', 'room-plan' => 'Preview plan', 'inventory' => 'Add many rooms at once', 'guests' => 'Waiting Guest', 'send' => 'Send selection link'] as $section => $content) {
+        $this->get(route('events.accommodation.section', [$event, $section]))->assertOk()
+            ->assertSee('← Accommodation')->assertSee($content);
+    }
+    $this->get('/events/'.$event->id.'/accommodation/nonsense')->assertNotFound();
 });

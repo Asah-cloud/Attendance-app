@@ -311,6 +311,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
             Route::get('/events/{event}/accommodation/report', [AccommodationController::class, 'report'])->name('events.accommodation.report');
             Route::get('/events/{event}/accommodation/report.csv', [AccommodationController::class, 'exportCsv'])->name('events.accommodation.report.csv');
             Route::get('/events/{event}/accommodation/report.pdf', [AccommodationController::class, 'exportPdf'])->name('events.accommodation.report.pdf');
+            Route::get('/events/{event}/accommodation/{section}', [AccommodationController::class, 'section'])
+                ->whereIn('section', AccommodationController::SECTIONS)->name('events.accommodation.section');
             Route::delete('/events/{event}/accommodation/inventory/{type}/{id}', [AccommodationController::class, 'destroyInventory'])->name('events.accommodation.inventory.destroy');
         });
 

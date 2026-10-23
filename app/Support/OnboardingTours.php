@@ -45,7 +45,7 @@ class OnboardingTours
             $is('support-staff.index') => 'staff-roster',
             $is(['events.forms.*', 'events.registration-form.*', 'events.confirmations.*']) => 'event-forms',
             $is('events.meals.*') => 'event-food',
-            $is('events.accommodation.*') => 'event-rooms',
+            $is('events.accommodation.index') => 'event-rooms',
             $is(['reports.*']) => 'event-reports',
             $is('events.messages.*') => 'event-messages',
             $is('events.billing.*') => 'event-billing',
