@@ -66,7 +66,7 @@ class RoomPlanController extends Controller
         $this->authorize('update', $event);
         $review = $request->session()->get($this->key($event));
         if (! $review) {
-            return redirect()->route('events.accommodation.index', $event);
+            return redirect()->route('events.accommodation.section', [$event, 'room-plan']);
         }
 
         return view('accommodation.plan', ['event' => $event, 'review' => $review, 'location' => $this->locationLabel($event, $review)]);
@@ -90,7 +90,7 @@ class RoomPlanController extends Controller
         $this->authorize('update', $event);
         $review = $request->session()->pull($this->key($event));
         if (! $review || ! Storage::disk('local')->exists($review['path'])) {
-            return redirect()->route('events.accommodation.index', $event)->with('error', 'That room plan has expired. Please upload the list again.');
+            return redirect()->route('events.accommodation.section', [$event, 'room-plan'])->with('error', 'That room plan has expired. Please upload the list again.');
         }
 
         $result = null;
@@ -124,7 +124,7 @@ class RoomPlanController extends Controller
             Storage::disk('local')->delete($review['path']);
         }
 
-        return redirect()->route('events.accommodation.index', $event)->with('success', 'Room plan cancelled. Nothing was changed.');
+        return redirect()->route('events.accommodation.section', [$event, 'room-plan'])->with('success', 'Room plan cancelled. Nothing was changed.');
     }
 
     /** What the list would do, worked out in a rolled-back trial and kept as plain data for the preview page. */
@@ -184,11 +184,11 @@ class RoomPlanController extends Controller
     private function failed(Event $event, \Throwable $exception): RedirectResponse
     {
         if ($exception instanceof ValidationException) {
-            return redirect()->route('events.accommodation.index', $event)->with('error', collect($exception->errors())->flatten()->first());
+            return redirect()->route('events.accommodation.section', [$event, 'room-plan'])->with('error', collect($exception->errors())->flatten()->first());
         }
         Log::error('Room plan import failed.', ['event_id' => $event->id, 'exception' => $exception]);
 
-        return redirect()->route('events.accommodation.index', $event)->with('error', 'The room plan could not be completed. Check the file format and try again.');
+        return redirect()->route('events.accommodation.section', [$event, 'room-plan'])->with('error', 'The room plan could not be completed. Check the file format and try again.');
     }
 
     private function key(Event $event): string
