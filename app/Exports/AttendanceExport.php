@@ -3,71 +3,70 @@
 namespace App\Exports;
 
 use App\Models\Event;
-use App\Services\AttendanceReportData;
-use Illuminate\Support\Enumerable;
+use App\Services\AttendanceGrid;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 
+/**
+ * The people present in a report period, one row each, with a column per day (or session)
+ * showing when they checked in. Used as-is for CSV downloads; AttendanceWorkbook wraps it
+ * with a title block and styling for Excel.
+ */
 class AttendanceExport implements FromCollection, WithHeadings, WithMapping
 {
-    protected $event;
+    protected ?array $grid = null;
 
-    protected $day;
+    private int $rowNumber = 0;
 
-    protected $area;
+    public function __construct(protected Event $event, protected int|string $day = 'all', protected ?string $area = null, protected ?int $session = null) {}
 
-    protected $session;
-
-    // 1. Accept BOTH the event and the day
-    public function __construct(Event $event, $day = 'all', ?string $area = null, ?int $session = null)
+    public function grid(): array
     {
-        $this->event = $event;
-        $this->day = $day;
-        $this->area = $area;
-        $this->session = $session;
+        return $this->grid ??= app(AttendanceGrid::class)->build($this->event, $this->day, $this->session, $this->area);
     }
 
-    public function collection(): Enumerable
+    /** The people present, in name order; map() looks up each person's day columns. */
+    public function collection(): Collection
     {
-        $presentUsers = app(AttendanceReportData::class)->forPeriod($this->event, $this->day, $this->session)['presentUsers'];
-
-        if ($this->area === null) {
-            return $presentUsers;
-        }
-
-        return $presentUsers
-            ->filter(fn ($user) => ($user->room_group ?: ($user->department ?: 'Area not specified')) === $this->area)
-            ->values();
+        return $this->grid()['rows']->pluck('person');
     }
 
     public function headings(): array
     {
-        // 3. Match your headings to your map data
-        return ['Name', 'Phone', 'Area', 'Category', 'Gender', 'Email', 'Date/Time Marked', 'Attendance Session', 'Check-in Method'];
-    }
-
-    public function map($user): array
-    {
-        // Get the specific attendance record for this event/day
-        $attendance = $user->attendances->first();
+        $grid = $this->grid();
 
         return [
-            $user->name,
-            $user->phone,
-            $user->room_group ?: ($user->department ?: 'Area not specified'),
-            $user->category,
-            $user->gender,
-            $user->email, // <-- added email to the export
-            $attendance ? $attendance->created_at->format('d-m-Y h:i A') : 'N/A',
-            $user->isNumberedParticipantStaff()
-                ? 'Staff check-in (all event days)'
-                : $this->event->attendanceSessionLabel($attendance ? $attendance->day : $this->day, $attendance->session ?? 1),
-            match (true) {
-                ! $attendance => '',
-                $attendance->method === 'self' => 'Self check-in',
-                default => 'By staff',
-            },
+            '#', 'Name', 'Phone', 'Area', 'Category', 'Gender', 'Email',
+            ...$grid['slots']->pluck('label')->all(),
+            ...($grid['multiDay'] ? ['Days attended'] : []),
+            'Check-in method',
         ];
+    }
+
+    public function map($person): array
+    {
+        $grid = $this->grid();
+        $row = $grid['rows']->firstWhere('person.id', $person->id);
+
+        return [
+            ++$this->rowNumber,
+            $person->name,
+            $person->phone,
+            $row->area,
+            $person->category,
+            $person->gender,
+            $person->email,
+            ...array_values($row->cells),
+            ...($grid['multiDay'] ? [$row->daysAttended.' of '.$grid['totalDays']] : []),
+            $row->method,
+        ];
+    }
+
+    /** 1-based column numbers of the day/session columns. */
+    protected function dayColumns(): array
+    {
+        return range(8, 7 + $this->grid()['slots']->count());
     }
 }

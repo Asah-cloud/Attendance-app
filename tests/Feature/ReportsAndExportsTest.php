@@ -2,6 +2,7 @@
 
 use App\Exports\AreaAttendanceSummaryExport;
 use App\Exports\AttendanceExport;
+use App\Exports\AttendanceWorkbook;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
@@ -263,4 +264,69 @@ it('uses the same numbered staff and unique-person counts in reports and area ex
         ->assertSee('Participant 7')
         ->assertSee('Staff · all days')
         ->assertDontSee('Usher');
+});
+
+it('gives every event day its own column so multi-day attendance is not squeezed into one', function () {
+    $company = Company::create(['name' => 'Grid Co']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Two Day Event', 'event_date' => now()->subDays(2), 'end_date' => now()->subDay()]);
+    unlockAllEventFeatures($event);
+    $both = Participant::create(['company_id' => $company->id, 'name' => 'Both Days', 'room_group' => 'Accra']);
+    $second = Participant::create(['company_id' => $company->id, 'name' => 'Second Day', 'room_group' => 'Accra']);
+    $never = Participant::create(['company_id' => $company->id, 'name' => 'Never Came', 'room_group' => 'Kumasi']);
+    foreach ([$both, $second, $never] as $person) {
+        $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    }
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $both->id, 'day' => 1, 'method' => 'self']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $both->id, 'day' => 2]);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $second->id, 'day' => 2]);
+
+    $export = new AttendanceExport($event, 'all');
+    expect($export->headings())->toContain('Day 1', 'Day 2', 'Days attended');
+    $rows = $export->collection()->map(fn ($person) => array_combine($export->headings(), $export->map($person)))->keyBy('Name');
+
+    expect($rows['Both Days']['Day 1'])->not->toBe('—')
+        ->and($rows['Both Days']['Day 2'])->not->toBe('—')
+        ->and($rows['Both Days']['Days attended'])->toBe('2 of 2')
+        ->and($rows['Both Days']['Check-in method'])->toBe('Self & by staff')
+        ->and($rows['Second Day']['Day 1'])->toBe('—')
+        ->and($rows['Second Day']['Days attended'])->toBe('1 of 2')
+        ->and($rows->has('Never Came'))->toBeFalse();
+
+    expect((new AreaAttendanceSummaryExport($event, 'all'))->collection()->firstWhere('area', 'Accra'))
+        ->toMatchArray(['slots' => [1, 2], 'present' => 2]);
+
+    $sheets = (new AttendanceWorkbook($event, 'all'))->sheets();
+    expect(array_map(fn ($sheet) => $sheet->title(), $sheets))->toBe(['Summary', 'Present', 'Not present'])
+        ->and($sheets[2]->array())->toHaveCount(1)
+        ->and($sheets[2]->array()[0][1])->toBe('Never Came');
+});
+
+it('leaves days that have not happened yet blank instead of marking people absent', function () {
+    $company = Company::create(['name' => 'Grid Co']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Running Event', 'event_date' => now(), 'end_date' => now()->addDays(2)]);
+    unlockAllEventFeatures($event);
+    $person = Participant::create(['company_id' => $company->id, 'name' => 'Early Bird']);
+    $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $person->id, 'day' => 1]);
+
+    $cells = app(\App\Services\AttendanceGrid::class)->build($event, 'all')['rows']->first()->cells;
+
+    expect($cells['2:1'])->toBe('')->and($cells['3:1'])->toBe('')->and($cells['1:1'])->not->toBe('');
+});
+
+it('builds the styled excel workbook and both pdfs for a multi-day event', function () {
+    $company = Company::create(['name' => 'Grid Co']);
+    $manager = reportsManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => "TAC Minister's Orientation", 'event_date' => now()->subDay(), 'end_date' => now()]);
+    unlockAllEventFeatures($event);
+    $person = Participant::create(['company_id' => $company->id, 'name' => 'Attendee']);
+    $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $person->id, 'day' => 1]);
+
+    $excel = $this->actingAs($manager)->get(route('reports.excel', ['event' => $event, 'day' => 'all']))->assertOk();
+    expect($excel->headers->get('Content-Disposition'))->toContain('TAC_Ministers_Orientation_Attendance_All_days.xlsx');
+    $this->actingAs($manager)->get(route('reports.pdf', ['event' => $event, 'day' => 'all']))->assertOk();
+    $this->actingAs($manager)->get(route('reports.summary.pdf', $event))->assertOk();
+    $this->actingAs($manager)->get(route('reports.summary.export', $event))->assertOk();
+    $this->actingAs($manager)->get(route('reports.area-summary', ['event' => $event, 'day' => 'all']))->assertOk();
 });

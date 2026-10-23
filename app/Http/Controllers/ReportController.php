@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Exports\AreaAttendanceSummaryExport;
 use App\Exports\AttendanceExport;
+use App\Exports\AttendanceWorkbook;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use App\Services\AttendanceGrid;
 use App\Services\AttendanceReportData;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -14,7 +16,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
-    public function __construct(private readonly ApplicationCache $cache, private readonly AttendanceReportData $attendanceReport) {}
+    public function __construct(private readonly ApplicationCache $cache, private readonly AttendanceReportData $attendanceReport, private readonly AttendanceGrid $grid) {}
 
     public function show(Request $request, Event $event, $day = 1)
     {
@@ -73,10 +75,8 @@ class ReportController extends Controller
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
         $session = $this->validatedSession($event, $day, $request->query('session'));
-        // Accepts route parameter directly to match Excel route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.xlsx';
 
-        return Excel::download(new AttendanceExport($event, $day, null, $session), $fileName);
+        return Excel::download(new AttendanceWorkbook($event, $day, null, $session), $this->fileName($event, 'Attendance', $day, $session, 'xlsx'));
     }
 
     public function exportCsv(Request $request, Event $event, $day = 'all')
@@ -84,10 +84,8 @@ class ReportController extends Controller
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
         $session = $this->validatedSession($event, $day, $request->query('session'));
-        // Accepts route parameter directly to match CSV route settings
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.csv';
 
-        return Excel::download(new AttendanceExport($event, $day, null, $session), $fileName, \Maatwebsite\Excel\Excel::CSV);
+        return Excel::download(new AttendanceExport($event, $day, null, $session), $this->fileName($event, 'Attendance', $day, $session, 'csv'), \Maatwebsite\Excel\Excel::CSV);
     }
 
     public function exportAreaSummary(Request $request, Event $event, $day = 'all')
@@ -95,9 +93,8 @@ class ReportController extends Controller
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
         $session = $this->validatedSession($event, $day, $request->query('session'));
-        $fileName = 'Area_Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.xlsx';
 
-        return Excel::download(new AreaAttendanceSummaryExport($event, $day, $session), $fileName);
+        return Excel::download(new AreaAttendanceSummaryExport($event, $day, $session), $this->fileName($event, 'Area_Attendance', $day, $session, 'xlsx'));
     }
 
     public function exportAreaDetail(Request $request, Event $event, string $area, $day = 'all')
@@ -105,9 +102,8 @@ class ReportController extends Controller
         $this->authorize('view', $event);
         $day = $this->validatedDay($event, $day);
         $session = $this->validatedSession($event, $day, $request->query('session'));
-        $fileName = 'Area_'.str_replace(' ', '_', $area).'_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($day, $session ?? 1)).'.xlsx';
 
-        return Excel::download(new AttendanceExport($event, $day, $area, $session), $fileName);
+        return Excel::download(new AttendanceWorkbook($event, $day, $area, $session), $this->fileName($event, 'Area_'.$area, $day, $session, 'xlsx'));
     }
 
     public function exportPdf(Request $request, Event $event, $day = 'all')
@@ -117,14 +113,16 @@ class ReportController extends Controller
         $selectedSession = $this->validatedSession($event, $selectedDay, $request->query('session'));
         $reportData = $this->reportData($event, $selectedDay, $selectedSession);
 
+        $grid = $this->grid->build($event, $selectedDay, $selectedSession);
+
         $pdf = Pdf::loadView('reports.attendance-pdf', array_merge(
-            ['event' => $event, 'selectedDay' => $selectedDay, 'selectedSession' => $selectedSession],
+            ['event' => $event, 'selectedDay' => $selectedDay, 'selectedSession' => $selectedSession, 'grid' => $grid],
             $reportData
-        ))->setPaper('a4');
+        ))->setPaper('a4', $grid['slots']->count() > 2 ? 'landscape' : 'portrait')
+            // Embed only the letters used; the full DejaVu font makes every PDF ~900 KB.
+            ->setOption('isFontSubsettingEnabled', true);
 
-        $fileName = 'Attendance_'.str_replace(' ', '_', $event->title).'_'.str_replace(' ', '_', $event->attendanceSessionLabel($selectedDay, $selectedSession ?? 1)).'.pdf';
-
-        return $pdf->download($fileName);
+        return $pdf->download($this->fileName($event, 'Attendance', $selectedDay, $selectedSession, 'pdf'));
     }
 
     private function reportData(Event $event, int|string $selectedDay, ?int $selectedSession = null): array
@@ -141,6 +139,15 @@ class ReportController extends Controller
     private function participantArea($participant): string
     {
         return $participant->room_group ?: ($participant->department ?: 'Area not specified');
+    }
+
+    /** e.g. TAC_Ministers_Orientation_Attendance_All_days.xlsx */
+    public static function fileName(Event $event, string $kind, int|string $day, ?int $session, string $extension): string
+    {
+        $period = $day === 'all' ? 'All days' : $event->attendanceSessionLabel($day, $session ?? 1);
+        $clean = fn (string $text) => trim(preg_replace('/[^A-Za-z0-9]+/', '_', str_replace("'", '', $text)), '_');
+
+        return $clean($event->title).'_'.$clean($kind).'_'.$clean($period).'.'.$extension;
     }
 
     private function validatedDay(Event $event, mixed $day): int|string

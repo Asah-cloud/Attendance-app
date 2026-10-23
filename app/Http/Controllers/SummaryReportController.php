@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\AttendanceExport;
+use App\Exports\AttendanceWorkbook;
 use App\Models\Event;
 use App\Services\ApplicationCache;
+use App\Services\AttendanceGrid;
 use App\Services\AttendanceReportData;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -34,9 +35,8 @@ class SummaryReportController extends Controller
     public function download(Event $event)
     {
         $this->authorize('view', $event);
-        $fileName = 'Full_Summary_'.str_replace(' ', '_', $event->title).'.xlsx';
 
-        return Excel::download(new AttendanceExport($event, 'all'), $fileName);
+        return Excel::download(new AttendanceWorkbook($event, 'all'), ReportController::fileName($event, 'Full summary', 'all', null, 'xlsx'));
     }
 
     public function downloadPdf(Event $event)
@@ -44,10 +44,14 @@ class SummaryReportController extends Controller
         $this->authorize('view', $event);
         $summaryData = $this->summaryData($event);
 
-        $pdf = Pdf::loadView('reports.summary-pdf', array_merge(['event' => $event], $summaryData))->setPaper('a4');
-        $fileName = 'Full_Summary_'.str_replace(' ', '_', $event->title).'.pdf';
+        $grid = app(AttendanceGrid::class)->build($event, 'all');
 
-        return $pdf->download($fileName);
+        $pdf = Pdf::loadView('reports.summary-pdf', array_merge(['event' => $event, 'grid' => $grid], $summaryData))
+            ->setPaper('a4', $grid['slots']->count() > 3 ? 'landscape' : 'portrait')
+            // Embed only the letters used; the full DejaVu font makes every PDF ~900 KB.
+            ->setOption('isFontSubsettingEnabled', true);
+
+        return $pdf->download(ReportController::fileName($event, 'Full summary', 'all', null, 'pdf'));
     }
 
     private function summaryData(Event $event): array

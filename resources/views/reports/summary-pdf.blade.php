@@ -2,66 +2,66 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <style>
-        body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; font-size: 11px; }
-        h1 { font-size: 20px; margin: 0 0 4px 0; }
-        .meta { color: #64748b; font-size: 10px; margin-bottom: 18px; }
-        .stats { width: 100%; margin-bottom: 18px; }
-        .stats td { width: 50%; padding: 10px; border: 1px solid #e2e8f0; text-align: center; }
-        .stats .label { display: block; font-size: 9px; text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
-        .stats .value { font-size: 18px; font-weight: bold; }
-        h2 { font-size: 13px; margin: 18px 0 8px 0; border-bottom: 2px solid #1e293b; padding-bottom: 4px; }
-        table.list { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        table.list th { text-align: left; font-size: 9px; text-transform: uppercase; color: #64748b; background: #f8fafc; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
-        table.list td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; font-size: 10px; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #f1f5f9; font-size: 9px; margin: 2px; }
-    </style>
+    @include('reports._pdf-style')
 </head>
 <body>
-    <h1>{{ $event->title }}</h1>
-    <div class="meta">Full summary report &middot; Generated {{ now()->format('M j, Y g:i A') }}</div>
+    @php
+        $slots = $grid['slots'];
+        $expected = $grid['totalExpected'];
+        $countFor = fn ($slot) => $grid['rows']->filter(fn ($row) => ! in_array($row->cells[$slot['key']], ['', \App\Services\AttendanceGrid::NOT_PRESENT], true))->count();
+        $people = $grid['rows']->sortBy([['daysAttended', 'desc'], [fn ($a, $b) => strcasecmp($a->person->name, $b->person->name)]])->values();
+    @endphp
+    <div class="footer">{{ $event->title }} · Full summary <span class="page" style="float: right"></span></div>
 
-    <table class="stats">
-        <tr>
-            <td><span class="label">Registered</span><span class="value">{{ $registeredCount }}</span></td>
-            <td><span class="label">Confirmed</span><span class="value">{{ $confirmedCount }}</span></td>
-        </tr>
-        <tr>
-            <td><span class="label">Arrived</span><span class="value">{{ $arrivedCount }}</span></td>
-            <td><span class="label">People present at least once</span><span class="value">{{ $presentUsers->count() }}</span></td>
-        </tr>
-        <tr>
-            <td><span class="label">Unique people (incl. numbered staff)</span><span class="value">{{ $presentUsers->count() }}</span></td>
-            <td><span class="label">Never Attended</span><span class="value">{{ $absentUsers->count() }}</span></td>
-        </tr>
+    <div class="band">
+        <div class="kicker">Full summary · all days</div>
+        <h1>{{ $event->title }}</h1>
+        <div class="meta">{{ $totalEventDays }} {{ \Illuminate\Support\Str::plural('day', $totalEventDays) }} · Generated {{ now()->format('j M Y, g:i A') }}</div>
+    </div>
+
+    <table class="stats"><tr>
+        <td><div class="label">Registered</div><div class="value">{{ number_format($registeredCount) }}</div></td>
+        <td><div class="label">Confirmed</div><div class="value">{{ number_format($confirmedCount) }}</div></td>
+        <td><div class="label">Arrived</div><div class="value">{{ number_format($arrivedCount) }}</div></td>
+        <td class="good"><div class="label">Present at least once</div><div class="value">{{ number_format($presentUsers->count()) }}</div></td>
+        <td class="bad"><div class="label">Never present</div><div class="value">{{ number_format($absentUsers->count()) }}</div></td>
+    </tr></table>
+
+    <h2>Present each day</h2>
+    <table class="list">
+        <thead><tr><th>Day</th><th class="c" style="width: 70px">People</th><th style="width: 45%">Of expected ({{ $expected }})</th></tr></thead>
+        <tbody>
+            @foreach($slots as $slot)
+                @php
+                    $n = $countFor($slot);
+                    $pct = $expected ? round($n / $expected * 100) : 0;
+                @endphp
+                <tr><td><strong>{{ $slot['label'] }}</strong></td><td class="c">{{ $n }}</td><td><table style="width: 100%; border-collapse: collapse"><tr><td style="padding: 0; border: 0; background: none"><div class="bar"><div style="width: {{ $pct }}%"></div></div></td><td style="padding: 0 0 0 6px; border: 0; background: none; width: 30px" class="muted">{{ $pct }}%</td></tr></table></td></tr>
+            @endforeach
+        </tbody>
     </table>
 
-    <h2>Attendees by category</h2>
-    <div>
-        @forelse($categoryBreakdown as $label => $count)
-            <span class="badge">{{ $label }} &middot; {{ $count }}</span>
-        @empty
-            <span>No attendance recorded.</span>
-        @endforelse
-    </div>
+    @include('reports._pdf-breakdowns', ['areaBreakdown' => $grid['rows']->countBy('area')->sortDesc()])
 
-    <h2>Attendees by gender</h2>
-    <div>
-        @forelse($genderBreakdown as $label => $count)
-            <span class="badge">{{ $label }} &middot; {{ $count }}</span>
-        @empty
-            <span>No attendance recorded.</span>
-        @endforelse
-    </div>
-
-    <h2>Member consistency rankings</h2>
+    <h2>Attendance by person <span class="count">({{ $people->count() }}, most days first)</span></h2>
     <table class="list">
-        <thead><tr><th>Name</th><th>Category</th><th>Days attended</th><th>Retention rate</th></tr></thead>
+        <thead><tr>
+            <th class="n">#</th><th>Name</th><th>Area</th><th>Category</th>
+            @foreach($slots as $slot)<th class="c">{{ $slot['label'] }}</th>@endforeach
+            <th class="c">Days</th>
+        </tr></thead>
         <tbody>
-            @forelse($presentUsers->sortByDesc('days_attended') as $user)
-                <tr><td>{{ $user->name }}</td><td>{{ $user->category ?? 'General Attendee' }}</td><td>{{ $user->days_attended }} / {{ $totalEventDays }}</td><td>{{ round($user->attendance_rate) }}%</td></tr>
+            @forelse($people as $index => $row)
+                <tr>
+                    <td class="n">{{ $index + 1 }}</td>
+                    <td><strong>{{ $row->person->name }}</strong></td>
+                    <td>{{ $row->area }}</td>
+                    <td>{{ $row->person->category ?: '—' }}</td>
+                    @foreach($slots as $slot)<td class="c">@include('reports._pdf-day-cell', ['value' => $row->cells[$slot['key']]])</td>@endforeach
+                    <td class="c"><strong>{{ $row->daysAttended }}</strong> of {{ $grid['totalDays'] }}</td>
+                </tr>
             @empty
-                <tr><td colspan="4">No attendance records found.</td></tr>
+                <tr><td colspan="{{ 5 + $slots->count() }}" class="muted">No attendance records found.</td></tr>
             @endforelse
         </tbody>
     </table>

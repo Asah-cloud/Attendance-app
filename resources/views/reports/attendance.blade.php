@@ -152,7 +152,7 @@
                                     <th class="px-6 py-4 w-12 text-center">#</th>
                                     <th class="px-6 py-4">Name</th>
                                     <th class="px-6 py-4">Area</th>
-                                    <th class="px-6 py-4 text-center">{{ $selectedDay === 'all' ? 'Freq.' : 'Time' }}</th>
+                                    <th class="px-6 py-4 text-center">{{ $selectedDay === 'all' ? 'Days' : 'Time' }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
@@ -168,8 +168,10 @@
                                         @if($user->isNumberedParticipantStaff())
                                             <span class="text-amber-700 font-black text-[10px] uppercase">All days</span>
                                         @elseif($selectedDay === 'all')
-                                            <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[9px] font-black uppercase">
-                                                {{ $user->attendances->count() }}x
+                                            <span class="inline-flex flex-wrap justify-center gap-1">
+                                                @foreach($user->attendances->where('day', '>=', 1)->pluck('day')->unique()->sort() as $attendedDay)
+                                                    <span class="rounded bg-green-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-green-700">Day {{ $attendedDay }}</span>
+                                                @endforeach
                                             </span>
                                         @else
                                             <span class="text-green-600 font-black text-[11px] uppercase">
