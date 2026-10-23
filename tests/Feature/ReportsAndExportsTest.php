@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
+use App\Services\AttendanceGrid;
 use App\Services\AttendanceReportData;
 use Spatie\Permission\Models\Role;
 
@@ -309,7 +310,7 @@ it('leaves days that have not happened yet blank instead of marking people absen
     $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
     Attendance::create(['event_id' => $event->id, 'participant_id' => $person->id, 'day' => 1]);
 
-    $cells = app(\App\Services\AttendanceGrid::class)->build($event, 'all')['rows']->first()->cells;
+    $cells = app(AttendanceGrid::class)->build($event, 'all')['rows']->first()->cells;
 
     expect($cells['2:1'])->toBe('')->and($cells['3:1'])->toBe('')->and($cells['1:1'])->not->toBe('');
 });
