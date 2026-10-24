@@ -67,6 +67,7 @@ class PublicEventRegistrationController extends Controller
                 'status' => $status,
                 'approved_at' => $status === EventRegistration::STATUS_CONFIRMED ? now() : null,
                 'source' => 'public',
+                ...$participants->eventDetails(['category' => $validated['category']], $participant, null, trusted: false),
                 'custom_answers' => $validated['custom'] ?? [],
                 'consented_at' => now(),
                 'terms_version' => $event->registration_terms_version,

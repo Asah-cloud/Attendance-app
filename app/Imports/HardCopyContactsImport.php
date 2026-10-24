@@ -45,6 +45,8 @@ class HardCopyContactsImport implements OnEachRow
             'participant_id' => $participant->id,
             'status' => EventRegistration::STATUS_AWAITING_CONFIRMATION,
             'source' => 'hardcopy_import',
+            'category' => $participant->getRawOriginal('category'),
+            'room_group' => $participant->getRawOriginal('room_group'),
         ]);
     }
 }

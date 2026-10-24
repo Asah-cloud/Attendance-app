@@ -146,7 +146,7 @@ it('prints only the bare room name on the badge, without block or floor', functi
 it('makes the imported area or group available as an optional badge field', function () {
     [$event] = badgeStudioFixture();
     $registration = badgeRegistration($event);
-    $registration->participant->update(['room_group' => 'Area 7 / Young Adults']);
+    $registration->update(['room_group' => 'Area 7 / Young Adults']);
 
     expect(BadgeDesign::LABELS['group'])->toBe('Area / Group')
         ->and(BadgeDesign::defaults()['group']['visible'])->toBeFalse()

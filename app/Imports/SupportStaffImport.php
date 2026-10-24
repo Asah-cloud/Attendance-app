@@ -63,8 +63,10 @@ class SupportStaffImport implements OnEachRow
             foreach ($this->eventIds as $eventId) {
                 $registration = EventRegistration::query()->firstOrCreate(
                     ['event_id' => $eventId, 'participant_id' => $participant->id],
-                    ['status' => EventRegistration::STATUS_CONFIRMED, 'approved_at' => now(), 'source' => 'support_staff']
+                    ['status' => EventRegistration::STATUS_CONFIRMED, 'approved_at' => now(), 'source' => 'support_staff', 'category' => $category]
                 );
+                // The staff role in these events is the one in this list.
+                $registration->update(['category' => $category]);
                 if (! $registration->wasRecentlyCreated && $registration->status !== EventRegistration::STATUS_CONFIRMED) {
                     $registration->update(['status' => EventRegistration::STATUS_CONFIRMED, 'approved_at' => now(), 'cancelled_at' => null]);
                 }

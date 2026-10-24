@@ -32,6 +32,18 @@ class MealCollection extends Model
         return $this->belongsTo(Participant::class);
     }
 
+    /** With the registration loaded, the person shows that event's category (see EventRegistration). */
+    public function getRelationValue($key)
+    {
+        $value = parent::getRelationValue($key);
+
+        if ($key === 'participant' && $value instanceof Participant && $this->relationLoaded('registration') && $this->registration) {
+            $value->useEventDetails($this->registration);
+        }
+
+        return $value;
+    }
+
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');

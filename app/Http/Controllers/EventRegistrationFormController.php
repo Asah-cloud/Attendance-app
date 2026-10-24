@@ -8,6 +8,7 @@ use App\Models\BadgeExport;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationField;
+use App\Models\Participant;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\BadgePdfService;
@@ -47,9 +48,9 @@ class EventRegistrationFormController extends Controller
             ->when($search !== '', function ($query) use ($search): void {
                 foreach (Search::words($search) as $word) {
                     $query->where(function ($query) use ($word): void {
-                        Search::matchWord($query, $word, ['registration_code']);
+                        Search::matchWord($query, $word, ['registration_code', 'category', 'room_group']);
                         $query->orWhereHas('participant', fn ($participant) => $participant->where(
-                            fn ($group) => Search::matchWord($group, $word, ['name', 'email', 'member_id', 'category', 'gender'], ['phone'])
+                            fn ($group) => Search::matchWord($group, $word, ['name', 'email', 'member_id', 'gender'], ['phone'])
                         ));
                     });
                 }
@@ -122,6 +123,7 @@ class EventRegistrationFormController extends Controller
                 'status' => $atCapacity ? EventRegistration::STATUS_WAITLISTED : EventRegistration::STATUS_CONFIRMED,
                 'approved_at' => $atCapacity ? null : now(),
                 'source' => 'manual',
+                ...$participants->eventDetails($validated, $participant, null),
             ]);
         });
 
@@ -203,7 +205,9 @@ class EventRegistrationFormController extends Controller
             ->mapWithKeys(fn ($value, $field) => [$field => ['old' => $participant->getAttribute($field), 'new' => $value]])
             ->all();
 
-        $participant->update($validated);
+        // Category and area are this event's only; the rest describes the person everywhere.
+        $registration->update(array_intersect_key($validated, array_flip(Participant::EVENT_FIELDS)));
+        $participant->update(array_diff_key($validated, array_flip(Participant::EVENT_FIELDS)));
 
         if ($changes !== []) {
             $participant->auditLogs()->create([
@@ -271,7 +275,7 @@ class EventRegistrationFormController extends Controller
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', $staffMode))
             ->when(isset($options['attendees']), fn ($query) => $query->whereIn('id', $options['attendees']))
-            ->when(filled($options['category'] ?? null), fn ($query) => $query->whereHas('participant', fn ($participant) => $participant->where('category', $options['category'])))
+            ->when(filled($options['category'] ?? null), fn ($query) => $query->where('category', $options['category']))
             ->with(['participant', 'roomAssignment.room.floor.block'])
             ->orderBy('id')
             ->when($request->boolean('sample'), fn ($query) => $query->limit(1))

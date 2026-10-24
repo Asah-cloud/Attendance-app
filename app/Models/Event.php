@@ -300,6 +300,9 @@ class Event extends Model
         return $this->belongsToMany(Participant::class, 'event_registrations')
             ->withPivot([
                 'status',
+                // Per-event category and area; Participant reads these instead of its own.
+                'category',
+                'room_group',
                 'registration_code',
                 'registered_at',
                 'approved_at',

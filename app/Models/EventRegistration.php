@@ -27,6 +27,8 @@ class EventRegistration extends Model
         'event_id',
         'participant_id',
         'status',
+        'category',
+        'room_group',
         'registered_at',
         'approved_at',
         'cancelled_at',
@@ -66,6 +68,15 @@ class EventRegistration extends Model
             $registration->registration_code ??= Str::random(40);
             $registration->management_token ??= Str::random(40);
             $registration->registered_at ??= now();
+
+            // A registration made without a category or area starts from the person's current
+            // ones; a value given explicitly (even blank) is kept as this event's.
+            $missing = array_diff(Participant::EVENT_FIELDS, array_keys($registration->getAttributes()));
+            if ($missing !== [] && ($person = Participant::query()->find($registration->participant_id))) {
+                foreach ($missing as $field) {
+                    $registration->setAttribute($field, $person->getRawOriginal($field));
+                }
+            }
         });
 
         static::saved(function (EventRegistration $registration): void {
@@ -87,6 +98,21 @@ class EventRegistration extends Model
     public function participant(): BelongsTo
     {
         return $this->belongsTo(Participant::class);
+    }
+
+    /**
+     * Whenever a person is read through this registration ($registration->participant), their
+     * category and area are this event's, not whatever a later import set on the person.
+     */
+    public function getRelationValue($key)
+    {
+        $value = parent::getRelationValue($key);
+
+        if ($key === 'participant' && $value instanceof Participant) {
+            $value->useEventDetails($this);
+        }
+
+        return $value;
     }
 
     public function mealCollections(): HasMany

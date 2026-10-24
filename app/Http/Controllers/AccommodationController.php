@@ -356,8 +356,8 @@ class AccommodationController extends Controller
         unset($data['room_group']);
         $data['accommodation_required'] = $request->boolean('accommodation_required');
         $data['accessibility_required'] = $data['accommodation_required'] && $request->boolean('accessibility_required');
-        $registration->update($data);
-        $registration->participant->update(['room_group' => $roomGroup]);
+        // The area is this event's only, so it is saved on the registration.
+        $registration->update($data + ['room_group' => $roomGroup]);
         if (! $data['accommodation_required'] && $registration->roomAssignment?->status !== 'checked_in') {
             $registration->roomAssignment?->delete();
         }

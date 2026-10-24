@@ -90,9 +90,13 @@ class DashboardController extends Controller
                 ],
                 'registrationStatuses' => EventRegistration::whereIn('event_id', clone $eventIds)
                     ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
-                'categoryBreakdown' => Attendance::whereIn('event_id', clone $eventIds)
+                // Category as recorded for each event, not whatever the person's latest import said
+                // (the person's own category only for old check-ins with no registration).
+                'categoryBreakdown' => Attendance::whereIn('attendances.event_id', clone $eventIds)
                     ->join('participants', 'participants.id', '=', 'attendances.participant_id')
-                    ->selectRaw("COALESCE(NULLIF(participants.category, ''), 'Unspecified') as label, count(*) as total")
+                    ->leftJoin('event_registrations', fn ($join) => $join->on('event_registrations.participant_id', '=', 'attendances.participant_id')
+                        ->on('event_registrations.event_id', '=', 'attendances.event_id'))
+                    ->selectRaw("COALESCE(NULLIF(event_registrations.category, ''), NULLIF(participants.category, ''), 'Unspecified') as label, count(*) as total")
                     ->groupBy('label')->orderByDesc('total')->pluck('total', 'label'),
                 'genderBreakdown' => Attendance::whereIn('event_id', clone $eventIds)
                     ->join('participants', 'participants.id', '=', 'attendances.participant_id')

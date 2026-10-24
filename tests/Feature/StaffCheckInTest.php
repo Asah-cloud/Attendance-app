@@ -113,9 +113,8 @@ it('lets a manager edit a staff name and category from the staff check-in page',
         ->assertSee('Kofi Mensah')
         ->assertSee('Lead Usher');
 
-    expect($staff->fresh())
-        ->name->toBe('Kofi Mensah')
-        ->category->toBe('Lead Usher');
+    expect($staff->fresh()->name)->toBe('Kofi Mensah')
+        ->and($event->registrations()->where('participant_id', $staff->id)->value('category'))->toBe('Lead Usher');
 });
 
 it('does not allow the staff editor to modify someone outside the event staff roster', function () {

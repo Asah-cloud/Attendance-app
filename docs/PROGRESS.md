@@ -185,6 +185,10 @@ ssh -i ~/.ssh/lightsail_attendance ubuntu@<server> \
   it has check-ins (or is today, during the event); empty days are left out of "days attended" and of
   averages. Average daily turnout = mean of each day's present ÷ expected. Live counters and reports
   only count check-ins of people still confirmed (`Attendance::countedFor`).
+- **Category and area belong to each event's registration** (`event_registrations.category` /
+  `room_group`, since #33). `$registration->participant` and an event's attendee lists show the
+  event's values automatically (`Participant::useEventDetails`); the member directory shows the
+  person's latest. Save category/area on the registration, never on the person, in event screens.
 - **Objects stored in the cache must be listed** in `config/cache.php` → `serializable_classes`
   (Laravel 13). Tests use the array cache, which hides this; see the cache test in `ReportsAndExportsTest`.
 - **Maatwebsite Excel drops an empty row (`[]`)** in `FromArray`. Use `['']` for a blank line.
@@ -221,6 +225,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #26 | 21 Oct | **Drag-and-drop room board** (SortableJS); warns before mixing genders |
 | #28 | 21 Oct | Import reads formula cells as values; dashboards show "People on events" with total records underneath |
 | #29 | 23 Oct | **Accommodation hub of cards** (each area on its own page); **room board redesigned** as a full-screen page in a new tab |
+| #33 | 24 Oct | **Category and area per event:** importing someone into a new event no longer rewrites an earlier event's category or area |
 | #31 | 24 Oct | **Reports rebuilt:** one counting engine (`AttendanceGrid`) for page, Excel, PDF and CSV; Simple / Detailed / Advanced views; a column per day in downloads; filters carry into downloads; old Summary page folded in |
 
 ### Data fixes on production (done by script)
