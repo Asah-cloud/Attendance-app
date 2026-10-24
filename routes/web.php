@@ -32,7 +32,6 @@ use App\Http\Controllers\RoomPlanController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SharedFormController;
 use App\Http\Controllers\SignInActivityController;
-use App\Http\Controllers\SummaryReportController;
 use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
@@ -197,15 +196,16 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     });
     // Reporting & Exports — the live report view is standard, exports are the paid advanced_reports feature
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
-    Route::get('/events/{event}/summary', [SummaryReportController::class, 'index'])->name('reports.summary');
+    // The old summary page is now the Simple view of the Reports page.
+    Route::get('/events/{event}/summary', [ReportController::class, 'summary'])->name('reports.summary');
     Route::middleware('event.feature:advanced_reports')->group(function () {
         Route::get('/reports/event/{event}/excel/{day?}', [ReportController::class, 'exportExcel'])->name('reports.excel');
         Route::get('/reports/event/{event}/csv/{day?}', [ReportController::class, 'exportCsv'])->name('reports.csv');
         Route::get('/reports/event/{event}/area-summary/{day?}', [ReportController::class, 'exportAreaSummary'])->name('reports.area-summary');
         Route::get('/reports/event/{event}/area/{area}/excel/{day?}', [ReportController::class, 'exportAreaDetail'])->name('reports.area-detail');
         Route::get('/reports/event/{event}/pdf/{day?}', [ReportController::class, 'exportPdf'])->name('reports.pdf');
-        Route::get('/events/{event}/summary/export', [SummaryReportController::class, 'download'])->name('reports.summary.export');
-        Route::get('/events/{event}/summary/pdf', [SummaryReportController::class, 'downloadPdf'])->name('reports.summary.pdf');
+        Route::get('/events/{event}/summary/export', [ReportController::class, 'exportExcel'])->name('reports.summary.export');
+        Route::get('/events/{event}/summary/pdf', [ReportController::class, 'exportPdf'])->name('reports.summary.pdf');
     });
 
     // Food / meal distribution — paid feature: food

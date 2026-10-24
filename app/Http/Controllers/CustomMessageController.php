@@ -89,13 +89,15 @@ class CustomMessageController extends Controller
         ]);
     }
 
-    public function create(Event $event): View
+    public function create(Request $request, Event $event): View
     {
         $this->authorize('manageMessages', $event);
 
         $composeConfig = $this->composeConfig($event);
+        // Reports link here with ?participants=1,2,3 to start a message to a list (e.g. people who missed a day).
+        $selectedParticipantIds = $this->companyParticipantIds($event, array_slice(array_filter(array_map('intval', explode(',', (string) $request->query('participants', '')))), 0, 5000));
 
-        return view('events.messages.create', compact('event', 'composeConfig'));
+        return view('events.messages.create', compact('event', 'composeConfig', 'selectedParticipantIds'));
     }
 
     public function edit(Event $event, CustomMessage $message): View

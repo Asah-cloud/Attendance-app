@@ -105,7 +105,7 @@ it('uses confirmed registrations for policy access totals reports and exports', 
         ->and((new AttendanceExport($event, 1))->collection()->pluck('id')->all())->toBe([$confirmed->id]);
 
     $this->actingAs($usher)
-        ->get(route('reports.event', ['event' => $event, 'day' => 1]))
+        ->get(route('reports.event', ['event' => $event, 'day' => 1, 'view' => 'detailed']))
         ->assertOk()
         ->assertSee('Confirmed Person')
         ->assertDontSee('Pending Person');

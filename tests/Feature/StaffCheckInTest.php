@@ -7,7 +7,6 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -62,8 +61,9 @@ it('keeps support staff out of the attendance roster, stats, and report', functi
         ->and($event->confirmedStaff()->pluck('participants.id')->all())->toBe([$staff->id]);
 
     $this->actingAs($manager)
-        ->get(route('reports.event', ['event' => $event, 'day' => 1]))
+        ->get(route('reports.event', ['event' => $event, 'day' => 1, 'view' => 'detailed']))
         ->assertOk()
+        ->assertSee('Not yet checked in')
         ->assertSee('Ama Attendee')
         ->assertDontSee('Kofi Staff');
 });
@@ -122,9 +122,11 @@ it('does not allow the staff editor to modify someone outside the event staff ro
     [, $event, $manager, , $attendee] = staffCheckInFixture();
 
     $this->actingAs($manager);
-    expect(fn () => Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
-        ->call('startEditingStaff', $attendee->id))
-        ->toThrow(ModelNotFoundException::class);
+    // Livewire 4.4.8+ turns the missing-model exception into a 404 response instead of rethrowing it.
+    Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
+        ->call('startEditingStaff', $attendee->id)
+        ->assertStatus(404)
+        ->assertSet('editingStaffId', null);
 });
 
 it('notifies through the shared toast bubble instead of a silent session flash', function () {

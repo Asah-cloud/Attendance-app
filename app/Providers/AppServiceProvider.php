@@ -62,7 +62,14 @@ class AppServiceProvider extends ServiceProvider
 
         Company::saved(fn (Company $company) => app(ApplicationCache::class)->invalidateCompany($company->id));
         Company::deleted(fn (Company $company) => app(ApplicationCache::class)->invalidateCompany($company->id));
-        Participant::saved(fn (Participant $participant) => app(ApplicationCache::class)->invalidateCompany($participant->company_id));
+        Participant::saved(function (Participant $participant): void {
+            $cache = app(ApplicationCache::class);
+            $cache->invalidateCompany($participant->company_id);
+            // Reports group people by these fields, so refresh the events they are registered for.
+            if (! $participant->wasRecentlyCreated && $participant->wasChanged(['name', 'phone', 'gender', 'category', 'room_group', 'department', 'is_support_staff'])) {
+                $participant->registrations()->pluck('event_id')->each(fn ($eventId) => $cache->invalidateEvent((int) $eventId));
+            }
+        });
         Participant::deleted(fn (Participant $participant) => app(ApplicationCache::class)->invalidateCompany($participant->company_id));
         SubscriptionPayment::saved(fn (SubscriptionPayment $payment) => app(ApplicationCache::class)->invalidateCompany($payment->company_id));
         SubscriptionPayment::deleted(fn (SubscriptionPayment $payment) => app(ApplicationCache::class)->invalidateCompany($payment->company_id));

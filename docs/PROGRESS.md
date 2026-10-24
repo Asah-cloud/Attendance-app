@@ -181,6 +181,15 @@ ssh -i ~/.ssh/lightsail_attendance ubuntu@<server> \
   A phone or email match with a different name opens the import review pop-up.
 - **Spreadsheets with formula cells** are imported as the value Excel shows. If the name is still
   formula text, the row is skipped and counted.
+- **How reports count (since #31):** Expected = confirmed attendees on every day. A day counts only once
+  it has check-ins (or is today, during the event); empty days are left out of "days attended" and of
+  averages. Average daily turnout = mean of each day's present ÷ expected. Live counters and reports
+  only count check-ins of people still confirmed (`Attendance::countedFor`).
+- **Objects stored in the cache must be listed** in `config/cache.php` → `serializable_classes`
+  (Laravel 13). Tests use the array cache, which hides this; see the cache test in `ReportsAndExportsTest`.
+- **Maatwebsite Excel drops an empty row (`[]`)** in `FromArray`. Use `['']` for a blank line.
+- **Locally, the full test suite needs more memory** than this Mac's 128 MB PHP default:
+  `php -d memory_limit=1G vendor/bin/pest`.
 - **The server's `package-lock.json` must stay unmodified.** `deploy.sh` uses `npm ci`. Never run
   `npm install` on the server.
 
@@ -212,6 +221,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #26 | 21 Oct | **Drag-and-drop room board** (SortableJS); warns before mixing genders |
 | #28 | 21 Oct | Import reads formula cells as values; dashboards show "People on events" with total records underneath |
 | #29 | 23 Oct | **Accommodation hub of cards** (each area on its own page); **room board redesigned** as a full-screen page in a new tab |
+| #31 | 24 Oct | **Reports rebuilt:** one counting engine (`AttendanceGrid`) for page, Excel, PDF and CSV; Simple / Detailed / Advanced views; a column per day in downloads; filters carry into downloads; old Summary page folded in |
 
 ### Data fixes on production (done by script)
 - **15 Oct, AWC 2026 (event 10):** restored 6 records overwritten by a row-number import
@@ -243,6 +253,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | Check-in | `AttendanceController` (`checkInByPhone`, `selfCheckIn`), `attendance/public-scan.blade.php` |
 | Sign-in bell | `RecordLoginActivity`, `SignInActivityController`, `components/sign-in-bell.blade.php` |
 | Event links | `Event::uniqueSlug/findBySlug`, `EventSlugRedirect` |
+| Attendance reports | `AttendanceGrid` (all counting), `AttendanceInsights` (Advanced view), `ReportController`, `reports/views/{simple,detailed,advanced}`, `AttendanceWorkbook` + sheets in `app/Exports`, `reports/attendance-pdf.blade.php` |
 
 ---
 

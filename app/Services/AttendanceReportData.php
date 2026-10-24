@@ -16,10 +16,10 @@ class AttendanceReportData
         // arrival and the "all days" view always mean "present at any session".
         $session = $day === 'all' || (int) $day < 1 ? null : $session;
 
-        $eligible = $day === 'all' || (int) $day === 0
-            ? $event->confirmedParticipants()
-            : $event->attendanceEligibleParticipants();
-        $eligibleIds = $eligible->pluck('participants.id');
+        // "Expected" is always the confirmed attendees, on every day and on the all-days view.
+        // On events with an arrival check-in, people who never arrived count as absent on each
+        // day rather than silently dropping out of the total.
+        $eligibleIds = $event->confirmedParticipants()->pluck('participants.id');
 
         $presentAttendeeIds = Attendance::query()
             ->where('event_id', $event->id)

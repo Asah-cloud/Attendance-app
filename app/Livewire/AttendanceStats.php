@@ -35,16 +35,14 @@ class AttendanceStats extends Component
         $participantStaffIds = $this->event->persistentParticipantStaffIds();
         $participantStaffCount = $participantStaffIds->count();
         $dailyAttendeeCount = Attendance::query()
-            ->where('event_id', $this->event->id)
+            ->countedFor($this->event)
             ->where('day', $this->day)
             ->where('session', $this->session)
-            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->distinct('participant_id')
             ->count('participant_id');
         $cumulativeAttendeeCount = $this->day < 1 ? 0 : Attendance::query()
-            ->where('event_id', $this->event->id)
+            ->countedFor($this->event)
             ->whereBetween('day', [1, $this->day])
-            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
             ->distinct('participant_id')
             ->count('participant_id');
 

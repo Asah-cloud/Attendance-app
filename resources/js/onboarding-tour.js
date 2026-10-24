@@ -85,8 +85,8 @@ const TOURS = {
     'event-reports': [
         { popover: { title: 'Reports', description: 'Attendance and summary numbers for this event, broken down however you need.' } },
         EVENT_TABS_STEP,
-        { element: '[data-tour="event-reports-filter"]', popover: { title: 'Filter the registry', description: 'Narrow the report down by category, gender, or area.', side: 'bottom' } },
-        { element: '[data-tour="event-reports-export"]', popover: { title: 'Export', description: 'Download as Excel or PDF, or print directly from the browser.', side: 'bottom' } },
+        { element: '[data-tour="event-reports-views"]', popover: { title: 'Simple, Detailed or Advanced', description: 'Simple gives the headline numbers. Detailed shows every day, area and person, with filters. Advanced shows check-in times, who dropped off, comparisons and data checks.', side: 'bottom' } },
+        { element: '[data-tour="event-reports-export"]', popover: { title: 'Download', description: 'Excel, PDF or CSV of what you are looking at, including any filters.', side: 'bottom' } },
     ],
 
     'event-messages': [
