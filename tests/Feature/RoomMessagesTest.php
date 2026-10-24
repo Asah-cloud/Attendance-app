@@ -99,3 +99,13 @@ it('offers the room message from the room board', function () {
         ->assertSee('Tell people their rooms')
         ->assertSee(route('events.messages.create', ['event' => $event, 'rooms' => 'new']), false);
 });
+
+it('recognises the room placeholders even when the event has accommodation switched off', function () {
+    [$event, $manager] = roomMessageSetup();
+    $event->update(['accommodation_enabled' => false]);
+
+    $this->actingAs($manager)->get(route('events.messages.create', ['event' => $event, 'rooms' => 'all']))
+        ->assertOk()
+        // It has rooms, so the room buttons still show, and the tokens are never flagged as unknown.
+        ->assertViewHas('composeConfig', fn ($config) => array_key_exists('room', $config['tokens']) && array_key_exists('room_link', $config['knownTokens']));
+});
