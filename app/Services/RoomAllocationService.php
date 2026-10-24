@@ -91,11 +91,25 @@ class RoomAllocationService
             ?? $free->first();
     }
 
-    /** A room's gender: its own or its block's restriction, else the gender of whoever is already in it. */
-    private function roomGender(AccommodationRoom $room): ?string
+    /**
+     * A room's gender: its own or its block's restriction, else the gender of whoever is already in it
+     * (leaving out $ignoreRegistrationId, so someone moving out of a room doesn't count towards it).
+     */
+    private function roomGender(AccommodationRoom $room, ?int $ignoreRegistrationId = null): ?string
     {
         return $this->normalizeGender($room->gender_restriction ?: $room->floor->block->gender_restriction)
-            ?: $room->activeAssignments->map(fn ($assignment) => $this->normalizeGender($assignment->registration?->participant?->gender))->filter()->first();
+            ?: $room->activeAssignments
+                ->reject(fn ($assignment) => $assignment->event_registration_id === $ignoreRegistrationId)
+                ->map(fn ($assignment) => $this->normalizeGender($assignment->registration?->participant?->gender))->filter()->first();
+    }
+
+    /** Whether this registration's gender fits the room's, as automatic assignment requires. Unknown genders fit anywhere. */
+    private function fitsRoomGender(EventRegistration $registration, AccommodationRoom $room): bool
+    {
+        $gender = $this->normalizeGender($registration->participant->gender);
+        $roomGender = $this->roomGender($room, $registration->id);
+
+        return ! $gender || ! $roomGender || $roomGender === $gender;
     }
 
     /** The distinct, normalized room_group values already occupying a room. */
@@ -309,7 +323,7 @@ class RoomAllocationService
             ->get();
     }
 
-    /** Rooms this registration may still choose from: compatible, active, with a free bed. */
+    /** Rooms this registration may still choose from: compatible, active, with a free bed, and no one of another gender in it. */
     public function selectableRooms(EventRegistration $registration): Collection
     {
         $registration->loadMissing('participant', 'roomAssignment');
@@ -319,7 +333,7 @@ class RoomAllocationService
             ->filter(function ($room) use ($registration, $currentRoomId) {
                 $used = $room->active_assignments_count - ($room->id === $currentRoomId ? 1 : 0);
 
-                return $used < $room->capacity && $this->matches($registration, $room);
+                return $used < $room->capacity && $this->matches($registration, $room) && $this->fitsRoomGender($registration, $room);
             })
             ->values();
     }
@@ -351,6 +365,10 @@ class RoomAllocationService
             }
             if ($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->lockForUpdate()->get()->count() >= $room->capacity) {
                 return ['ok' => false, 'message' => 'Sorry, that room was just taken. Please choose another.'];
+            }
+            // Rechecked under the lock: someone of another gender may have taken a bed since the picker loaded.
+            if (! $this->fitsRoomGender($registration, $room->load('activeAssignments.registration.participant'))) {
+                return ['ok' => false, 'message' => 'Sorry, guests of another gender are staying in that room. Please choose another.'];
             }
 
             RoomAssignment::updateOrCreate(

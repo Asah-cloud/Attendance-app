@@ -575,6 +575,31 @@ it('lets a confirmed attendee choose their own room before the cutoff', function
         ->and($registration->fresh()->roomAssignment->method)->toBe('self');
 });
 
+it('keeps attendees out of rooms where someone of the other gender is staying', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->addDays(2)]);
+    unlockAllEventFeatures($event);
+    $menRoom = accommodationRoom($event, 'Room 101', 4);
+    $emptyRoom = accommodationRoom($event, 'Room 102', 4);
+    accommodationRegistration($event, 'Kwame', 'Male')->roomAssignment()->create(['accommodation_room_id' => $menRoom->id, 'status' => 'assigned', 'method' => 'manual']);
+    $woman = accommodationRegistration($event, 'Ama', 'Female');
+    $man = accommodationRegistration($event, 'Kofi', 'M');
+    $allocator = app(RoomAllocationService::class);
+
+    expect($allocator->selectableRooms($woman)->pluck('id')->all())->toBe([$emptyRoom->id])
+        ->and($allocator->selectableRooms($man)->pluck('id')->all())->toBe([$menRoom->id, $emptyRoom->id]);
+
+    $this->get(route('registrations.room.select', $woman->management_token))->assertOk()
+        ->assertSee('Room 102')->assertDontSee('Room 101')
+        ->assertSee('4 beds free')->assertDontSee('@endif', false);
+
+    // Posting the room directly (or picking it just before it was taken) is still refused.
+    $this->post(route('registrations.room.claim', $woman->management_token), ['room_id' => $menRoom->id])
+        ->assertSessionHas('error', fn ($message) => str_contains($message, 'another gender'));
+
+    expect($woman->fresh()->roomAssignment)->toBeNull();
+});
+
 it('closes self-selection after the cutoff and blocks the last-bed race', function () {
     $company = Company::create(['name' => 'Acme']);
     $past = Event::create(['company_id' => $company->id, 'title' => 'Past', 'event_date' => now()->addWeek(), 'accommodation_enabled' => true, 'accommodation_self_select_closes_at' => now()->subDay()]);
