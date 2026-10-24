@@ -108,11 +108,11 @@ it('prefers seating people who share a room group together, even over an empty h
     $roomY = accommodationRoom($event, 'Y01', 3); // created second: lower priority, already holds their group
 
     $seed = accommodationRegistration($event, 'Seed Guest');
-    $seed->participant->update(['room_group' => 'Kumasi Area']);
+    $seed->update(['room_group' => 'Kumasi Area']);
     $seed->roomAssignment()->create(['accommodation_room_id' => $roomY->id, 'status' => 'assigned', 'method' => 'manual']);
 
     $newcomer = accommodationRegistration($event, 'New Guest');
-    $newcomer->participant->update(['room_group' => 'Kumasi Area']);
+    $newcomer->update(['room_group' => 'Kumasi Area']);
 
     $result = app(RoomAllocationService::class)->commit($event, null);
 
@@ -132,7 +132,9 @@ it('lets a manager set a participant\'s room group from the accommodation page',
         'accommodation_required' => 1, 'room_group' => 'Kumasi Area',
     ])->assertRedirect();
 
-    expect($registration->participant->fresh()->room_group)->toBe('Kumasi Area');
+    // The area is this event's: saved on the registration, not on the person.
+    expect($registration->fresh()->room_group)->toBe('Kumasi Area')
+        ->and($registration->participant->fresh()->getRawOriginal('room_group'))->toBeNull();
 });
 
 it('explains why a filtered assign run placed nobody instead of a silent success', function () {

@@ -207,10 +207,9 @@ class AttendanceSearch extends Component
             'editCategory' => 'staff category',
         ]);
 
-        $staff->update([
-            'name' => trim($validated['editName']),
-            'category' => trim($validated['editCategory']),
-        ]);
+        $staff->update(['name' => trim($validated['editName'])]);
+        // The staff role is recorded for this event only.
+        $this->event->registrations()->where('participant_id', $staff->id)->update(['category' => trim($validated['editCategory'])]);
 
         $this->cancelEditingStaff();
         $this->dispatch('notify', message: 'Staff details updated successfully.', type: 'success');
@@ -220,7 +219,7 @@ class AttendanceSearch extends Component
     {
         Gate::authorize('view', $this->event);
         $users = $this->participantsQuery()
-            ->tap(fn ($query) => Search::apply($query, $this->search, ['name', 'category', 'room_group', 'department'], ['phone']))
+            ->tap(fn ($query) => Search::apply($query, $this->search, ['participants.name', 'event_registrations.category', 'event_registrations.room_group', 'participants.department'], ['participants.phone']))
             ->paginate(15);
 
         // We automatically pass public properties to the view,

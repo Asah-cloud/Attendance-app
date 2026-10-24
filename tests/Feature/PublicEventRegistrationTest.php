@@ -410,9 +410,12 @@ it('lets a manager edit an attendee\'s details', function () {
     expect($participant->fresh())
         ->name->toBe('New Name')
         ->email->toBe('new@example.com')
+        ->member_id->toBe('M-100');
+    // Category and area are saved for this event only.
+    expect($registration->fresh())
         ->category->toBe('VIP')
-        ->member_id->toBe('M-100')
-        ->room_group->toBe('Kumasi Area');
+        ->room_group->toBe('Kumasi Area')
+        ->and($participant->fresh()->getRawOriginal('category'))->toBe('Guest');
 });
 
 it('logs an audit entry for each changed field when a manager edits an attendee', function () {

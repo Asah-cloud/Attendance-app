@@ -432,7 +432,7 @@ class MealDistributionController extends Controller
     {
         $meals = $event->mealDistributions()->with('entitlements')->withSum('collections', 'quantity')->withCount('collections')->orderBy('opens_at')->get();
         $collections = MealCollection::query()->whereHas('distribution', fn ($query) => $query->where('event_id', $event->id))
-            ->with(['distribution', 'participant', 'issuer', 'station'])->latest('collected_at')->get();
+            ->with(['distribution', 'participant', 'registration', 'issuer', 'station'])->latest('collected_at')->get();
         $audits = MealCollectionAudit::query()->where('event_id', $event->id)
             ->with(['distribution', 'participant', 'performer'])->latest('occurred_at')->get();
         $wasteLogs = MealWasteLog::query()->whereHas('distribution', fn ($query) => $query->where('event_id', $event->id))

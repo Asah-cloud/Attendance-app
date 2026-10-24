@@ -14,6 +14,7 @@ class ParticipantRegistrationService
     {
         return DB::transaction(function () use ($event, $data, $source, $trusted): array {
             $participant = $this->resolveParticipant($event, $data, $trusted);
+            $existing = EventRegistration::query()->where('event_id', $event->id)->where('participant_id', $participant->id)->first();
 
             $registration = EventRegistration::query()->updateOrCreate(
                 ['event_id' => $event->id, 'participant_id' => $participant->id],
@@ -22,11 +23,32 @@ class ParticipantRegistrationService
                     'approved_at' => now(),
                     'cancelled_at' => null,
                     'source' => $source,
+                    ...$this->eventDetails($data, $participant, $existing, $trusted),
                 ]
             );
 
             return [$participant, $registration];
         });
+    }
+
+    /**
+     * Category and area for this event's registration. They come from what was submitted or
+     * imported for this event; when nothing was given, a new registration starts from the
+     * person's latest values and an existing one keeps its own. An untrusted public form
+     * cannot change an existing registration's category.
+     *
+     * @return array{category: ?string, room_group: ?string}
+     */
+    public function eventDetails(array $data, Participant $participant, ?EventRegistration $existing, bool $trusted = true): array
+    {
+        $category = $this->usableString($data['category'] ?? null);
+        $roomGroup = $this->usableString($data['room_group'] ?? null);
+
+        return [
+            'category' => ($trusted || ! $existing ? $category : null) ?? $existing?->category ?? $participant->getRawOriginal('category'),
+            // A row for this event with a blank area means "no area for this event".
+            'room_group' => array_key_exists('room_group', $data) ? $roomGroup : ($existing?->room_group ?? $participant->getRawOriginal('room_group')),
+        ];
     }
 
     /**

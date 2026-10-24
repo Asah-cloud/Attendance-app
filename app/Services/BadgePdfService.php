@@ -15,7 +15,7 @@ class BadgePdfService
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', $staffMode))
             ->when(isset($options['attendees']), fn ($query) => $query->whereIn('id', $options['attendees']))
-            ->when(filled($options['category'] ?? null), fn ($query) => $query->whereHas('participant', fn ($participant) => $participant->where('category', $options['category'])))
+            ->when(filled($options['category'] ?? null), fn ($query) => $query->where('category', $options['category']))
             ->with(['participant', 'roomAssignment.room.floor.block'])
             ->orderBy('id')
             ->when($options['sample'] ?? false, fn ($query) => $query->limit(1))

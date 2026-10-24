@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\Event;
+use App\Models\EventRegistration;
 use App\Models\Participant;
 use Illuminate\Support\Collection;
 
@@ -59,6 +60,12 @@ class AttendanceReportData
             ->whereIn('id', $eligibleIds->diff($presentAttendeeIds))
             ->orderBy('name')
             ->get();
+
+        // Show each person's category and area as registered for this event.
+        $details = EventRegistration::query()->where('event_id', $event->id)
+            ->whereIn('participant_id', $presentIds->merge($eligibleIds)->unique())
+            ->get(['participant_id', 'category', 'room_group'])->keyBy('participant_id');
+        $presentUsers->merge($absentUsers)->each(fn (Participant $person) => $details->has($person->id) && $person->useEventDetails($details[$person->id]));
 
         return [
             'presentUsers' => $presentUsers,
