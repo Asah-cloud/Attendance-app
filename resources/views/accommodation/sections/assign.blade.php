@@ -11,7 +11,7 @@
                 <select name="category" class="rounded-lg border-indigo-200 text-sm"><option value="">All categories</option>@foreach($allocationCategories as $option)<option value="{{ $option }}" @selected($allocationCategory === $option)>{{ $option }}</option>@endforeach</select>
                 <select name="gender" class="rounded-lg border-indigo-200 text-sm"><option value="">All genders</option>@foreach($allocationGenders as $option)<option value="{{ $option }}" @selected($allocationGender === $option)>{{ $option }}</option>@endforeach</select>
                 <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white" @disabled(!$event->accommodation_enabled)>Assign rooms now</button>
-                <a href="{{ route('events.accommodation.section', array_filter(['event' => $event, 'section' => 'assign', 'preview' => 1, 'category' => $allocationCategory, 'gender' => $allocationGender])) }}" class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-black text-indigo-700">Preview selection</a>
+                <button name="preview" value="1" class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-black text-indigo-700">Preview selection</button>
                 @if($preview)<a href="{{ route('events.accommodation.section', [$event, 'assign']) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-500">Hide preview</a>@endif
                 <span class="text-xs text-indigo-700">Choose a category, gender, or both. Run each group separately; people already assigned are left unchanged. Preview is a fresh calculation each time — it doesn't assign anything.</span>
             </form>

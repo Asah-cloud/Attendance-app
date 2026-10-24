@@ -1,6 +1,6 @@
 # Project progress and handover
 
-Last updated: **23 Oct 2026**. Read this first when picking the project back up. It records what has
+Last updated: **24 Oct 2026**. Read this first when picking the project back up. It records what has
 been done, how changes are shipped, and what is still open. For how the system itself works, see
 [SYSTEM_DOCUMENTATION.md](SYSTEM_DOCUMENTATION.md).
 
@@ -13,11 +13,11 @@ been done, how changes are shipped, and what is still open. For how the system i
 
 | | |
 |---|---|
-| Production | Running `main` at `7dee88e` (merge of PR #29), deployed 23 Oct 2026 |
+| Production | Running `main` with PR #38 (and #31–#37), deployed 24 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
 | Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
-| Open PRs | Dependabot only: #3, #4, #5, #12, #27 (not reviewed yet) |
-| Tests | 620 passing. CI green on `main` |
-| Server working copy | Clean: `git status` on the server shows no changes |
+| Open PRs | Dependabot only: #3, #4, #5, #27, #32 (not reviewed yet) |
+| Tests | 647 passing. CI green on `main` |
+| Server working copy | Should be clean: `git status --short` on the server prints nothing |
 
 ---
 
@@ -88,8 +88,12 @@ composer audit --locked                    # CI fails on any security advisory
 ### 3.3 Look at it in a browser (for anything visible)
 
 There is a **local demo** with a **test manager account**. Its data is a "Demo Church" organisation
-with a "Demo Retreat" event, buildings and sample guests, kept in a scratch SQLite database (not the
-project's own). It is used to sign in and screenshot pages with puppeteer driving the installed Chrome:
+with a "Demo Retreat" event (id 1), buildings and sample guests, kept in a scratch SQLite database (not
+the project's own). It is used to sign in and screenshot pages with puppeteer driving the installed Chrome.
+The database, the login file and the puppeteer script (`browser/shoot.js`) sit together in a Claude Code
+scratch folder under `/private/tmp/claude-501/` (look for `demo.sqlite`); the login is never written
+into the repo. That folder can be wiped by a reboot; `demo-seed.php` beside it rebuilds the data. Back up
+`demo.sqlite` before changing data for a test, and restore it afterwards.
 
 ```bash
 DB_CONNECTION=sqlite DB_DATABASE=<scratch>/demo.sqlite APP_URL=http://127.0.0.1:8766 \
@@ -177,6 +181,12 @@ ssh -i ~/.ssh/lightsail_attendance ubuntu@<server> \
   `LogResendEmailEvents` still has the problem, so email bounces are logged twice.
 - **Counts from `withCount` are strings on SQLite** (tests) but integers on Postgres. Cast to `int`
   before strict comparisons such as `=== 0`.
+- **`->select(...)` after `->withCount(...)` silently drops the count** (it comes back `null`). Call
+  `select` first. This made every room look empty to automatic room assignment until it was fixed.
+- **A Blade directive glued to a word is printed as text**, e.g. `free@if(...)` or `step-free@endif`.
+  Put a space (or a tag) before the `@`. The room picker showed raw `@if(...)` code to attendees this way.
+- **Room tests that start with empty rooms hide occupancy bugs.** When testing allocation, put someone
+  in a room first.
 - **`import` with row numbers in column A:** an ID alone only re-finds someone with the same name.
   A phone or email match with a different name opens the import review pop-up.
 - **Spreadsheets with formula cells** are imported as the value Excel shows. If the name is still
@@ -225,8 +235,33 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #26 | 21 Oct | **Drag-and-drop room board** (SortableJS); warns before mixing genders |
 | #28 | 21 Oct | Import reads formula cells as values; dashboards show "People on events" with total records underneath |
 | #29 | 23 Oct | **Accommodation hub of cards** (each area on its own page); **room board redesigned** as a full-screen page in a new tab |
-| #33 | 24 Oct | **Category and area per event:** importing someone into a new event no longer rewrites an earlier event's category or area |
+| #30 | 23 Oct | This handover document brought up to date |
 | #31 | 24 Oct | **Reports rebuilt:** one counting engine (`AttendanceGrid`) for page, Excel, PDF and CSV; Simple / Detailed / Advanced views; a column per day in downloads; filters carry into downloads; old Summary page folded in |
+| #33 | 24 Oct | **Category and area per event:** importing someone into a new event no longer rewrites an earlier event's category or area |
+| #34 | 24 Oct | Room board: full rooms fold to a row of initials; All / Has space / Full filter; compact view; choices remembered per browser |
+| #35 | 24 Oct | Room board: drop anywhere on a room card; tap a person then a room to place them; green/red highlight while dragging; hold-to-drag on touch screens |
+| #36 | 24 Oct | **Tell people their rooms:** shortcut on the room board and Send to attendees; Messages opens pre-filled; placeholders `{room}`, `{building}`, `{floor}`, `{location}`, `{room_link}`; a sent room message marks people as told, a board move marks them not told |
+| #37 | 24 Oct | Messages always recognises the room placeholders (it wrongly warned on events with rooms but accommodation switched off) |
+| #38 | 24 Oct | **Automatic room assignment and room picker fixed**, see below |
+
+### Room assignment fixes (#38)
+Found in a system check on 24 Oct and confirmed with tests and on the local demo.
+- **Every room looked empty to the allocator.** `RoomAllocationService::eligibleRooms` called `select()`
+  after `withCount()`, which dropped the occupancy count. "Assign rooms now" proposed full rooms, then
+  skipped those people, so they stayed unplaced while other rooms had free beds. The same bug hit
+  placement on registration (`allocateOne`), the room plan import and the attendee room picker.
+  **After deploying, run "Assign rooms now" again on live events** with people still waiting.
+- **Mixed genders.** Automatic assignment only respected explicit gender restrictions, so an
+  unrestricted room could take men and women. A room's gender now comes from its restriction, else its
+  occupants (`roomGender`), as the room plan import already did.
+- **Rooms fill before new ones open.** Before, everyone got an empty room first and the rest were
+  spread over whatever beds were left. Room groups still go together, and a new group starts a fresh room.
+- **"Preview selection" ignored the dropdowns.** It was a link built at page load. It now submits the
+  same form (`preview=1`) and the controller redirects to the preview without assigning anyone. After
+  a run, the page shows the selection that ran, never a stale preview.
+- **Attendee room picker** hides rooms where someone of the other gender is staying, and the claim
+  rechecks it under the room lock. Attendees with no gender recorded can still choose any room. The
+  picker also printed raw Blade (`free@if(...)`) on every room line; fixed.
 
 ### Data fixes on production (done by script)
 - **15 Oct, AWC 2026 (event 10):** restored 6 records overwritten by a row-number import
@@ -251,7 +286,10 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | Area | Code |
 |---|---|
 | Participant import | `UsersImport`, `ParticipantListImporter`, `ParticipantRegistrationService`, `EventController::import/confirmImport` |
+| Automatic room assignment | `RoomAllocationService::preview/commit/pickRoom` (bulk), `allocateOne` (on registration), `AccommodationController::allocate`, `accommodation/sections/assign.blade.php` |
+| Attendee room picker | `RoomAllocationService::selectableRooms/claim`, `PublicEventRegistrationController::roomSelect/roomClaim`, `registrations/room-select.blade.php` |
 | Room plan | `RoomPlanController`, `RoomAllocationService::planBatch/commitPlan`, `accommodation/plan.blade.php` |
+| Room messages | `MergeFields` (room placeholders), `CustomMessageController`, `accommodation/_tell-rooms.blade.php` |
 | Room board | `RoomBoardController`, `resources/js/room-board.js`, `accommodation/board.blade.php` |
 | Accommodation hub | `AccommodationController::index/section`, `accommodation/index.blade.php`, `accommodation/sections/*` |
 | Forms | `EventFormController`, `PublicFormController`, `FormViewerController`, `SharedFormController` |
@@ -264,16 +302,25 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 
 ## 7. Open items and next steps
 
-1. **Dependabot PRs #3, #4, #5, #12, #27** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
+1. **After #38: run "Assign rooms now" again** on live events that have people waiting for a room; the
+   old bug may have left them unplaced.
+2. **Dependabot PRs #3, #4, #5, #27, #32** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
    (spatie/laravel-permission 7 → 8) are major upgrades and need care.
-2. **`LogResendEmailEvents` logs every email event twice** (listener discovery plus `subscribe`).
+3. **`LogResendEmailEvents` logs every email event twice** (listener discovery plus `subscribe`).
    Rename its methods the way `RecordLoginActivity` does.
-3. **The weekly health check reported "attention needed"** on 19 Oct because of an `npm audit`
+4. **The weekly health check reported "attention needed"** on 19 Oct because of an `npm audit`
    warning. Review it.
-4. **Lighter public pages:** public pages load the whole app bundle (~123 KB compressed), including
+5. **Lighter public pages:** public pages load the whole app bundle (~123 KB compressed), including
    admin and scanner code. A separate small bundle would make first loads on phones faster.
-5. **236 older participant records on no event** (from the Sept set-up). Some duplicate registered
+6. **236 older participant records on no event** (from the Sept set-up). Some duplicate registered
    people; tidy them with Merge Duplicates.
-6. **Optional:** a correction SMS to the 6 people who got message #24 under someone else's name (15 Oct).
-7. **Possible improvements:** an SMS length and Unicode warning on the compose page; a pre-send
-   Arkesel balance check; an email digest of new form responses.
+7. **Optional:** a correction SMS to the 6 people who got message #24 under someone else's name (15 Oct).
+8. **Unused component with a broken link:** `components/qr-print-button.blade.php` points to a route
+   `events.print-qr` that doesn't exist. Nothing uses it, or the view `events/print-qr.blade.php`, today;
+   delete both or wire them up before using them.
+9. **Naming:** the product now covers registration, check-in, meals, rooms, messaging and billing, so
+   "event management system" describes it better than "attendance app". The README still says
+   "attendance system".
+10. **Possible improvements:** an SMS length and Unicode warning on the compose page; a pre-send
+    Arkesel balance check; an email digest of new form responses; an "Are you sure?" step before
+    "Assign rooms now".

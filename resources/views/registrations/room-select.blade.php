@@ -49,7 +49,7 @@
                                                 <label class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50">
                                                     <input type="radio" name="room_id" value="{{ $room->id }}" required @checked($registration->roomAssignment?->accommodation_room_id === $room->id) @disabled($preview ?? false) class="text-indigo-600">
                                                     <span class="text-sm font-bold text-slate-800">{{ $room->name }}</span>
-                                                    <span class="ml-auto text-xs text-slate-500">{{ $free }} bed{{ $free === 1 ? '' : 's' }} free@if($room->is_accessible || $room->floor->is_accessible) · step-free@endif</span>
+                                                    <span class="ml-auto text-xs text-slate-500">{{ $free }} bed{{ $free === 1 ? '' : 's' }} free @if($room->is_accessible || $room->floor->is_accessible) · step-free @endif</span>
                                                 </label>
                                             @endforeach
                                         </div>

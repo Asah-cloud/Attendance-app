@@ -368,13 +368,20 @@ class AccommodationController extends Controller
     public function allocate(Request $request, Event $event, RoomAllocationService $allocator): RedirectResponse
     {
         $this->authorize('update', $event);
-        abort_unless($event->accommodation_enabled, 422, 'Tick "Use accommodation" and Save before assigning rooms.');
         $data = $request->validate([
             'category' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', 'max:255'],
         ]);
         $category = trim((string) ($data['category'] ?? '')) ?: null;
         $gender = trim((string) ($data['gender'] ?? '')) ?: null;
+
+        // "Preview selection" submits this same form so it carries the dropdowns as chosen;
+        // it only shows the proposals and assigns nobody.
+        if ($request->boolean('preview')) {
+            return redirect()->route('events.accommodation.section', array_filter(['event' => $event, 'section' => 'assign', 'preview' => 1, 'category' => $category, 'gender' => $gender]));
+        }
+
+        abort_unless($event->accommodation_enabled, 422, 'Tick "Use accommodation" and Save before assigning rooms.');
         $result = $allocator->commit($event, $request->user()->id, $category, $gender);
         if ($event->accommodation_published) {
             $this->sendPendingNotifications($event);
@@ -385,11 +392,12 @@ class AccommodationController extends Controller
         $scope = collect([$category ? "category: {$category}" : null, $gender ? "gender: {$gender}" : null])->filter()->implode(', ');
         $scopeLabel = $scope ? " for {$scope}" : '';
 
-        // Plain redirect back — never auto-attach ?preview=1. The preview is a
-        // heavy per-run scan; it stays an explicit "Preview selection" click so
-        // it doesn't silently recompute on every refresh of a large event.
+        // Back to the assign page showing the selection that ran — never with ?preview=1,
+        // even after a preview. The preview is a heavy per-run scan; it stays an explicit
+        // "Preview selection" click so it doesn't silently recompute on every refresh.
+        $back = redirect()->route('events.accommodation.section', array_filter(['event' => $event, 'section' => 'assign', 'category' => $category, 'gender' => $gender]));
         if ($assigned === 0) {
-            return back()->with('error', $unallocated > 0
+            return $back->with('error', $unallocated > 0
                 ? "No rooms assigned{$scopeLabel}. {$unallocated} attendee(s) still need a room, but no active room has a free bed that matches their gender/category. Use \"Preview selection\" to see each one, or adjust the room restrictions."
                 : "No unassigned attendee matches this selection{$scopeLabel}. Confirm they are confirmed and ticked as \"Needs room\".");
         }
@@ -399,7 +407,7 @@ class AccommodationController extends Controller
             $message .= " {$unallocated} still need a room — use \"Preview selection\" to see who.";
         }
 
-        return back()->with('success', $message);
+        return $back->with('success', $message);
     }
 
     public function assign(Request $request, Event $event, EventRegistration $registration, RoomAllocationService $allocator): RedirectResponse
