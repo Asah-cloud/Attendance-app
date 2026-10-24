@@ -13,11 +13,11 @@ been done, how changes are shipped, and what is still open. For how the system i
 
 | | |
 |---|---|
-| Production | Last recorded deploy: `7dee88e` (merge of PR #29), 23 Oct 2026. `main` has moved on to `de87ce4` (#37); run `git log --oneline -1` on the server to see whether #31–#37 are live |
-| Open work | Branch `fix/auto-assign-rooms`: automatic room assignment and room picker fixes (see [section 5](#5-what-has-been-done)). Committed locally; not pushed, no PR yet |
+| Production | Running `main` with PR #38 (and #31–#37), deployed 24 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
+| Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
 | Open PRs | Dependabot only: #3, #4, #5, #27, #32 (not reviewed yet) |
-| Tests | 647 passing on `fix/auto-assign-rooms` (640 on `main`) |
-| Server working copy | Clean at the last check (23 Oct): `git status` on the server showed no changes |
+| Tests | 647 passing. CI green on `main` |
+| Server working copy | Should be clean: `git status --short` on the server prints nothing |
 
 ---
 
@@ -242,9 +242,9 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #35 | 24 Oct | Room board: drop anywhere on a room card; tap a person then a room to place them; green/red highlight while dragging; hold-to-drag on touch screens |
 | #36 | 24 Oct | **Tell people their rooms:** shortcut on the room board and Send to attendees; Messages opens pre-filled; placeholders `{room}`, `{building}`, `{floor}`, `{location}`, `{room_link}`; a sent room message marks people as told, a board move marks them not told |
 | #37 | 24 Oct | Messages always recognises the room placeholders (it wrongly warned on events with rooms but accommodation switched off) |
-| *(branch `fix/auto-assign-rooms`, no PR yet)* | 24 Oct | **Automatic room assignment fixed**, see below |
+| #38 | 24 Oct | **Automatic room assignment and room picker fixed**, see below |
 
-### Room assignment fixes (branch `fix/auto-assign-rooms`)
+### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
 - **Every room looked empty to the allocator.** `RoomAllocationService::eligibleRooms` called `select()`
   after `withCount()`, which dropped the occupancy count. "Assign rooms now" proposed full rooms, then
@@ -302,8 +302,8 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
 
 ## 7. Open items and next steps
 
-1. **Ship `fix/auto-assign-rooms`:** push, open the PR, merge after CI, deploy, then run "Assign rooms
-   now" again on live events that have people waiting for a room.
+1. **After #38: run "Assign rooms now" again** on live events that have people waiting for a room; the
+   old bug may have left them unplaced.
 2. **Dependabot PRs #3, #4, #5, #27, #32** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
    (spatie/laravel-permission 7 → 8) are major upgrades and need care.
 3. **`LogResendEmailEvents` logs every email event twice** (listener discovery plus `subscribe`).
