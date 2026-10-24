@@ -62,8 +62,9 @@ it('keeps support staff out of the attendance roster, stats, and report', functi
         ->and($event->confirmedStaff()->pluck('participants.id')->all())->toBe([$staff->id]);
 
     $this->actingAs($manager)
-        ->get(route('reports.event', ['event' => $event, 'day' => 1]))
+        ->get(route('reports.event', ['event' => $event, 'day' => 1, 'view' => 'detailed']))
         ->assertOk()
+        ->assertSee('Not yet checked in')
         ->assertSee('Ama Attendee')
         ->assertDontSee('Kofi Staff');
 });

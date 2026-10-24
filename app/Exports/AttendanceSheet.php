@@ -3,19 +3,20 @@
 namespace App\Exports;
 
 use App\Exports\Concerns\StylesReportSheet;
+use App\Services\AttendanceGrid;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 
-/** The "Present" sheet of the Excel download: AttendanceExport with a title block and styling. */
+/** The present sheet ("Came at least once" / "Present") of the Excel download: AttendanceExport with a title block and styling. */
 class AttendanceSheet extends AttendanceExport implements WithCustomStartCell, WithEvents, WithTitle
 {
     use StylesReportSheet;
 
     public function title(): string
     {
-        return 'Present';
+        return $this->grid()['presentLabel'];
     }
 
     public function startCell(): string
@@ -32,8 +33,8 @@ class AttendanceSheet extends AttendanceExport implements WithCustomStartCell, W
                 $sheet,
                 $this->event->title,
                 collect([
-                    'Present: '.$grid['periodLabel'],
-                    $this->area,
+                    $grid['presentLabel'].': '.$grid['periodLabel'],
+                    AttendanceGrid::filterLabel($grid['filters']),
                     $grid['rows']->count().' of '.$grid['totalExpected'].' people',
                     'Generated '.now()->format('j M Y, g:i A'),
                 ])->filter()->join('  ·  ')

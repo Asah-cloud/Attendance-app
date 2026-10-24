@@ -148,6 +148,8 @@ return [
         EventRegistration::class,
         SubscriptionPayment::class,
         Attendance::class,
+        // Report rows (AttendanceGrid) are plain objects.
+        stdClass::class,
     ],
 
 ];

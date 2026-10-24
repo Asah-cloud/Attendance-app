@@ -20,11 +20,12 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
 
     private int $rowNumber = 0;
 
-    public function __construct(protected Event $event, protected int|string $day = 'all', protected ?string $area = null, protected ?int $session = null) {}
+    /** @param  array{area?: ?string, category?: ?string, gender?: ?string}  $filters */
+    public function __construct(protected Event $event, protected int|string $day = 'all', protected ?int $session = null, protected array $filters = []) {}
 
     public function grid(): array
     {
-        return $this->grid ??= app(AttendanceGrid::class)->build($this->event, $this->day, $this->session, $this->area);
+        return $this->grid ??= app(AttendanceGrid::class)->build($this->event, $this->day, $this->session, $this->filters);
     }
 
     /** The people present, in name order; map() looks up each person's day columns. */

@@ -17,11 +17,11 @@ class NotPresentSheet implements FromArray, WithCustomStartCell, WithEvents, Wit
 {
     use StylesReportSheet;
 
-    public function __construct(private readonly Event $event, private readonly array $grid, private readonly ?string $area = null) {}
+    public function __construct(private readonly Event $event, private readonly array $grid) {}
 
     public function title(): string
     {
-        return 'Not present';
+        return $this->grid['absentLabel'];
     }
 
     public function startCell(): string
@@ -46,8 +46,8 @@ class NotPresentSheet implements FromArray, WithCustomStartCell, WithEvents, Wit
         return [AfterSheet::class => function (AfterSheet $event): void {
             $sheet = $event->sheet->getDelegate();
             $this->writeTitleBlock($sheet, $this->event->title, collect([
-                'Not present: '.$this->grid['periodLabel'],
-                $this->area,
+                $this->grid['absentLabel'].': '.$this->grid['periodLabel'],
+                AttendanceGrid::filterLabel($this->grid['filters']),
                 $this->grid['absent']->count().' of '.$this->grid['totalExpected'].' people',
             ])->filter()->join('  ·  '));
             $this->styleTable($sheet, $this->headerRow, 7, [1]);

@@ -27,7 +27,7 @@ class AttendanceSummarySheet implements FromArray, WithEvents, WithTitle
 
     private int $widest = 2;
 
-    public function __construct(private readonly Event $event, private readonly array $grid, private readonly ?string $area = null) {}
+    public function __construct(private readonly Event $event, private readonly array $grid) {}
 
     public function title(): string
     {
@@ -43,7 +43,7 @@ class AttendanceSummarySheet implements FromArray, WithEvents, WithTitle
 
         $lines = [
             [$this->event->title],
-            [collect(['Attendance summary: '.$grid['periodLabel'], $this->area, 'Generated '.now()->format('j M Y, g:i A')])->filter()->join('  ·  ')],
+            [collect(['Attendance summary: '.$grid['periodLabel'], AttendanceGrid::filterLabel($grid['filters']), 'Generated '.now()->format('j M Y, g:i A')])->filter()->join('  ·  ')],
             // Blank rows must hold a value: an empty array is read as "no rows" and dropped.
             [''],
         ];
@@ -57,15 +57,17 @@ class AttendanceSummarySheet implements FromArray, WithEvents, WithTitle
             $lines[] = [''];
         };
 
-        $section('Overview', ['', 'People'], [
-            ['Expected', $grid['totalExpected']],
-            [$grid['multiDay'] ? 'Present at least once' : 'Present', $rows->count()],
-            [$grid['multiDay'] ? 'Never present' : 'Not present', $grid['absent']->count()],
+        $section('Overview', ['', 'Number', 'How it is counted'], [
+            ['Expected', $grid['totalExpected'], 'Confirmed attendees (support staff not included)'],
+            [$grid['presentLabel'], $rows->count(), $grid['day'] === 'all' ? 'Checked in on at least one day' : 'Checked in during this period'],
+            [$grid['absentLabel'], $grid['absent']->count(), 'Expected but no check-in'],
+            ...($grid['day'] === 'all' ? [['Days with check-ins', $grid['totalDays'], 'Of '.$grid['eventDays'].' event day(s); days with no check-ins are left out']] : []),
+            [$grid['day'] === 'all' ? 'Average daily turnout' : 'Turnout', $grid['turnout'].'%', $grid['day'] === 'all' ? 'Average of each day\'s present ÷ expected' : 'Present ÷ expected'],
         ]);
 
         if ($slots->count() > 1) {
-            $section('Present each day', ['Day', 'People present', 'Of expected'], $slots->map(fn ($slot) => [
-                $slot['label'], $present($rows, $slot), $grid['totalExpected'] ? round($present($rows, $slot) / $grid['totalExpected'] * 100).'%' : '0%',
+            $section('Present each day', ['Day', 'Present', 'Absent', 'Turnout'], $slots->map(fn ($slot) => [
+                $slot['label'], $grid['slotStats'][$slot['key']]['present'], max(0, $grid['totalExpected'] - $grid['slotStats'][$slot['key']]['present']), $grid['slotStats'][$slot['key']]['rate'].'%',
             ])->all());
         }
 

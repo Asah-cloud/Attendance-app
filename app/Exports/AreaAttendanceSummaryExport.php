@@ -22,11 +22,11 @@ class AreaAttendanceSummaryExport implements FromCollection, WithCustomStartCell
 
     private ?array $grid = null;
 
-    public function __construct(private readonly Event $event, private readonly int|string $day, private readonly ?int $session = null) {}
+    public function __construct(private readonly Event $event, private readonly int|string $day, private readonly ?int $session = null, private readonly array $filters = []) {}
 
     private function grid(): array
     {
-        return $this->grid ??= app(AttendanceGrid::class)->build($this->event, $this->day, $this->session);
+        return $this->grid ??= app(AttendanceGrid::class)->build($this->event, $this->day, $this->session, $this->filters);
     }
 
     private function perDay(): bool
