@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\CustomMessageRecipient;
 use App\Notifications\CustomAttendeeMessage;
+use App\Support\MergeFields;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -42,6 +43,11 @@ class SendCustomAttendeeMessageJob implements ShouldQueue
                 attachments: $isMail ? ($message->attachments ?? []) : [],
             ));
             $recipient->update(['status' => CustomMessageRecipient::STATUS_SENT]);
+
+            // A message that told them their room counts as the room notice, like the standard one.
+            if (MergeFields::mentionsRoom($message->subject.' '.($isMail ? $message->email_body : $message->sms_body))) {
+                MergeFields::assignmentFor($message->event, $recipient->participant_id)?->update(['notification_sent_at' => now()]);
+            }
         } catch (Throwable $exception) {
             $recipient->update([
                 'status' => CustomMessageRecipient::STATUS_FAILED,

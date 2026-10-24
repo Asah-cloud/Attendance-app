@@ -8,6 +8,7 @@ use App\Models\CustomMessage;
 use App\Models\CustomMessageRecipient;
 use App\Models\Event;
 use App\Models\Participant;
+use App\Models\RoomAssignment;
 use App\Services\CustomMessageSender;
 use App\Services\CustomMessageService;
 use App\Services\PhoneNumberService;
@@ -28,6 +29,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomMessageController extends Controller
 {
+    /** The ready-made "your room" message the room board opens with; managers can edit it before sending. */
+    public const ROOM_MESSAGE = [
+        'subject' => 'Your room for {event}',
+        'email_body' => "Your room for {event} is ready.\n\nRoom: {room}\nBuilding: {building}, {floor}\nLocation: {location}\n\nPlease keep this message for check-in. You can see your room details any time here: {room_link}",
+        'sms_body' => 'Hi {first_name}, your room for {event} is {room}, {building} ({floor}). Details: {room_link}',
+    ];
+
     private const FILTERS = ['drafts', 'scheduled', 'email', 'sms', 'failed', 'today'];
 
     public function __construct(private readonly CustomMessageSender $sender) {}
@@ -96,8 +104,20 @@ class CustomMessageController extends Controller
         $composeConfig = $this->composeConfig($event);
         // Reports link here with ?participants=1,2,3 to start a message to a list (e.g. people who missed a day).
         $selectedParticipantIds = $this->companyParticipantIds($event, array_slice(array_filter(array_map('intval', explode(',', (string) $request->query('participants', '')))), 0, 5000));
+        $preset = null;
 
-        return view('events.messages.create', compact('event', 'composeConfig', 'selectedParticipantIds'));
+        // The room board links here with ?rooms=new (not yet told) or ?rooms=all, to tell people their rooms.
+        if (in_array($request->query('rooms'), ['new', 'all'], true)) {
+            $selectedParticipantIds = RoomAssignment::query()
+                ->join('event_registrations', 'event_registrations.id', '=', 'room_assignments.event_registration_id')
+                ->where('event_registrations.event_id', $event->id)
+                ->whereIn('room_assignments.status', ['assigned', 'checked_in'])
+                ->when($request->query('rooms') === 'new', fn ($query) => $query->whereNull('room_assignments.notification_sent_at'))
+                ->pluck('event_registrations.participant_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+            $preset = self::ROOM_MESSAGE;
+        }
+
+        return view('events.messages.create', compact('event', 'composeConfig', 'selectedParticipantIds', 'preset'));
     }
 
     public function edit(Event $event, CustomMessage $message): View
@@ -616,12 +636,21 @@ class CustomMessageController extends Controller
      */
     private function composeConfig(Event $event): array
     {
+        // Each person's room, so the preview shows real room details for the first recipient.
+        $rooms = $event->accommodation_enabled
+            ? RoomAssignment::query()->whereIn('status', ['assigned', 'checked_in'])
+                ->whereHas('registration', fn ($query) => $query->where('event_id', $event->id))
+                ->with(['room.floor.block.site', 'registration'])->get()
+                ->keyBy(fn (RoomAssignment $assignment) => $assignment->registration->participant_id)
+            : collect();
+
         return [
             'organization' => $event->company?->name ?? 'The event team',
             'eventTitle' => $event->title,
             'smsEnabled' => (bool) config('services.arkesel.enabled'),
             'timezone' => config('app.timezone'),
-            'tokens' => MergeFields::TOKENS,
+            'tokens' => $event->accommodation_enabled ? MergeFields::all() : MergeFields::TOKENS,
+            'noRoom' => MergeFields::NO_ROOM,
             'urls' => [
                 'autosave' => route('events.messages.autosave', $event),
                 'templates' => route('events.message-templates.store', $event),
@@ -637,6 +666,7 @@ class CustomMessageController extends Controller
                 'hasEmail' => filled($participant->email) && ! str_ends_with($participant->email, '@example.invalid'),
                 'ghana' => PhoneNumberService::isGhanaNumber($participant->phone),
                 'country' => PhoneNumberService::countryOf($participant->phone),
+                'room' => $rooms->has($participant->id) ? MergeFields::roomValues($rooms[$participant->id]) : null,
             ])->values()->all(),
         ];
     }

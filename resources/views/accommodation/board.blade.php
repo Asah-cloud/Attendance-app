@@ -62,6 +62,7 @@
                     <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-center"><p data-total-placed class="text-xl font-black text-emerald-300">{{ $placed }}</p><p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Placed</p></div>
                     <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-center"><p data-total-free class="text-xl font-black text-sky-300">{{ $freeBeds }}</p><p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Free beds</p></div>
                 </div>
+                @include('accommodation._tell-rooms', ['dark' => true])
                 <a href="{{ route('events.accommodation.index', $event) }}" class="rounded-xl border border-white/15 px-4 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/10">Accommodation</a>
             </div>
             <div class="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-5 pb-4 lg:px-8">

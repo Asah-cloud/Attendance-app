@@ -5,10 +5,13 @@
         @include('accommodation.sections._header', ['title' => 'Send to attendees', 'intro' => 'Email people their rooms, or invite them to choose one.'])
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ $errors->first() }}</div>@endif
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-xl font-black text-slate-900">Email rooms to attendees</h2>
-            <p class="mt-1 text-sm text-slate-500">Sends each assigned attendee their room, once per assignment. Moving someone sends their new room next time.
-                @unless($event->accommodation_published) Tick <strong>Show rooms to attendees</strong> on the Accommodation page first.@endunless</p>
-            <form method="POST" action="{{ route('events.accommodation.notify', $event) }}" class="mt-4">@csrf<button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white disabled:opacity-40" @disabled(!$event->accommodation_published)>Email rooms to attendees</button></form>
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-black text-slate-900">Tell people their rooms</h2>
+                    <p class="mt-1 max-w-2xl text-sm text-slate-500">Write your own message in Messages, where {room}, {building}, {floor}, {location} and {room_link} fill in each person's own room, or send the standard room message. Either way each person is marked as told; moving someone marks them as not told again.</p>
+                </div>
+                @include('accommodation._tell-rooms')
+            </div>
         </section>
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="text-xl font-black text-slate-900">Let attendees pick their own room</h2>
