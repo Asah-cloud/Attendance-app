@@ -637,19 +637,20 @@ class CustomMessageController extends Controller
     private function composeConfig(Event $event): array
     {
         // Each person's room, so the preview shows real room details for the first recipient.
-        $rooms = $event->accommodation_enabled
-            ? RoomAssignment::query()->whereIn('status', ['assigned', 'checked_in'])
-                ->whereHas('registration', fn ($query) => $query->where('event_id', $event->id))
-                ->with(['room.floor.block.site', 'registration'])->get()
-                ->keyBy(fn (RoomAssignment $assignment) => $assignment->registration->participant_id)
-            : collect();
+        $rooms = RoomAssignment::query()->whereIn('status', ['assigned', 'checked_in'])
+            ->whereHas('registration', fn ($query) => $query->where('event_id', $event->id))
+            ->with(['room.floor.block.site', 'registration'])->get()
+            ->keyBy(fn (RoomAssignment $assignment) => $assignment->registration->participant_id);
+        // Room buttons show for events that use or have rooms; the room tokens always work.
+        $hasRooms = $event->accommodation_enabled || $event->accommodationSites()->whereHas('blocks.floors.rooms')->exists();
 
         return [
             'organization' => $event->company?->name ?? 'The event team',
             'eventTitle' => $event->title,
             'smsEnabled' => (bool) config('services.arkesel.enabled'),
             'timezone' => config('app.timezone'),
-            'tokens' => $event->accommodation_enabled ? MergeFields::all() : MergeFields::TOKENS,
+            'tokens' => $hasRooms ? MergeFields::all() : MergeFields::TOKENS,
+            'knownTokens' => MergeFields::all(),
             'noRoom' => MergeFields::NO_ROOM,
             'urls' => [
                 'autosave' => route('events.messages.autosave', $event),

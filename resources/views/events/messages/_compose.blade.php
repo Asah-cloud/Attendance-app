@@ -464,7 +464,7 @@
                     const found = new Set();
                     [this.subject, this.emailBody, this.smsBody].forEach(text => {
                         (text || '').replace(TOKEN_PATTERN, (whole, key) => {
-                            if (!(key.toLowerCase() in cfg.tokens)) found.add(whole);
+                            if (!(key.toLowerCase() in (cfg.knownTokens || cfg.tokens))) found.add(whole);
                             return whole;
                         });
                     });
