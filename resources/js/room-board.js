@@ -1,6 +1,7 @@
 // Drag-and-drop room board (resources/views/accommodation/board.blade.php): each room and the
-// "Needs a room" list is a Sortable list; dropping a person saves the move through
-// RoomBoardController@move, and anything the server refuses is put back where it came from.
+// "Needs a room" list is a Sortable list. A person can be dropped anywhere on a room card, or
+// tapped and then a room tapped. Moves save through RoomBoardController@move, and anything the
+// server refuses is put back where it came from.
 import Sortable from 'sortablejs';
 
 const board = document.querySelector('[data-room-board]');
@@ -111,22 +112,124 @@ async function save(evt, confirmed = false) {
     notify(roomId ? `${evt.item.dataset.name} → ${evt.to.dataset.roomName}` : `${evt.item.dataset.name} now needs a room`);
 }
 
+/** The drop area (a room card, or the "Needs a room" panel) under a screen point. */
+function zoneAt(x, y) {
+    return document.elementFromPoint(x, y)?.closest('[data-drop-zone]') ?? null;
+}
+
+const listOf = (zone) => zone?.querySelector('[data-room-list]') ?? null;
+const hasSpace = (list) => list.dataset.roomId === '' || list.querySelectorAll('[data-registration-id]').length < Number(list.dataset.capacity);
+
+function markZone(zone) {
+    board.querySelectorAll('.is-drop-target, .is-drop-blocked').forEach((el) => el.classList.remove('is-drop-target', 'is-drop-blocked'));
+    const list = listOf(zone);
+    if (list) zone.classList.add(hasSpace(list) ? 'is-drop-target' : 'is-drop-blocked');
+}
+
+/** Move a person into a list (after a drop or a tap) and save it; the server can still refuse. */
+function place(item, from, oldIndex, to) {
+    if (to === from) return;
+    if (!hasSpace(to) && item.parentElement !== to) {
+        notify(`${to.dataset.roomName} is full.`, 'error');
+        from.insertBefore(item, from.children[oldIndex] || null);
+        refreshCounts();
+        return;
+    }
+    if (item.parentElement !== to) to.appendChild(item);
+    refreshCounts();
+    save({ item, from, to, oldIndex });
+}
+
+// --- Tap to place: tap a person, then tap a room (or "Needs a room"). ---
+let selected = null;
+
+function select(chip) {
+    if (selected) selected.classList.remove('is-selected');
+    selected = chip === selected ? null : chip;
+    selected?.classList.add('is-selected');
+    board.classList.toggle('is-placing', Boolean(selected));
+    const banner = board.querySelector('[data-placing-banner]');
+    if (banner) {
+        banner.style.display = selected ? '' : 'none';
+        if (selected) banner.querySelector('[data-placing-name]').textContent = selected.dataset.name;
+    }
+}
+
 if (board) {
+    let lastPoint = null;
+    let dragging = false;
+    let justDragged = false;
+    const track = (x, y) => {
+        lastPoint = { x, y };
+        if (dragging) markZone(zoneAt(x, y));
+    };
+    document.addEventListener('pointermove', (e) => track(e.clientX, e.clientY), { passive: true });
+    document.addEventListener('touchmove', (e) => e.touches[0] && track(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+
     board.querySelectorAll('[data-room-list]').forEach((list) => Sortable.create(list, {
         group: {
             name: 'rooms',
             // A full room accepts nobody new; "Needs a room" always does.
-            put: (to) => to.el.dataset.roomId === '' || to.el.querySelectorAll('[data-registration-id]').length < Number(to.el.dataset.capacity),
+            put: (to) => hasSpace(to.el),
         },
         animation: 150,
         // Pointer-based dragging behaves the same with a mouse, a finger or a pen.
         forceFallback: true,
         fallbackOnBody: true,
+        // A small wobble is still a tap, not a drag.
+        fallbackTolerance: 4,
+        // On touch screens, hold briefly to pick someone up, so swiping still scrolls the page.
+        delay: 180,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 6,
+        // Scroll sooner and faster when dragging near the top or bottom of the screen.
+        scrollSensitivity: 120,
+        scrollSpeed: 22,
+        bubbleScroll: true,
+        emptyInsertThreshold: 30,
         filter: '.is-locked',
         preventOnFilter: false,
         ghostClass: 'opacity-40',
-        onAdd: (evt) => { refreshCounts(); save(evt); },
+        onStart: () => {
+            dragging = true;
+            select(null);
+            board.classList.add('is-dragging');
+        },
+        // Saving happens on drop, below, so a drop anywhere on a room card counts.
+        onEnd: (evt) => {
+            dragging = false;
+            justDragged = true;
+            setTimeout(() => { justDragged = false; }, 0);
+            board.classList.remove('is-dragging');
+            markZone(null);
+            const pointed = lastPoint ? listOf(zoneAt(lastPoint.x, lastPoint.y)) : null;
+            const target = pointed && pointed !== evt.to && hasSpace(pointed) ? pointed : evt.to;
+            if (target === evt.from) {
+                refreshCounts();
+                return;
+            }
+            place(evt.item, evt.from, evt.oldIndex, target);
+        },
     }));
+
+    board.addEventListener('click', (event) => {
+        if (justDragged || event.target.closest('button, a, input')) return;
+        // Tapping a person picks them (tap again to let go); tapping a room then places them.
+        const chip = event.target.closest('[data-registration-id]');
+        if (chip) {
+            if (!chip.classList.contains('is-locked')) select(chip);
+            return;
+        }
+        const zone = event.target.closest('[data-drop-zone]');
+        if (selected && zone) {
+            const from = selected.parentElement;
+            const item = selected;
+            select(null);
+            place(item, from, [...from.children].indexOf(item), listOf(zone));
+        }
+    });
+    board.querySelector('[data-placing-cancel]')?.addEventListener('click', () => select(null));
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') select(null); });
 
     board.querySelectorAll('[data-show-button]').forEach((button) => button.addEventListener('click', () => setShow(button.dataset.showButton)));
     board.querySelector('[data-density-toggle]')?.addEventListener('click', () => setDensity(board.dataset.density === 'compact' ? 'names' : 'compact'));

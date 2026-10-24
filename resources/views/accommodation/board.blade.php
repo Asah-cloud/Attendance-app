@@ -30,6 +30,14 @@
         [data-density="compact"] [data-room-card]:not(.is-open) .chip-text, [data-density="compact"] [data-room-card]:not(.is-open) .chip-badge { display: none; }
         /* Room filter: hide full rooms, or rooms with space. */
         [data-show="space"] [data-room-card].is-full, [data-show="full"] [data-room-card]:not(.is-full), [data-floor].is-empty { display: none; }
+        /* Where a dragged or picked person would land. */
+        [data-drop-zone] { transition: box-shadow .12s, transform .12s; }
+        [data-drop-zone].is-drop-target { box-shadow: 0 0 0 3px rgb(52 211 153 / .9); transform: scale(1.01); }
+        [data-drop-zone].is-drop-blocked { box-shadow: 0 0 0 3px rgb(251 113 133 / .8); }
+        .is-placing [data-room-card]:not(.is-full), .is-placing aside[data-drop-zone] { cursor: pointer; box-shadow: 0 0 0 2px rgb(52 211 153 / .45); }
+        .is-placing [data-room-card]:not(.is-full):hover { box-shadow: 0 0 0 3px rgb(52 211 153 / .95); }
+        .board-chip.is-selected { outline: 3px solid rgb(252 211 77); outline-offset: 2px; }
+        .is-dragging, .is-dragging * { cursor: grabbing !important; }
     </style>
 </head>
 <body class="min-h-full bg-[#0b1026] text-white antialiased" style="font-family: Manrope, sans-serif">
@@ -80,10 +88,16 @@
             </div>
         </header>
 
+        {{-- Shown while a person is picked by tapping. --}}
+        <div data-placing-banner style="display: none" class="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl bg-amber-300 px-4 py-3 text-sm font-bold text-slate-900 shadow-2xl shadow-black/40">
+            <span>Placing <span data-placing-name></span>: tap a room with a green outline.</span>
+            <button type="button" data-placing-cancel class="rounded-lg bg-slate-900/10 px-3 py-1 text-xs font-black hover:bg-slate-900/20">Cancel</button>
+        </div>
+
         <div class="mx-auto grid max-w-[1600px] items-start gap-6 px-5 py-6 lg:grid-cols-[20rem_1fr] lg:px-8">
-            <aside class="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-4 backdrop-blur-xl lg:sticky lg:top-40">
+            <aside data-drop-zone class="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-4 backdrop-blur-xl lg:sticky lg:top-40">
                 <h2 class="font-black text-amber-200">Needs a room</h2>
-                <p class="mt-0.5 text-xs text-amber-100/70">Drag someone onto a room to place them.</p>
+                <p class="mt-0.5 text-xs text-amber-100/70">Drag someone onto any part of a room, or tap them and then tap a room.</p>
                 <ul data-room-list data-room-id="" class="mt-3 max-h-[calc(100vh-16rem)] min-h-24 space-y-2 overflow-y-auto pr-1">
                     @foreach($waiting as $registration)
                         @include('accommodation._board-chip', ['registration' => $registration])
@@ -109,7 +123,7 @@
                                             @php
                                                 $used = $room->activeAssignments->count();
                                             @endphp
-                                            <div data-room-card class="{{ $used >= $room->capacity ? 'is-full' : '' }} group rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-xl shadow-black/20 backdrop-blur-xl transition [&.is-full]:border-rose-400/30">
+                                            <div data-room-card data-drop-zone class="{{ $used >= $room->capacity ? 'is-full' : '' }} group rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-xl shadow-black/20 backdrop-blur-xl transition [&.is-full]:border-rose-400/30">
                                                 <div class="flex items-center justify-between gap-2">
                                                     <p class="text-base font-black">{{ $room->name }}
                                                         @if($room->gender_restriction)<span class="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300">{{ $room->gender_restriction }}</span>@endif
