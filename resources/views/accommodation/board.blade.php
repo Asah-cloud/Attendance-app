@@ -17,7 +17,20 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800&display=swap" rel="stylesheet">
     <x-compiled-assets />
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+        [x-cloak] { display: none !important; }
+        /* Folded (full, not opened) rooms and compact view: people as a row of initials. */
+        [data-room-card].is-full:not(.is-open) [data-room-list],
+        [data-density="compact"] [data-room-card]:not(.is-open) [data-room-list] { display: flex; flex-wrap: wrap; gap: .375rem; min-height: 3.25rem; }
+        [data-room-card].is-full:not(.is-open) [data-room-list] > *,
+        [data-density="compact"] [data-room-card]:not(.is-open) [data-room-list] > * { margin: 0 !important; }
+        [data-room-card].is-full:not(.is-open) .board-chip,
+        [data-density="compact"] [data-room-card]:not(.is-open) .board-chip { padding: 0; border: 0; background: transparent; box-shadow: none; }
+        [data-room-card].is-full:not(.is-open) .chip-text, [data-room-card].is-full:not(.is-open) .chip-badge,
+        [data-density="compact"] [data-room-card]:not(.is-open) .chip-text, [data-density="compact"] [data-room-card]:not(.is-open) .chip-badge { display: none; }
+        /* Room filter: hide full rooms, or rooms with space. */
+        [data-show="space"] [data-room-card].is-full, [data-show="full"] [data-room-card]:not(.is-full), [data-floor].is-empty { display: none; }
+    </style>
 </head>
 <body class="min-h-full bg-[#0b1026] text-white antialiased" style="font-family: Manrope, sans-serif">
     <x-toast />
@@ -29,7 +42,7 @@
         <div class="absolute inset-0 bg-[radial-gradient(rgb(255_255_255_/_0.05)_1px,transparent_1px)] [background-size:24px_24px]"></div>
     </div>
 
-    <div data-room-board data-move-url="{{ route('events.accommodation.board.move', $event) }}" x-data="{ building: 'all' }" class="relative">
+    <div data-room-board data-show="all" data-density="names" data-move-url="{{ route('events.accommodation.board.move', $event) }}" x-data="{ building: 'all' }" x-effect="building; $nextTick(() => window.dispatchEvent(new Event('room-board:filter')))" class="relative">
         <header class="z-30 border-b lg:sticky lg:top-0 border-white/10 bg-[#0b1026]/70 backdrop-blur-xl">
             <div class="mx-auto flex max-w-[1600px] flex-wrap items-center gap-4 px-5 py-4 lg:px-8">
                 <div class="min-w-0 basis-full sm:basis-auto sm:flex-1">
@@ -54,6 +67,12 @@
                         <button type="button" @click="building = '{{ $building['id'] }}'" :class="building === '{{ $building['id'] }}' ? 'bg-white text-slate-900' : 'bg-white/10 text-slate-200 hover:bg-white/20'" class="rounded-full px-3 py-1.5 transition">{{ $building['name'] }}</button>
                     @endforeach
                 </div>
+                <div class="flex flex-wrap gap-1.5 text-xs font-bold" role="group" aria-label="Which rooms to show">
+                    @foreach(['all' => 'All rooms', 'space' => 'Has space', 'full' => 'Full'] as $key => $label)
+                        <button type="button" data-show-button="{{ $key }}" class="rounded-full bg-white/10 px-3 py-1.5 text-slate-200 transition hover:bg-white/20 [&.is-active]:bg-amber-300 [&.is-active]:text-slate-900">{{ $label }} <span data-show-count="{{ $key }}" class="opacity-70"></span></button>
+                    @endforeach
+                </div>
+                <button type="button" data-density-toggle class="rounded-full border border-white/15 px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:bg-white/10">Compact view</button>
                 <span class="ml-auto flex items-center gap-3 text-xs font-bold text-slate-300">
                     <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-gradient-to-br from-sky-400 to-blue-600"></span>Male</span>
                     <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-gradient-to-br from-pink-400 to-rose-500"></span>Female</span>
@@ -83,9 +102,9 @@
                             </div>
                             @foreach($block->floors as $floor)
                                 @continue($floor->rooms->isEmpty())
-                                <div>
+                                <div data-floor>
                                     <p class="mb-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{{ $floor->name }}</p>
-                                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                                    <div class="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                                         @foreach($floor->rooms as $room)
                                             @php
                                                 $used = $room->activeAssignments->count();
@@ -95,12 +114,15 @@
                                                     <p class="text-base font-black">{{ $room->name }}
                                                         @if($room->gender_restriction)<span class="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300">{{ $room->gender_restriction }}</span>@endif
                                                         @if($room->status === 'reserved')<span class="ml-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-200">Reserved</span>@endif</p>
-                                                    <span data-count-for="{{ $room->id }}" class="text-xs font-bold text-slate-300 group-[.is-full]:text-rose-300">{{ $used }} / {{ $room->capacity }} beds</span>
+                                                    <span class="flex shrink-0 items-center gap-2">
+                                                        <span data-count-for="{{ $room->id }}" class="text-xs font-bold text-slate-300 group-[.is-full]:text-rose-300">{{ $used }} / {{ $room->capacity }} beds</span>
+                                                        <button type="button" data-room-toggle class="hidden rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-200 hover:bg-white/20 group-[.is-full]:inline-block group-[.is-compact]:inline-block" aria-expanded="false">Show names</button>
+                                                    </span>
                                                 </div>
                                                 <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                                                     <div data-bar-for="{{ $room->id }}" class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300 group-[.is-full]:from-rose-400 group-[.is-full]:to-pink-500" style="width: {{ $room->capacity ? min(100, round($used / $room->capacity * 100)) : 0 }}%"></div>
                                                 </div>
-                                                <ul data-room-list data-room-id="{{ $room->id }}" data-room-name="{{ $room->name }}" data-capacity="{{ $room->capacity }}" class="mt-3 min-h-16 space-y-2 rounded-2xl border border-dashed border-white/15 p-2">
+                                                <ul data-room-list data-room-id="{{ $room->id }}" data-room-name="{{ $room->name }}" data-capacity="{{ $room->capacity }}" class="mt-3 max-h-80 min-h-16 space-y-2 overflow-y-auto rounded-2xl border border-dashed border-white/15 p-2">
                                                     @foreach($room->activeAssignments->sortBy(fn ($assignment) => $assignment->registration->participant->name) as $assignment)
                                                         @include('accommodation._board-chip', ['registration' => $assignment->registration->setRelation('roomAssignment', $assignment)])
                                                     @endforeach

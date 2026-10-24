@@ -7,9 +7,53 @@ const board = document.querySelector('[data-room-board]');
 const csrf = document.querySelector('meta[name=csrf-token]').content;
 const notify = (message, type = 'success') => window.dispatchEvent(new CustomEvent('notify', { detail: { message, type } }));
 
+// Per-viewer display choices; storage can be unavailable (private windows), so never rely on it.
+const remember = (key, value) => { try { localStorage.setItem(`room-board:${key}`, value); } catch { /* not saved */ } };
+const recall = (key, fallback) => { try { return localStorage.getItem(`room-board:${key}`) || fallback; } catch { return fallback; } };
+
+/** Hide floors whose rooms are all filtered out, and keep the room filter's counts current. */
+function applyFilter() {
+    board.querySelectorAll('[data-show-button]').forEach((button) => button.classList.toggle('is-active', button.dataset.showButton === board.dataset.show));
+    board.querySelectorAll('[data-floor]').forEach((floor) => {
+        // A card's own display is "none" only when the room filter hides it.
+        const visible = [...floor.querySelectorAll('[data-room-card]')].some((card) => getComputedStyle(card).display !== 'none');
+        floor.classList.toggle('is-empty', !visible);
+    });
+}
+
+function setShow(value) {
+    board.dataset.show = value;
+    remember('show', value);
+    board.querySelectorAll('[data-floor]').forEach((floor) => floor.classList.remove('is-empty'));
+    applyFilter();
+}
+
+function setDensity(value) {
+    board.dataset.density = value;
+    remember('density', value);
+    const toggle = board.querySelector('[data-density-toggle]');
+    if (toggle) toggle.textContent = value === 'compact' ? 'Show names' : 'Compact view';
+    board.querySelectorAll('[data-room-card]').forEach((card) => {
+        card.classList.toggle('is-compact', value === 'compact');
+        setOpen(card, false);
+    });
+}
+
+/** A folded room (full, or any room in compact view) shows initials; opening it shows names. */
+function setOpen(card, open) {
+    card.classList.toggle('is-open', open);
+    const button = card.querySelector('[data-room-toggle]');
+    if (button) {
+        button.textContent = open ? 'Fold' : 'Show names';
+        button.setAttribute('aria-expanded', String(open));
+    }
+}
+
 function refreshCounts() {
     let placed = 0;
     let beds = 0;
+    let full = 0;
+    let rooms = 0;
     board.querySelectorAll('[data-room-list]').forEach((list) => {
         const used = list.querySelectorAll('[data-registration-id]').length;
         const counter = board.querySelector(`[data-count-for="${list.dataset.roomId}"]`);
@@ -23,12 +67,24 @@ function refreshCounts() {
         if (counter) counter.textContent = `${used} / ${capacity} beds`;
         const bar = board.querySelector(`[data-bar-for="${list.dataset.roomId}"]`);
         if (bar) bar.style.width = `${capacity ? Math.min(100, Math.round((used / capacity) * 100)) : 0}%`;
-        list.closest('[data-room-card]').classList.toggle('is-full', used >= capacity);
+        const card = list.closest('[data-room-card]');
+        const nowFull = used >= capacity;
+        // Nothing to fold or show in an empty room.
+        const toggle = card.querySelector('[data-room-toggle]');
+        if (toggle) toggle.style.display = used ? '' : 'none';
+        // A room that has just filled up folds itself, so the board stays short.
+        if (nowFull && !card.classList.contains('is-full')) setOpen(card, false);
+        card.classList.toggle('is-full', nowFull);
+        rooms += 1;
+        full += nowFull ? 1 : 0;
     });
+    const counts = { all: rooms, space: rooms - full, full };
+    board.querySelectorAll('[data-show-count]').forEach((el) => { el.textContent = `(${counts[el.dataset.showCount]})`; });
     const placedTotal = board.querySelector('[data-total-placed]');
     const freeTotal = board.querySelector('[data-total-free]');
     if (placedTotal) placedTotal.textContent = placed;
     if (freeTotal) freeTotal.textContent = Math.max(0, beds - placed);
+    applyFilter();
 }
 
 function putBack(evt) {
@@ -71,6 +127,19 @@ if (board) {
         ghostClass: 'opacity-40',
         onAdd: (evt) => { refreshCounts(); save(evt); },
     }));
+
+    board.querySelectorAll('[data-show-button]').forEach((button) => button.addEventListener('click', () => setShow(button.dataset.showButton)));
+    board.querySelector('[data-density-toggle]')?.addEventListener('click', () => setDensity(board.dataset.density === 'compact' ? 'names' : 'compact'));
+    board.querySelectorAll('[data-room-toggle]').forEach((button) => button.addEventListener('click', () => {
+        const card = button.closest('[data-room-card]');
+        setOpen(card, !card.classList.contains('is-open'));
+    }));
+    // The building pills (Alpine) change which sections show; re-check empty floors afterwards.
+    window.addEventListener('room-board:filter', applyFilter);
+
+    setDensity(recall('density', 'names'));
+    setShow(recall('show', 'all'));
+    refreshCounts();
 
     board.querySelector('[data-board-search]')?.addEventListener('input', (event) => {
         const term = event.target.value.trim().toLowerCase();
