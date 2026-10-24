@@ -5,7 +5,7 @@
 | **Document type** | System / architecture reference |
 | **Status** | Living document — update alongside significant changes |
 | **Owner** | Engineering |
-| **Last updated** | 2026-08-21 |
+| **Last updated** | 2026-10-24 (§6.13 Accommodation added; other sections not yet revised since 2026-08-21, see [PROGRESS.md](PROGRESS.md) for later changes) |
 
 ## 1. Purpose and scope
 
@@ -200,6 +200,43 @@ Managers can upload a company logo and, per event, an event logo/flyer (`Organiz
 
 `a21e5b5` added `sitemap.xml` and locked down `robots.txt`/`noindex` so that tenant-specific and transactional pages (registration forms, confirmation pages, etc.) aren't indexed by search engines while the marketing pages remain discoverable.
 
+### 6.13 Accommodation (rooms)
+
+A paid per-event feature (`event.feature:rooms`). Managers build an inventory of **site → block → floor
+→ room** (`AccommodationController`, bulk create, CSV import, or copied from another event without its
+occupants). Blocks and rooms can carry a gender or category restriction, floors and rooms can be marked
+step-free, and blocks, floors and rooms have a priority that sets the fill order. A room is `active`,
+`reserved` (skipped by automatic assignment, still assignable by hand) or `closed`.
+
+A confirmed registration ticked "Needs room" (`accommodation_required`) gets one `RoomAssignment`
+(`assigned` → `checked_in` → `checked_out`), recorded with its `method`: `automatic`, `plan`, `self`
+or `manual`. Each registration's `room_group` (its "area", per event) keeps people together.
+
+**Ways people get a room**, all in `RoomAllocationService`:
+
+| Route in | Method | Notes |
+|---|---|---|
+| "Assign rooms now", optionally for one category and/or gender | `preview` / `commit` | "Preview selection" shows the proposals and assigns nobody |
+| Confirming a registration | `allocateOne` | Places one person inline |
+| Room plan import (a listed group, N to a room) | `planBatch` / `commitPlan` | Spare beds stay free |
+| Attendee room picker, while self-selection is open | `selectableRooms` / `claim` | Open until `accommodation_self_select_closes_at` |
+| Room board (drag and drop) or the guests list | `assignManually` | A manager override: may break restrictions; the board warns before mixing genders |
+
+**Rules for automatic assignment and the picker:**
+- A room only takes people who match its (or its block's) gender and category restriction, and only
+  step-free rooms take people who need one. People who need step-free rooms are placed first.
+- **A room never mixes genders.** A room without a restriction takes the gender of whoever is already
+  in it. A person with no gender recorded can go anywhere.
+- Someone with a room group goes to a room already holding that group; someone without one fills a
+  part-filled room before an empty one is opened. A new group starts a fresh room.
+- Bed counts are rechecked under a row lock when saving, so two runs or two attendees can't overfill a
+  room; anyone who can't be placed is listed with the reason.
+
+**Telling attendees:** with "Show rooms to attendees" (`accommodation_published`) on, assignments send
+`RoomAssigned`; `RoomSelectionInvite` emails the picker link. Custom messages can use `{room}`,
+`{building}`, `{floor}`, `{location}` and `{room_link}` (`MergeFields`). Reports, CSV and PDF rooming
+lists come from `AccommodationController::report/exportCsv/exportPdf`.
+
 ## 7. Notifications architecture
 
 | Notification | Trigger |
@@ -209,6 +246,8 @@ Managers can upload a company logo and, per event, an event logo/flyer (`Organiz
 | `AttendanceConfirmationRequest` | Hard-copy attendee confirmation request and reminder |
 | `CompanySubscriptionNotification` | 7-day expiry warning and post-expiry notice, sent to the company's managers |
 | `ArkeselBalanceLow` | Internal/ops alert when the SMS provider balance is low |
+| `RoomAssigned` | An attendee who hasn't been told yet is placed in a room while rooms are shown to attendees (§6.13) |
+| `RoomSelectionInvite` | Link to the attendee room picker while self-selection is open (§6.13) |
 
 All notifications are queued (`php artisan queue:work` must run in production) and channel selection is delegated to `NotifiesPerChannel` / `UsesAttendanceChannels`, which send email via Resend, SMS via the custom `ArkeselChannel`, or both depending on what contact data the notifiable (a `Participant` or `User`) has. Both models implement `routeNotificationForArkesel()`, which normalizes phone numbers to the `233…` (Ghana) international format expected by Arkesel.
 
