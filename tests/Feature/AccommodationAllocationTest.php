@@ -121,6 +121,107 @@ it('prefers seating people who share a room group together, even over an empty h
         ->and($roomX->activeAssignments()->count())->toBe(0);
 });
 
+it('never mixes genders in a room that has no gender restriction', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $first = accommodationRoom($event, 'A01', 4);
+    $second = accommodationRoom($event, 'A02', 4);
+    $man = accommodationRegistration($event, 'Kwame', 'Male');
+    $woman = accommodationRegistration($event, 'Ama', 'Female');
+    $secondMan = accommodationRegistration($event, 'Kofi', 'M');
+
+    $result = app(RoomAllocationService::class)->commit($event, null);
+
+    expect($result)->toBe(['assigned' => 3, 'unallocated' => 0])
+        ->and($man->fresh()->roomAssignment->accommodation_room_id)->toBe($first->id)
+        ->and($secondMan->fresh()->roomAssignment->accommodation_room_id)->toBe($first->id)
+        ->and($woman->fresh()->roomAssignment->accommodation_room_id)->toBe($second->id);
+});
+
+it('leaves someone unplaced rather than put them in a room of the other gender', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $room = accommodationRoom($event, 'A01', 4);
+    $seed = accommodationRegistration($event, 'Kwame', 'Male');
+    $seed->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
+    $woman = accommodationRegistration($event, 'Ama', 'Female');
+
+    expect(app(RoomAllocationService::class)->commit($event, null))->toBe(['assigned' => 0, 'unallocated' => 1])
+        ->and($woman->fresh()->roomAssignment)->toBeNull()
+        ->and(app(RoomAllocationService::class)->allocateOne($woman->fresh()))->toBeNull();
+});
+
+it('skips a full room and uses the next one with a free bed', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $full = accommodationRoom($event, 'A01', 1);
+    $free = accommodationRoom($event, 'A02', 2);
+    accommodationRegistration($event, 'Sleeper')->roomAssignment()->create(['accommodation_room_id' => $full->id, 'status' => 'assigned', 'method' => 'manual']);
+    $waiting = accommodationRegistration($event, 'Waiting Guest');
+    $alsoWaiting = accommodationRegistration($event, 'Also Waiting');
+    $allocator = app(RoomAllocationService::class);
+
+    expect($allocator->selectableRooms($waiting)->pluck('id')->all())->toBe([$free->id])
+        ->and($allocator->allocateOne($waiting)?->accommodation_room_id)->toBe($free->id)
+        ->and($allocator->commit($event, null))->toBe(['assigned' => 1, 'unallocated' => 0])
+        ->and($alsoWaiting->fresh()->roomAssignment->accommodation_room_id)->toBe($free->id);
+});
+
+it('fills a room before opening the next one', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $rooms = collect(['R1', 'R2', 'R3'])->map(fn ($name) => accommodationRoom($event, $name, 4));
+    foreach (range(1, 5) as $number) {
+        accommodationRegistration($event, "Guest {$number}");
+    }
+
+    app(RoomAllocationService::class)->commit($event, null);
+
+    expect($rooms->map(fn ($room) => $room->activeAssignments()->count())->all())->toBe([4, 1, 0]);
+});
+
+it('starts a fresh room for a new room group instead of joining another group', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $first = accommodationRoom($event, 'A01', 4);
+    $second = accommodationRoom($event, 'A02', 4);
+    $kumasi = accommodationRegistration($event, 'Kumasi Guest');
+    $kumasi->update(['room_group' => 'Kumasi Area']);
+    $accra = accommodationRegistration($event, 'Accra Guest');
+    $accra->update(['room_group' => 'Accra Area']);
+
+    app(RoomAllocationService::class)->commit($event, null);
+
+    expect($kumasi->fresh()->roomAssignment->accommodation_room_id)->toBe($first->id)
+        ->and($accra->fresh()->roomAssignment->accommodation_room_id)->toBe($second->id);
+});
+
+it('previews the category and gender chosen in the dropdowns without assigning anyone', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    accommodationRoom($event, 'A01', 2);
+    $woman = accommodationRegistration($event, 'Ama', 'Female', 'VIP');
+
+    $this->actingAs($manager)
+        ->post(route('events.accommodation.allocate', $event), ['category' => 'VIP', 'gender' => 'Female', 'preview' => 1])
+        ->assertRedirect(route('events.accommodation.section', ['event' => $event, 'section' => 'assign', 'preview' => 1, 'category' => 'VIP', 'gender' => 'Female']));
+
+    expect($woman->fresh()->roomAssignment)->toBeNull();
+
+    $this->actingAs($manager)
+        ->get(route('events.accommodation.section', ['event' => $event, 'section' => 'assign', 'preview' => 1, 'category' => 'VIP', 'gender' => 'Female']))
+        ->assertOk()
+        ->assertSee('1 proposed')
+        ->assertSee('Ama → ', false);
+});
+
 it('lets a manager set a participant\'s room group from the accommodation page', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = accommodationManager($company);
@@ -146,16 +247,17 @@ it('explains why a filtered assign run placed nobody instead of a silent success
     accommodationRoom($event, 'F01', 2, ['gender' => 'Female']);
     accommodationRegistration($event, 'Male Guest', 'Male', 'STAFF');
 
-    // Filter that matches nobody unassigned — plain redirect back, no sticky ?preview=1.
-    $this->actingAs($manager)->from(route('events.accommodation.index', $event))
+    // Filter that matches nobody unassigned — back to the assign page, no sticky ?preview=1 even after a preview.
+    $assignPage = route('events.accommodation.section', ['event' => $event, 'section' => 'assign', 'preview' => 1]);
+    $this->actingAs($manager)->from($assignPage)
         ->post(route('events.accommodation.allocate', $event), ['category' => 'VIP', 'gender' => ''])
-        ->assertRedirect(route('events.accommodation.index', $event))
+        ->assertRedirect(route('events.accommodation.section', ['event' => $event, 'section' => 'assign', 'category' => 'VIP']))
         ->assertSessionHas('error', fn ($m) => str_contains($m, 'No unassigned attendee matches'));
 
     // Filter matches the Male STAFF guest, but no compatible room has a free bed.
-    $this->actingAs($manager)->from(route('events.accommodation.index', $event))
+    $this->actingAs($manager)->from($assignPage)
         ->post(route('events.accommodation.allocate', $event), ['category' => 'STAFF', 'gender' => ''])
-        ->assertRedirect(route('events.accommodation.index', $event))
+        ->assertRedirect(route('events.accommodation.section', ['event' => $event, 'section' => 'assign', 'category' => 'STAFF']))
         ->assertSessionHas('error', fn ($m) => str_contains($m, 'no active room has a free bed'));
 });
 

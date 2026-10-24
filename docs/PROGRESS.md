@@ -177,6 +177,8 @@ ssh -i ~/.ssh/lightsail_attendance ubuntu@<server> \
   `LogResendEmailEvents` still has the problem, so email bounces are logged twice.
 - **Counts from `withCount` are strings on SQLite** (tests) but integers on Postgres. Cast to `int`
   before strict comparisons such as `=== 0`.
+- **`->select(...)` after `->withCount(...)` silently drops the count** (it comes back `null`). Call
+  `select` first. This made every room look empty to automatic room assignment until it was fixed.
 - **`import` with row numbers in column A:** an ID alone only re-finds someone with the same name.
   A phone or email match with a different name opens the import review pop-up.
 - **Spreadsheets with formula cells** are imported as the value Excel shows. If the name is still
