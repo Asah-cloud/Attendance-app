@@ -39,7 +39,14 @@ class CustomAttendeeMessage extends Notification
     /** @return array<string, string> */
     private function mergeValues(object $notifiable): array
     {
-        return MergeFields::values($notifiable->name ?? null, $this->event->title, $this->event->company?->name);
+        $values = MergeFields::values($notifiable->name ?? null, $this->event->title, $this->event->company?->name);
+
+        // Room tokens are looked up only when used, for this recipient's room at this event.
+        if (MergeFields::mentionsRoom($this->subject.' '.$this->body)) {
+            $values += MergeFields::roomValues(MergeFields::assignmentFor($this->event, $notifiable->participant_id ?? null));
+        }
+
+        return $values;
     }
 
     public function toMail(object $notifiable): MailMessage

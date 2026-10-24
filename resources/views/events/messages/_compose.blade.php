@@ -7,9 +7,9 @@
     $initial = [
         'selected' => array_map('strval', (array) old('participant_ids', $selectedParticipantIds ?? [])),
         'mode' => old('mode', $message->mode ?? 'smart'),
-        'subject' => old('subject', $message->subject ?? ''),
-        'email_body' => old('email_body', $message->email_body ?? ''),
-        'sms_body' => old('sms_body', $message->sms_body ?? ''),
+        'subject' => old('subject', $message->subject ?? $preset['subject'] ?? ''),
+        'email_body' => old('email_body', $message->email_body ?? $preset['email_body'] ?? ''),
+        'sms_body' => old('sms_body', $message->sms_body ?? $preset['sms_body'] ?? ''),
         'seedCount' => count($seedRecipients ?? []),
         'draftId' => $pending && $message->isDraft() ? $message->id : null,
         'autosave' => ! $editing && ! ($pending && $message->isScheduled()),
@@ -449,7 +449,9 @@
                 get sample() {
                     const person = this.list[0];
                     const name = person ? person.name : 'Ama Mensah';
-                    return { name: name, first_name: name.split(/\s+/)[0], event: cfg.eventTitle, organization: cfg.organization };
+                    const room = (person && person.room) || { room: 'A01', building: 'Block A', floor: 'Ground Floor', location: 'Main Campus', room_link: 'https://…' };
+                    const noRoom = person && !person.room ? Object.fromEntries(['room', 'building', 'floor', 'location', 'room_link'].map(key => [key, cfg.noRoom])) : room;
+                    return { name: name, first_name: name.split(/\s+/)[0], event: cfg.eventTitle, organization: cfg.organization, ...noRoom };
                 },
                 merge(text) {
                     const values = this.sample;
