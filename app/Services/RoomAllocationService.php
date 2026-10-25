@@ -8,6 +8,7 @@ use App\Models\EventRegistration;
 use App\Models\RoomAssignment;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\RoomAssigned;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -92,12 +93,12 @@ class RoomAllocationService
     }
 
     /**
-     * A room's gender: its own or its block's restriction, else the gender of whoever is already in it
+     * A room's gender: its room, floor or building restriction, else the gender of whoever is already in it
      * (leaving out $ignoreRegistrationId, so someone moving out of a room doesn't count towards it).
      */
     private function roomGender(AccommodationRoom $room, ?int $ignoreRegistrationId = null): ?string
     {
-        return $this->normalizeGender($room->gender_restriction ?: $room->floor->block->gender_restriction)
+        return $this->normalizeGender($room->effectiveGender())
             ?: $room->activeAssignments
                 ->reject(fn ($assignment) => $assignment->event_registration_id === $ignoreRegistrationId)
                 ->map(fn ($assignment) => $this->normalizeGender($assignment->registration?->participant?->gender))->filter()->first();
@@ -443,14 +444,7 @@ class RoomAllocationService
 
     public function matches(EventRegistration $registration, AccommodationRoom $room): bool
     {
-        $participant = $registration->participant;
-        $gender = $room->gender_restriction ?: $room->floor->block->gender_restriction;
-        $category = $room->category_restriction ?: $room->floor->block->category_restriction;
-
-        if ($gender && $this->normalizeGender($gender) !== $this->normalizeGender($participant->gender)) {
-            return false;
-        }
-        if ($category && $this->normalizeText($category) !== $this->normalizeText($participant->category)) {
+        if (! $this->fitsRestrictions($registration, $room)) {
             return false;
         }
         if ($registration->accessibility_required && ! ($room->is_accessible || $room->floor->is_accessible)) {
@@ -458,6 +452,31 @@ class RoomAllocationService
         }
 
         return true;
+    }
+
+    /** Whether this registration fits the room's gender and category, set on the room, its floor or its building. */
+    private function fitsRestrictions(EventRegistration $registration, AccommodationRoom $room): bool
+    {
+        $participant = $registration->participant;
+        $gender = $room->effectiveGender();
+        $category = $room->effectiveCategory();
+
+        return (! $gender || $this->normalizeGender($gender) === $this->normalizeGender($participant->gender))
+            && (! $category || $this->normalizeText($category) === $this->normalizeText($participant->category));
+    }
+
+    /**
+     * How many people already in these rooms don't fit their room's gender or category - after a
+     * manager changes a building's, floor's or room's setting. They are left where they are.
+     *
+     * @param  Collection<int, AccommodationRoom>  $rooms
+     */
+    public function occupantsNotFitting(Collection $rooms): int
+    {
+        return EloquentCollection::make($rooms->all())->loadMissing('floor.block', 'activeAssignments.registration.participant')
+            ->sum(fn (AccommodationRoom $room) => $room->activeAssignments
+                ->filter(fn ($assignment) => $assignment->registration && ! $this->fitsRestrictions($assignment->registration, $room))
+                ->count());
     }
 
     /** Fold common spellings of a gender to 'male' / 'female'; anything else passes through lower-cased. */
@@ -497,10 +516,10 @@ class RoomAllocationService
         if ($registration->accessibility_required) {
             $reasons[] = 'accessible room/floor';
         }
-        if ($room->gender_restriction || $room->floor->block->gender_restriction) {
+        if ($room->effectiveGender()) {
             $reasons[] = 'gender matched';
         }
-        if ($room->category_restriction || $room->floor->block->category_restriction) {
+        if ($room->effectiveCategory()) {
             $reasons[] = 'category matched';
         }
 

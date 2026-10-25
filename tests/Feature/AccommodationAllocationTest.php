@@ -373,6 +373,65 @@ it('lets a manager rename a room and rejects a duplicate name on the same floor'
     expect($sibling->fresh()->name)->toBe('A02');
 });
 
+it('lets a manager set a floor\'s gender and category, with a room\'s own setting winning over its floor\'s, and its floor\'s over its building\'s', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $floorRoom = accommodationRoom($event, 'U1', 2, ['floor' => 'Upper', 'block_gender' => 'Male']);
+    $maleRoom = accommodationRoom($event, 'U2', 2, ['floor' => 'Upper', 'gender' => 'Male']);
+    $vipWoman = accommodationRegistration($event, 'Ama', 'Female', 'VIP');
+    $otherWoman = accommodationRegistration($event, 'Abena', 'Female', 'General');
+    $vipMan = accommodationRegistration($event, 'Kofi', 'Male', 'VIP');
+
+    $this->actingAs($manager)->patch(route('events.accommodation.floors.update', [$event, $floorRoom->floor]), [
+        'name' => 'Upper', 'gender_restriction' => 'Female', 'category_restriction' => 'VIP', 'priority' => 100, 'is_active' => 1,
+    ])->assertRedirect()->assertSessionHas('success', 'Floor updated.');
+
+    expect($floorRoom->floor->fresh()->only('gender_restriction', 'category_restriction'))->toBe(['gender_restriction' => 'Female', 'category_restriction' => 'VIP']);
+
+    app(RoomAllocationService::class)->commit($event, null);
+
+    expect($vipWoman->fresh()->roomAssignment->accommodation_room_id)->toBe($floorRoom->id)
+        ->and($vipMan->fresh()->roomAssignment->accommodation_room_id)->toBe($maleRoom->id)
+        ->and($otherWoman->fresh()->roomAssignment)->toBeNull();
+
+    $this->actingAs($manager)->get(route('events.accommodation.section', [$event, 'inventory']))->assertOk()
+        ->assertDontSee('&amp;amp;', false)
+        ->assertSee('Female · VIP · 2 room(s)', false)
+        ->assertSee('<option value="VIP"></option>', false);
+});
+
+it('warns when a new building setting no longer fits people already in its rooms, and leaves them there', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $room = accommodationRoom($event, 'A01', 2);
+    $man = accommodationRegistration($event, 'Kwame', 'Male');
+    $man->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
+
+    $this->actingAs($manager)->patch(route('events.accommodation.blocks.update', [$event, $room->floor->block]), [
+        'name' => 'Block A', 'gender_restriction' => 'Female', 'priority' => 100, 'is_active' => 1,
+    ])->assertSessionHas('success', fn ($message) => str_contains($message, '1 person already in these rooms no longer match'));
+
+    expect($man->fresh()->roomAssignment->accommodation_room_id)->toBe($room->id);
+});
+
+it('adds a floor with a gender and category', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = accommodationManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
+    unlockAllEventFeatures($event);
+    $block = accommodationRoom($event, 'A01')->floor->block;
+
+    $this->actingAs($manager)->post(route('events.accommodation.floors.store', [$event, $block]), [
+        'name' => 'First', 'gender_restriction' => 'Male', 'category_restriction' => 'Pastors',
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('accommodation_floors', ['accommodation_block_id' => $block->id, 'name' => 'First', 'gender_restriction' => 'Male', 'category_restriction' => 'Pastors']);
+});
+
 it('matches rooms despite loose gender spellings', function () {
     $company = Company::create(['name' => 'Acme']);
     $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now(), 'accommodation_enabled' => true]);
@@ -507,6 +566,7 @@ it('clones sites, blocks, floors and rooms from a past event without assignments
     $destination = Event::create(['company_id' => $company->id, 'title' => 'Summit 2026', 'event_date' => now()]);
     unlockAllEventFeatures($destination);
     $room = accommodationRoom($source, 'A01', 2, ['block' => 'Block A']);
+    $room->floor->update(['gender_restriction' => 'Female', 'category_restriction' => 'VIP']);
     $guest = accommodationRegistration($source, 'Past Guest');
     $guest->roomAssignment()->create(['accommodation_room_id' => $room->id, 'status' => 'assigned', 'method' => 'manual']);
 
@@ -521,7 +581,8 @@ it('clones sites, blocks, floors and rooms from a past event without assignments
     $this->assertDatabaseHas('accommodation_rooms', ['name' => 'A01', 'capacity' => 2]);
     $destinationRoom = AccommodationRoom::whereHas('floor.block.site', fn ($q) => $q->where('event_id', $destination->id))
         ->where('name', 'A01')->firstOrFail();
-    expect($destinationRoom->assignments()->count())->toBe(0);
+    expect($destinationRoom->assignments()->count())->toBe(0)
+        ->and($destinationRoom->floor->only('gender_restriction', 'category_restriction'))->toBe(['gender_restriction' => 'Female', 'category_restriction' => 'VIP']);
 
     // Re-running is idempotent — no duplicate rows.
     $this->actingAs($manager)->post(route('events.accommodation.clone', $destination), ['source_event_id' => $source->id]);

@@ -33,6 +33,18 @@ class AccommodationRoom extends Model
         return $this->assignments()->whereIn('status', ['assigned', 'checked_in']);
     }
 
+    /** The gender this room is kept for: its own setting, else its floor's, else its building's. */
+    public function effectiveGender(): ?string
+    {
+        return $this->gender_restriction ?: $this->floor->gender_restriction ?: $this->floor->block->gender_restriction;
+    }
+
+    /** The category this room is kept for: its own setting, else its floor's, else its building's. */
+    public function effectiveCategory(): ?string
+    {
+        return $this->category_restriction ?: $this->floor->category_restriction ?: $this->floor->block->category_restriction;
+    }
+
     public function label(): string
     {
         return $this->floor->block->site->name.' / '.$this->floor->block->name.' / '.$this->floor->name.' / '.$this->name;

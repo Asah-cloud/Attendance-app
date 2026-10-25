@@ -185,6 +185,8 @@ ssh -i ~/.ssh/lightsail_attendance ubuntu@<server> \
   `select` first. This made every room look empty to automatic room assignment until it was fixed.
 - **A Blade directive glued to a word is printed as text**, e.g. `free@if(...)` or `step-free@endif`.
   Put a space (or a tag) before the `@`. The room picker showed raw `@if(...)` code to attendees this way.
+- **Read a room's gender/category with `effectiveGender()` / `effectiveCategory()`**, never
+  `$room->gender_restriction ?: $room->floor->block->...`: that skips the floor's setting.
 - **Room tests that start with empty rooms hide occupancy bugs.** When testing allocation, put someone
   in a room first.
 - **`import` with row numbers in column A:** an ID alone only re-finds someone with the same name.
@@ -243,6 +245,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #36 | 24 Oct | **Tell people their rooms:** shortcut on the room board and Send to attendees; Messages opens pre-filled; placeholders `{room}`, `{building}`, `{floor}`, `{location}`, `{room_link}`; a sent room message marks people as told, a board move marks them not told |
 | #37 | 24 Oct | Messages always recognises the room placeholders (it wrongly warned on events with rooms but accommodation switched off) |
 | #38 | 24 Oct | **Automatic room assignment and room picker fixed**, see below |
+| *(branch `feature/floor-restrictions`)* | 25 Oct | **Gender and category per floor** (new columns on `accommodation_floors`), alongside buildings and rooms; a room's own setting wins, then its floor's, then its building's. Saving a building, floor or room says how many people already there no longer fit (they are not moved). Category boxes suggest the event's categories. The room board shows a floor's gender. Fixed "Buildings &amp;amp; rooms" in the inventory heading |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
