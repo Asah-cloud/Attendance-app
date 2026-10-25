@@ -118,7 +118,8 @@
                             @foreach($block->floors as $floor)
                                 @continue($floor->rooms->isEmpty())
                                 <div data-floor>
-                                    <p class="mb-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{{ $floor->name }}</p>
+                                    <p class="mb-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{{ $floor->name }}
+                                        @if($floor->gender_restriction)<span class="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] tracking-wider text-slate-300">{{ $floor->gender_restriction }} only</span>@endif</p>
                                     <div class="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                                         @foreach($floor->rooms as $room)
                                             @php

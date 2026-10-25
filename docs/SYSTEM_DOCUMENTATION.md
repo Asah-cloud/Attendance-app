@@ -204,8 +204,11 @@ Managers can upload a company logo and, per event, an event logo/flyer (`Organiz
 
 A paid per-event feature (`event.feature:rooms`). Managers build an inventory of **site → block → floor
 → room** (`AccommodationController`, bulk create, CSV import, or copied from another event without its
-occupants). Blocks and rooms can carry a gender or category restriction, floors and rooms can be marked
-step-free, and blocks, floors and rooms have a priority that sets the fill order. A room is `active`,
+occupants). Blocks, floors and rooms can each carry a gender or category restriction; the most specific
+one wins (room, then floor, then block: `AccommodationRoom::effectiveGender/effectiveCategory`). Changing
+one never moves anyone: the save message counts occupants who no longer fit
+(`RoomAllocationService::occupantsNotFitting`) so a manager can move them on the room board. Floors and
+rooms can be marked step-free, and blocks, floors and rooms have a priority that sets the fill order. A room is `active`,
 `reserved` (skipped by automatic assignment, still assignable by hand) or `closed`.
 
 A confirmed registration ticked "Needs room" (`accommodation_required`) gets one `RoomAssignment`

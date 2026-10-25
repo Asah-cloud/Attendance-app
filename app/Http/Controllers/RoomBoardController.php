@@ -76,7 +76,7 @@ class RoomBoardController extends Controller
         if ($gender === '') {
             return null;
         }
-        $restriction = strtolower((string) ($room->gender_restriction ?: $room->floor->block->gender_restriction));
+        $restriction = strtolower((string) $room->effectiveGender());
         if ($restriction && ! str_starts_with($restriction, $gender[0])) {
             return "{$room->name} is set aside for {$restriction} guests. Put {$registration->participant->name} there anyway?";
         }

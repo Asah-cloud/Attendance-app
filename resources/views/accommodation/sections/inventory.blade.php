@@ -2,7 +2,7 @@
 <x-app-layout>
     <x-slot name="header">Buildings &amp; rooms</x-slot>
     <div class="py-10"><div class="mx-auto max-w-7xl space-y-7 sm:px-6 lg:px-8">
-        @include('accommodation.sections._header', ['title' => 'Buildings &amp; rooms', 'intro' => 'Locations, buildings, floors and rooms, with their beds and restrictions.'])
+        @include('accommodation.sections._header', ['title' => 'Buildings & rooms','intro' => 'Locations, buildings, floors and rooms, with their beds and restrictions.'])
         @if($errors->any())<div class="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800">{{ $errors->first() }}</div>@endif
         @if($cloneableEvents->isNotEmpty())
         <section class="rounded-3xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm">
@@ -20,6 +20,8 @@
         </section>
         @endif
 
+        {{-- Suggest this event's categories in every category box, so a typo doesn't quietly keep everyone out. --}}
+        <datalist id="room-categories">@foreach($allocationCategories as $option)<option value="{{ $option }}"></option>@endforeach</datalist>
         <section data-tour="event-rooms-inventory" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xl font-black text-slate-900">Buildings &amp; rooms</h2>
@@ -66,7 +68,7 @@
                                     <form method="POST" action="{{ route('events.accommodation.blocks.store', [$event, $site]) }}" class="mt-2 grid gap-2 md:grid-cols-5">@csrf
                                         <input name="name" required placeholder="Building name (e.g. Block A)" class="rounded-xl border-slate-300 text-sm">
                                         <select name="gender_restriction" class="rounded-xl border-slate-300 text-sm"><option value="">Open to anyone</option><option>Male</option><option>Female</option></select>
-                                        <input name="category_restriction" placeholder="Category (optional)" class="rounded-xl border-slate-300 text-sm">
+                                        <input name="category_restriction" list="room-categories" placeholder="Category (optional)" class="rounded-xl border-slate-300 text-sm">
                                         <select name="priority" class="rounded-xl border-slate-300 text-sm">@foreach(Priority::options(null) as $label => $value)<option value="{{ $value }}" @selected($value === Priority::DEFAULT)>{{ $label }}</option>@endforeach</select>
                                         <button class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">Add building</button>
                                     </form>
@@ -102,6 +104,8 @@
                                                 <summary class="cursor-pointer list-none rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-black text-white">+ Add floor</summary>
                                                 <form method="POST" action="{{ route('events.accommodation.floors.store', [$event, $block]) }}" class="mt-2 flex flex-wrap gap-2">@csrf
                                                     <input name="name" required placeholder="Floor name" class="rounded-xl border-slate-300 text-sm">
+                                                    <select name="gender_restriction" class="rounded-xl border-slate-300 text-sm"><option value="">Same as building</option><option>Male</option><option>Female</option></select>
+                                                    <input name="category_restriction" list="room-categories" placeholder="Category (optional)" class="rounded-xl border-slate-300 text-sm">
                                                     <select name="priority" class="w-40 rounded-xl border-slate-300 text-sm">@foreach(Priority::options(null) as $label => $value)<option value="{{ $value }}" @selected($value === Priority::DEFAULT)>{{ $label }}</option>@endforeach</select>
                                                     <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="is_accessible" value="1"> Step-free access (no stairs)</label>
                                                     <button class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-black text-white">Add floor</button>
@@ -113,7 +117,7 @@
                                                     <form method="POST" action="{{ route('events.accommodation.blocks.update', [$event, $block]) }}" class="grid gap-2">@csrf @method('PATCH')
                                                         <input name="name" value="{{ $block->name }}" required class="rounded-lg border-slate-300 text-xs">
                                                         <select name="gender_restriction" class="rounded-lg border-slate-300 text-xs"><option value="">Open to anyone</option><option @selected($block->gender_restriction === 'Male')>Male</option><option @selected($block->gender_restriction === 'Female')>Female</option></select>
-                                                        <input name="category_restriction" value="{{ $block->category_restriction }}" placeholder="Category" class="rounded-lg border-slate-300 text-xs">
+                                                        <input name="category_restriction" value="{{ $block->category_restriction }}" list="room-categories" placeholder="Category (anyone if blank)" class="rounded-lg border-slate-300 text-xs">
                                                         <select name="priority" class="rounded-lg border-slate-300 text-xs">@foreach(Priority::options($block->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $block->priority)>{{ $label }}</option>@endforeach</select>
                                                         <label class="text-xs"><input type="checkbox" name="is_active" value="1" @checked($block->is_active)> Active</label>
                                                         <button class="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-black text-white">Save</button>
@@ -128,7 +132,7 @@
                                                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-3 hover:bg-slate-50">
                                                     <span class="min-w-0">
                                                         <span class="block truncate text-sm font-bold text-slate-700">{{ $floor->name }} @if($floor->is_accessible)<span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-black uppercase text-indigo-700">Step-free</span>@endif@unless($floor->is_active)<span class="ml-1 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-black uppercase text-slate-600">Inactive</span>@endunless</span>
-                                                        <span class="text-xs text-slate-500">{{ $floor->rooms->count() }} room(s) · {{ $floor->rooms->sum('active_assignments_count') }}/{{ $floor->rooms->sum('capacity') }} bed(s) filled</span>
+                                                        <span class="text-xs text-slate-500">{{ $floor->gender_restriction ? $floor->gender_restriction.' · ' : '' }}{{ $floor->category_restriction ? $floor->category_restriction.' · ' : '' }}{{ $floor->rooms->count() }} room(s) · {{ $floor->rooms->sum('active_assignments_count') }}/{{ $floor->rooms->sum('capacity') }} bed(s) filled</span>
                                                     </span>
                                                     <svg class="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                                 </summary>
@@ -139,8 +143,8 @@
                                                             <form method="POST" action="{{ route('events.accommodation.rooms.store', [$event, $floor]) }}" class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">@csrf
                                                                 <input name="name" required placeholder="Room name / number" class="rounded-xl border-slate-300 text-sm">
                                                                 <input name="capacity" required type="number" min="1" placeholder="Beds" class="rounded-xl border-slate-300 text-sm">
-                                                                <select name="gender_restriction" class="rounded-xl border-slate-300 text-sm"><option value="">Same as building</option><option>Male</option><option>Female</option></select>
-                                                                <input name="category_restriction" placeholder="Category" class="rounded-xl border-slate-300 text-sm">
+                                                                <select name="gender_restriction" class="rounded-xl border-slate-300 text-sm"><option value="">Same as floor / building</option><option>Male</option><option>Female</option></select>
+                                                                <input name="category_restriction" list="room-categories" placeholder="Category" class="rounded-xl border-slate-300 text-sm">
                                                                 <select name="priority" class="rounded-xl border-slate-300 text-sm">@foreach(Priority::options(null) as $label => $value)<option value="{{ $value }}" @selected($value === Priority::DEFAULT)>{{ $label }}</option>@endforeach</select>
                                                                 <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_accessible" value="1"> Step-free access (no stairs)</label>
                                                                 <button class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white sm:col-span-2 lg:col-span-3">Add room</button>
@@ -153,7 +157,7 @@
                                                                 <input name="start" type="number" min="0" required placeholder="From" class="w-20 rounded-lg border-indigo-200 text-xs">
                                                                 <input name="end" type="number" min="0" required placeholder="To" class="w-20 rounded-lg border-indigo-200 text-xs">
                                                                 <input name="capacity" type="number" min="1" required placeholder="Beds" class="w-20 rounded-lg border-indigo-200 text-xs">
-                                                                <select name="gender_restriction" class="rounded-lg border-indigo-200 text-xs"><option value="">Same as building</option><option>Male</option><option>Female</option></select>
+                                                                <select name="gender_restriction" class="rounded-lg border-indigo-200 text-xs"><option value="">Same as floor / building</option><option>Male</option><option>Female</option></select>
                                                                 <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_accessible" value="1"> Step-free access (no stairs)</label>
                                                                 <button class="rounded-lg bg-indigo-700 px-3 py-2 text-xs font-black text-white">Create range</button>
                                                             </form>
@@ -163,6 +167,8 @@
                                                             <div class="mt-2 flex flex-wrap items-start gap-3">
                                                                 <form method="POST" action="{{ route('events.accommodation.floors.update', [$event, $floor]) }}" class="grid gap-2">@csrf @method('PATCH')
                                                                     <input name="name" value="{{ $floor->name }}" required class="rounded-lg border-slate-300 text-xs">
+                                                                    <select name="gender_restriction" class="rounded-lg border-slate-300 text-xs"><option value="">Same as building</option><option @selected($floor->gender_restriction === 'Male')>Male</option><option @selected($floor->gender_restriction === 'Female')>Female</option></select>
+                                                                    <input name="category_restriction" value="{{ $floor->category_restriction }}" list="room-categories" placeholder="Category (same as building if blank)" class="rounded-lg border-slate-300 text-xs">
                                                                     <select name="priority" class="rounded-lg border-slate-300 text-xs">@foreach(Priority::options($floor->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $floor->priority)>{{ $label }}</option>@endforeach</select>
                                                                     <label class="text-xs"><input type="checkbox" name="is_accessible" value="1" @checked($floor->is_accessible)> Step-free access (no stairs)</label>
                                                                     <label class="text-xs"><input type="checkbox" name="is_active" value="1" @checked($floor->is_active)> Active</label>
@@ -181,7 +187,7 @@
                                                                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-3 hover:bg-slate-50">
                                                                     <span class="min-w-0">
                                                                         <span class="block truncate text-sm font-black text-slate-900">Room {{ $room->name }}</span>
-                                                                        <span class="text-xs text-slate-500">{{ $room->active_assignments_count }} of {{ $room->capacity }} bed{{ $room->capacity === 1 ? '' : 's' }} occupied</span>
+                                                                        <span class="text-xs text-slate-500">{{ $room->active_assignments_count }} of {{ $room->capacity }} bed{{ $room->capacity === 1 ? '' : 's' }} occupied{{ $room->gender_restriction ? ' · '.$room->gender_restriction : '' }}{{ $room->category_restriction ? ' · '.$room->category_restriction : '' }}</span>
                                                                     </span>
                                                                     <span class="flex items-center gap-2">
                                                                         @if($room->status !== 'active')<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800">{{ $room->status }}</span>@endif
@@ -196,8 +202,8 @@
                                                                     </div>
                                                                     <div class="mt-2 grid grid-cols-2 gap-2">
                                                                         <select name="status" class="rounded border-slate-300 p-1 text-xs">@foreach(['active' => 'active', 'reserved' => 'reserved (manual only)', 'closed' => 'closed (out of service)'] as $value => $label)<option value="{{ $value }}" @selected($room->status === $value)>{{ $label }}</option>@endforeach</select>
-                                                                        <select name="gender_restriction" class="rounded border-slate-300 p-1 text-xs"><option value="">Same as building</option><option @selected($room->gender_restriction === 'Male')>Male</option><option @selected($room->gender_restriction === 'Female')>Female</option></select>
-                                                                        <input name="category_restriction" value="{{ $room->category_restriction }}" placeholder="Category" class="rounded border-slate-300 p-1 text-xs">
+                                                                        <select name="gender_restriction" class="rounded border-slate-300 p-1 text-xs"><option value="">Same as floor / building</option><option @selected($room->gender_restriction === 'Male')>Male</option><option @selected($room->gender_restriction === 'Female')>Female</option></select>
+                                                                        <input name="category_restriction" value="{{ $room->category_restriction }}" list="room-categories" placeholder="Category" class="rounded border-slate-300 p-1 text-xs">
                                                                         <select name="priority" class="rounded border-slate-300 p-1 text-xs">@foreach(Priority::options($room->priority) as $label => $value)<option value="{{ $value }}" @selected($value === (int) $room->priority)>{{ $label }}</option>@endforeach</select>
                                                                     </div>
                                                                     <label class="mt-2 flex items-center gap-1 text-xs"><input type="checkbox" name="is_accessible" value="1" @checked($room->is_accessible)> Step-free access (no stairs)</label>

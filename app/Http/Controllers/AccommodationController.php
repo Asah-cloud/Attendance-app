@@ -16,6 +16,7 @@ use App\Services\RoomAllocationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -93,7 +94,7 @@ class AccommodationController extends Controller
                     foreach ($block->floors as $floor) {
                         $destFloor = $destBlock->floors()->firstOrCreate(
                             ['name' => $floor->name],
-                            ['is_accessible' => $floor->is_accessible, 'priority' => $floor->priority, 'is_active' => true]
+                            ['gender_restriction' => $floor->gender_restriction, 'category_restriction' => $floor->category_restriction, 'is_accessible' => $floor->is_accessible, 'priority' => $floor->priority, 'is_active' => true]
                         );
                         $counts['floor'] += $destFloor->wasRecentlyCreated ? 1 : 0;
 
@@ -268,7 +269,7 @@ class AccommodationController extends Controller
     {
         $this->authorize('update', $event);
         $this->blockBelongs($block, $event);
-        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'priority' => ['nullable', 'integer', 'min:0'], 'is_accessible' => ['nullable', 'boolean']]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'gender_restriction' => ['nullable', Rule::in(['Male', 'Female'])], 'category_restriction' => ['nullable', 'string', 'max:255'], 'priority' => ['nullable', 'integer', 'min:0'], 'is_accessible' => ['nullable', 'boolean']]);
         $data['is_accessible'] = $request->boolean('is_accessible');
         $block->floors()->create($data);
 
@@ -335,7 +336,7 @@ class AccommodationController extends Controller
         return back()->with('success', "{$created} room(s) imported.");
     }
 
-    public function updateRoom(Request $request, Event $event, AccommodationRoom $room): RedirectResponse
+    public function updateRoom(Request $request, Event $event, AccommodationRoom $room, RoomAllocationService $allocator): RedirectResponse
     {
         $this->authorize('update', $event);
         $this->roomBelongs($room, $event);
@@ -344,7 +345,7 @@ class AccommodationController extends Controller
         $data['is_accessible'] = $request->boolean('is_accessible');
         $room->update($data);
 
-        return back()->with('success', 'Room updated.');
+        return back()->with('success', 'Room updated.'.$this->notFittingNote($allocator, collect([$room->fresh()])));
     }
 
     public function updateRequirement(Request $request, Event $event, EventRegistration $registration): RedirectResponse
@@ -504,22 +505,22 @@ class AccommodationController extends Controller
         return back()->with('success', 'Site updated.');
     }
 
-    public function updateBlock(Request $request, Event $event, AccommodationBlock $block): RedirectResponse
+    public function updateBlock(Request $request, Event $event, AccommodationBlock $block, RoomAllocationService $allocator): RedirectResponse
     {
         $this->authorize('update', $event);
         $this->blockBelongs($block, $event);
-        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'gender_restriction' => ['nullable', Rule::in(['Male', 'Female'])], 'category_restriction' => ['nullable', 'string'], 'priority' => ['required', 'integer', 'min:0'], 'is_active' => ['nullable', 'boolean']]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'gender_restriction' => ['nullable', Rule::in(['Male', 'Female'])], 'category_restriction' => ['nullable', 'string', 'max:255'], 'priority' => ['required', 'integer', 'min:0'], 'is_active' => ['nullable', 'boolean']]);
         $data['is_active'] = $request->boolean('is_active');
         $block->update($data);
 
-        return back()->with('success', 'Block updated.');
+        return back()->with('success', 'Block updated.'.$this->notFittingNote($allocator, $block->floors()->with('rooms')->get()->flatMap->rooms));
     }
 
-    public function updateFloor(Request $request, Event $event, AccommodationFloor $floor): RedirectResponse
+    public function updateFloor(Request $request, Event $event, AccommodationFloor $floor, RoomAllocationService $allocator): RedirectResponse
     {
         $this->authorize('update', $event);
         $this->floorBelongs($floor, $event);
-        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'priority' => ['required', 'integer', 'min:0'], 'is_active' => ['nullable', 'boolean'], 'is_accessible' => ['nullable', 'boolean'], 'room_status' => ['nullable', Rule::in(['active', 'reserved', 'closed'])]]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'gender_restriction' => ['nullable', Rule::in(['Male', 'Female'])], 'category_restriction' => ['nullable', 'string', 'max:255'], 'priority' => ['required', 'integer', 'min:0'], 'is_active' => ['nullable', 'boolean'], 'is_accessible' => ['nullable', 'boolean'], 'room_status' => ['nullable', Rule::in(['active', 'reserved', 'closed'])]]);
         $roomStatus = $data['room_status'] ?? null;
         unset($data['room_status']);
         $data['is_active'] = $request->boolean('is_active');
@@ -531,7 +532,17 @@ class AccommodationController extends Controller
             }
         });
 
-        return back()->with('success', $roomStatus ? 'Floor and all its rooms updated.' : 'Floor updated.');
+        return back()->with('success', ($roomStatus ? 'Floor and all its rooms updated.' : 'Floor updated.').$this->notFittingNote($allocator, $floor->rooms()->get()));
+    }
+
+    /** A note for the save message when a changed gender/category no longer fits people already in those rooms. */
+    private function notFittingNote(RoomAllocationService $allocator, Collection $rooms): string
+    {
+        $count = $allocator->occupantsNotFitting($rooms);
+
+        return $count
+            ? ' '.$count.' '.($count === 1 ? 'person' : 'people').' already in these rooms no longer match the gender or category. They stay where they are; move them on the room board if needed.'
+            : '';
     }
 
     public function destroyInventory(Event $event, string $type, int $id): RedirectResponse

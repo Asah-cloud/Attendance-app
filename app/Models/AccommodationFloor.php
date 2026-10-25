@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AccommodationFloor extends Model
 {
-    protected $fillable = ['accommodation_block_id', 'name', 'is_accessible', 'priority', 'is_active'];
+    protected $fillable = ['accommodation_block_id', 'name', 'gender_restriction', 'category_restriction', 'is_accessible', 'priority', 'is_active'];
 
     protected $casts = ['is_accessible' => 'boolean', 'is_active' => 'boolean'];
 
