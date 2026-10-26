@@ -182,7 +182,11 @@ For organizations that collect attendee lists outside the system (e.g., a physic
 
 ### 6.8 Reporting and exports
 
-`ReportController` and `SummaryReportController` provide per-event and per-day attendance views with export to **Excel** (`AttendanceExport`), **CSV**, and **PDF** (dompdf). `8c31dc0` added gender/category breakdowns to reporting. Printable attendee badges (`4759873`) are generated from `EventRegistrationFormController::badges`.
+`ReportController` shows an event's attendance for all days, one day or one session, in three views: **Simple** (headline numbers), **Detailed** (each day, each group and each person) and **Advanced** (check-in times, drop-offs, comparisons and data checks). All counting happens in `AttendanceGrid`, so the page, Excel, CSV and PDF always agree.
+
+The Detailed view can be filtered by **area, category, gender and country**, and every download follows the filter. It splits attendance by the same four, with present, expected and turnout per group. **Country** comes from each attendee's phone number (`AttendanceGrid::country`, using `PhoneNumberService::countryOf`, as Messages does): there is no country field, so it shows "No phone number" or "Country unknown" where the phone can't tell.
+
+Downloads: an Excel workbook (`AttendanceWorkbook`: summary, people present, people not present), CSV (`AttendanceExport`), PDF, an **area or country summary** (`GroupAttendanceSummaryExport`, one row per group with a count per day) and a workbook for **one area or one country** (click its name). Sheets write text as text (`KeepsTextAsText`) so international phone numbers keep their "+". Printable attendee badges (`4759873`) are generated from `EventRegistrationFormController::badges`.
 
 ### 6.9 Billing and subscriptions
 

@@ -87,17 +87,24 @@ composer audit --locked                    # CI fails on any security advisory
 
 ### 3.3 Look at it in a browser (for anything visible)
 
-There is a **local demo** with a **test manager account**. Its data is a "Demo Church" organisation
-with a "Demo Retreat" event (id 1), buildings and sample guests, kept in a scratch SQLite database (not
-the project's own). It is used to sign in and screenshot pages with puppeteer driving the installed Chrome.
-The database, the login file and the puppeteer script (`browser/shoot.js`) sit together in a Claude Code
-scratch folder under `/private/tmp/claude-501/` (look for `demo.sqlite`); the login is never written
-into the repo. That folder can be wiped by a reboot; `demo-seed.php` beside it rebuilds the data. Back up
-`demo.sqlite` before changing data for a test, and restore it afterwards.
+There is a **local demo** with a **test manager account** (`test-manager@demo.test`). Its data is a
+"Demo Church" organisation with a two-day "Demo Retreat" (event id 1) whose 14 attendees have phones from
+Ghana, Nigeria, the UK, Mali and Benin (plus one with no phone and one unreadable number) and check-ins on
+both days. It lives in a scratch SQLite database, not the project's own, and is used to sign in and
+screenshot pages with puppeteer driving the installed Chrome. The folder (`demo/` in a Claude Code scratch
+folder under `/private/tmp/claude-501/`) holds `demo.sqlite`, `credentials.txt` (the login; never put it
+in the repo), `seed.php` and `browser/` (puppeteer-core 23.11.1).
+
+**macOS clears `/private/tmp`**: the first demo was lost this way on 26 Oct. To rebuild, in an empty
+folder: create an empty `demo.sqlite`, run `php artisan migrate` against it, then
+`DEMO_DIR=<folder> php artisan tinker --execute="$(cat seed.php)"`. It writes a fresh password to
+`credentials.txt`. Keep a copy of `seed.php` outside `/private/tmp` if you want to be safe. Back up
+`demo.sqlite` before changing data for a test, and restore it afterwards. It has no rooms set up; add
+them when testing accommodation.
 
 ```bash
-DB_CONNECTION=sqlite DB_DATABASE=<scratch>/demo.sqlite APP_URL=http://127.0.0.1:8766 \
-  SESSION_DRIVER=file MAIL_MAILER=log QUEUE_CONNECTION=sync php artisan serve --port=8766
+DB_CONNECTION=sqlite DB_DATABASE=<folder>/demo.sqlite APP_URL=http://127.0.0.1:8766 SESSION_DRIVER=file \
+  CACHE_STORE=array MAIL_MAILER=log QUEUE_CONNECTION=sync php artisan serve --port=8766
 ```
 
 - Run `npm run build` first, so the page uses the current CSS and JS.
@@ -204,6 +211,9 @@ ssh -i ~/.ssh/lightsail_attendance ubuntu@<server> \
 - **Objects stored in the cache must be listed** in `config/cache.php` → `serializable_classes`
   (Laravel 13). Tests use the array cache, which hides this; see the cache test in `ReportsAndExportsTest`.
 - **Maatwebsite Excel drops an empty row (`[]`)** in `FromArray`. Use `['']` for a blank line.
+- **Excel turns text that looks like a number into a number**: `+2348091000008` loses its "+" and shows
+  as 2.34809E+12. Report sheets use `KeepsTextAsText` (with `WithCustomValueBinder`). And without
+  `WithStrictNullComparison` a count of 0 is written as an empty cell.
 - **Locally, the full test suite needs more memory** than this Mac's 128 MB PHP default:
   `php -d memory_limit=1G vendor/bin/pest`.
 - **The server's `package-lock.json` must stay unmodified.** `deploy.sh` uses `npm ci`. Never run
@@ -246,6 +256,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #37 | 24 Oct | Messages always recognises the room placeholders (it wrongly warned on events with rooms but accommodation switched off) |
 | #38 | 24 Oct | **Automatic room assignment and room picker fixed**, see below |
 | #39 | 25 Oct | **Gender and category per floor** (new columns on `accommodation_floors`), alongside buildings and rooms; a room's own setting wins, then its floor's, then its building's. Saving a building, floor or room says how many people already there no longer fit (they are not moved). Category boxes suggest the event's categories. The room board shows a floor's gender. Fixed "Buildings &amp;amp; rooms" in the inventory heading |
+| *(branch `feature/report-countries`)* | 26 Oct | **Reports by country:** a country filter and "By country" split in the Detailed view, a country summary download and a download per country, a Country column in the attendee sheets, and "By country" in the Excel summary and PDF. Country comes from the phone number. Downloads now keep the "+" on international numbers and write zero counts as 0 |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
@@ -299,7 +310,7 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
 | Check-in | `AttendanceController` (`checkInByPhone`, `selfCheckIn`), `attendance/public-scan.blade.php` |
 | Sign-in bell | `RecordLoginActivity`, `SignInActivityController`, `components/sign-in-bell.blade.php` |
 | Event links | `Event::uniqueSlug/findBySlug`, `EventSlugRedirect` |
-| Attendance reports | `AttendanceGrid` (all counting), `AttendanceInsights` (Advanced view), `ReportController`, `reports/views/{simple,detailed,advanced}`, `AttendanceWorkbook` + sheets in `app/Exports`, `reports/attendance-pdf.blade.php` |
+| Attendance reports | `AttendanceGrid` (all counting; `area()` and `country()` for the splits), `GroupAttendanceSummaryExport` (area or country summary), `AttendanceInsights` (Advanced view), `ReportController`, `reports/views/{simple,detailed,advanced}`, `AttendanceWorkbook` + sheets in `app/Exports`, `reports/attendance-pdf.blade.php` |
 
 ---
 

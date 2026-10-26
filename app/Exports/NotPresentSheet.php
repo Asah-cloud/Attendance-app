@@ -2,20 +2,22 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\KeepsTextAsText;
 use App\Exports\Concerns\StylesReportSheet;
 use App\Models\Event;
 use App\Services\AttendanceGrid;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 
 /** Registered people who did not check in during the report period. */
-class NotPresentSheet implements FromArray, WithCustomStartCell, WithEvents, WithHeadings, WithTitle
+class NotPresentSheet implements FromArray, WithCustomStartCell, WithCustomValueBinder, WithEvents, WithHeadings, WithTitle
 {
-    use StylesReportSheet;
+    use KeepsTextAsText, StylesReportSheet;
 
     public function __construct(private readonly Event $event, private readonly array $grid) {}
 
@@ -31,13 +33,13 @@ class NotPresentSheet implements FromArray, WithCustomStartCell, WithEvents, Wit
 
     public function headings(): array
     {
-        return ['#', 'Name', 'Phone', 'Area', 'Category', 'Gender', 'Email'];
+        return ['#', 'Name', 'Phone', 'Country', 'Area', 'Category', 'Gender', 'Email'];
     }
 
     public function array(): array
     {
         return $this->grid['absent']->values()->map(fn ($person, $index) => [
-            $index + 1, $person->name, $person->phone, AttendanceGrid::area($person), $person->category, $person->gender, $person->email,
+            $index + 1, $person->name, $person->phone, AttendanceGrid::country($person), AttendanceGrid::area($person), $person->category, $person->gender, $person->email,
         ])->all();
     }
 

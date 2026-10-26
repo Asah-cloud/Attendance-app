@@ -1,8 +1,8 @@
 <?php
 
-use App\Exports\AreaAttendanceSummaryExport;
 use App\Exports\AttendanceExport;
 use App\Exports\AttendanceWorkbook;
+use App\Exports\GroupAttendanceSummaryExport;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
@@ -10,6 +10,8 @@ use App\Models\Participant;
 use App\Models\User;
 use App\Services\AttendanceGrid;
 use App\Services\AttendanceReportData;
+use Maatwebsite\Excel\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -165,6 +167,95 @@ it('downloads the detailed attendee list for a single area, including unspecifie
         ->assertHeader('Content-Disposition');
 });
 
+/** Three attendees who came on day 1: a Ghana phone, a Nigeria phone, and no phone. */
+function reportsCountryEvent(Company $company): Event
+{
+    $event = Event::create(['company_id' => $company->id, 'title' => 'World Conference', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
+    foreach (['Kofi' => '0241234567', 'Chidi' => '+234 803 123 4567', 'Nophone' => null] as $name => $phone) {
+        $participant = Participant::create(['company_id' => $company->id, 'name' => $name, 'phone' => $phone]);
+        $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+        Attendance::create(['event_id' => $event->id, 'participant_id' => $participant->id, 'day' => 1, 'status' => 'present']);
+    }
+
+    return $event;
+}
+
+it('splits attendance by the country of each phone number and downloads a country summary', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = reportsCountryEvent($company);
+
+    expect((new GroupAttendanceSummaryExport($event, 1, null, [], 'country'))->collection()->pluck('present', 'country')->sortKeys()->all())
+        ->toBe(['Ghana' => 1, 'Nigeria' => 1, 'No phone number' => 1]);
+
+    $response = $this->actingAs($manager)->get(route('reports.country-summary', ['event' => $event, 'day' => 1]));
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('Country_Attendance_')->toContain('.xlsx');
+
+    $export = new AttendanceExport($event, 1);
+    $rows = $export->collection()->map(fn ($person) => array_combine($export->headings(), $export->map($person)))->keyBy('Name');
+    expect($rows['Chidi']['Country'])->toBe('Nigeria')
+        ->and($rows['Chidi']['Day 1'])->not->toBe('')
+        ->and($rows['Nophone']['Country'])->toBe('No phone number');
+});
+
+it('filters reports by country, on the page and in every download', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = reportsCountryEvent($company);
+
+    expect(app(AttendanceGrid::class)->build($event, 1, null, ['country' => 'Nigeria'])['rows']->pluck('person.name')->all())->toBe(['Chidi'])
+        ->and((new AttendanceExport($event, 1, null, ['country' => 'Ghana']))->collection()->pluck('name')->all())->toBe(['Kofi']);
+
+    $this->actingAs($manager)
+        ->get(route('reports.event', ['event' => $event, 'day' => 1, 'view' => 'detailed', 'country' => 'Nigeria']))
+        ->assertOk()
+        ->assertSee('All countries')
+        ->assertSee('By country')
+        ->assertSee(route('reports.country-summary', ['event' => $event->id, 'day' => 1, 'country' => 'Nigeria']), false)
+        ->assertSee('Chidi')
+        ->assertDontSee('Kofi');
+
+    foreach (['Nigeria', 'No phone number'] as $country) {
+        $response = $this->actingAs($manager)->get(route('reports.country-detail', ['event' => $event, 'country' => $country, 'day' => 1]));
+        $response->assertOk();
+        expect($response->headers->get('Content-Disposition'))->toContain('Country_');
+    }
+    $this->actingAs($manager)->get(route('reports.pdf', ['event' => $event, 'day' => 1, 'country' => 'Ghana']))->assertOk();
+});
+
+it('keeps the + on international phone numbers and writes zero counts as 0 in downloads', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $event = reportsCountryEvent($company);
+    $absent = Participant::create(['company_id' => $company->id, 'name' => 'Absent Abroad', 'phone' => '+2348091000008']);
+    $event->registrations()->create(['participant_id' => $absent->id, 'status' => 'confirmed']);
+    Participant::where('name', 'Chidi')->update(['phone' => '+2348031234567']);
+    $cells = function (object $export, int $sheet): array {
+        $path = tempnam(sys_get_temp_dir(), 'report').'.xlsx';
+        file_put_contents($path, Maatwebsite\Excel\Facades\Excel::raw($export, Excel::XLSX));
+
+        return IOFactory::load($path)->getSheet($sheet)->toArray(null, false, false);
+    };
+
+    // Workbook sheets: summary, people present, people not present.
+    $present = collect($cells(new AttendanceWorkbook($event, 1), 1));
+    $neverCame = collect($cells(new AttendanceWorkbook($event, 1), 2));
+    $countries = collect($cells(new GroupAttendanceSummaryExport($event, 'all', null, [], 'country'), 0));
+
+    expect($present->first(fn ($row) => in_array('Chidi', $row, true)))->toContain('+2348031234567')
+        ->and($neverCame->first(fn ($row) => in_array('Absent Abroad', $row, true)))->toContain('+2348091000008')
+        ->and($countries->first(fn ($row) => ($row[0] ?? null) === 'Nigeria'))->toBe(['Nigeria', 1]);
+});
+
+it('keeps another company out of the country downloads', function () {
+    $manager = reportsManager(Company::create(['name' => 'Acme Co']));
+    $event = reportsCountryEvent(Company::create(['name' => 'Other Co']));
+
+    $this->actingAs($manager)->get(route('reports.country-summary', ['event' => $event, 'day' => 1]))->assertForbidden();
+    $this->actingAs($manager)->get(route('reports.country-detail', ['event' => $event, 'country' => 'Ghana', 'day' => 1]))->assertForbidden();
+});
+
 it('prevents a manager from exporting another company event attendance', function () {
     $company = Company::create(['name' => 'Acme Co']);
     $otherCompany = Company::create(['name' => 'Other Co']);
@@ -257,7 +348,7 @@ it('uses the same numbered staff and unique-person counts in reports and area ex
         ->and($report['totalExpected'])->toBe(2)
         ->and($report['absentUsers'])->toBeEmpty();
     expect(app(AttendanceReportData::class)->forPeriod($event, 2)['presentUsers']->pluck('name')->all())->toBe(['Guest', 'Participant 7']);
-    expect((new AreaAttendanceSummaryExport($event, 'all'))->collection()->pluck('present', 'area')->all())
+    expect((new GroupAttendanceSummaryExport($event, 'all'))->collection()->pluck('present', 'area')->all())
         ->toBe(['Kumasi' => 1, 'Accra' => 1]);
     expect((new AttendanceExport($event, 'all'))->collection()->count())->toBe(2);
 
@@ -295,7 +386,7 @@ it('gives every event day its own column so multi-day attendance is not squeezed
         ->and($rows['Second Day']['Days attended'])->toBe('1 of 2')
         ->and($rows->has('Never Came'))->toBeFalse();
 
-    expect((new AreaAttendanceSummaryExport($event, 'all'))->collection()->firstWhere('area', 'Accra'))
+    expect((new GroupAttendanceSummaryExport($event, 'all'))->collection()->firstWhere('area', 'Accra'))
         ->toMatchArray(['slots' => [1, 2], 'present' => 2]);
 
     $sheets = (new AttendanceWorkbook($event, 'all'))->sheets();

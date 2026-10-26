@@ -1,6 +1,6 @@
-{{-- Category, gender and area counts side by side. --}}
+{{-- Category, gender, area and country counts side by side. --}}
 <table class="split"><tr>
-    @foreach(['By category' => $categoryBreakdown, 'By gender' => $genderBreakdown, 'By area' => $areaBreakdown ?? null] as $heading => $breakdown)
+    @foreach(['By category' => $categoryBreakdown, 'By gender' => $genderBreakdown, 'By area' => $areaBreakdown ?? null, 'By country' => $countryBreakdown ?? null] as $heading => $breakdown)
         @continue($breakdown === null)
         <td>
             <h2>{{ $heading }}</h2>

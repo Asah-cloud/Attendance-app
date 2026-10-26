@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\AreaAttendanceSummaryExport;
 use App\Exports\AttendanceExport;
 use App\Exports\AttendanceWorkbook;
+use App\Exports\GroupAttendanceSummaryExport;
 use App\Models\Event;
 use App\Services\ApplicationCache;
 use App\Services\AttendanceGrid;
@@ -30,11 +30,12 @@ class ReportController extends Controller
         $filters = $view === 'detailed' ? $this->filters($request) : [];
         $grid = $this->cachedGrid($event, $selectedDay, $selectedSession, $filters);
 
-        $people = $event->confirmedParticipants()->get(['participants.id', 'participants.gender', 'participants.department']);
+        $people = $event->confirmedParticipants()->get(['participants.id', 'participants.gender', 'participants.department', 'participants.phone']);
         $filterOptions = [
             'area' => $people->map(fn ($person) => AttendanceGrid::area($person))->unique()->sort()->values(),
             'category' => $people->map(fn ($person) => $person->category ?: 'Unspecified')->unique()->sort()->values(),
             'gender' => $people->map(fn ($person) => $person->gender ?: 'Unspecified')->unique()->sort()->values(),
+            'country' => $people->map(fn ($person) => AttendanceGrid::country($person))->unique()->sort()->values(),
         ];
         $registrationCounts = $event->registrations()
             ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
@@ -91,7 +92,16 @@ class ReportController extends Controller
         $day = $this->validatedDay($event, $day);
         $session = $this->validatedSession($event, $day, $request->query('session'));
 
-        return Excel::download(new AreaAttendanceSummaryExport($event, $day, $session, $this->filters($request)), $this->fileName($event, 'Area_Attendance', $day, $session, 'xlsx'));
+        return Excel::download(new GroupAttendanceSummaryExport($event, $day, $session, $this->filters($request)), $this->fileName($event, 'Area_Attendance', $day, $session, 'xlsx'));
+    }
+
+    public function exportCountrySummary(Request $request, Event $event, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        $session = $this->validatedSession($event, $day, $request->query('session'));
+
+        return Excel::download(new GroupAttendanceSummaryExport($event, $day, $session, $this->filters($request), 'country'), $this->fileName($event, 'Country_Attendance', $day, $session, 'xlsx'));
     }
 
     public function exportAreaDetail(Request $request, Event $event, string $area, $day = 'all')
@@ -101,6 +111,15 @@ class ReportController extends Controller
         $session = $this->validatedSession($event, $day, $request->query('session'));
 
         return Excel::download(new AttendanceWorkbook($event, $day, $session, ['area' => $area] + $this->filters($request)), $this->fileName($event, 'Area_'.$area, $day, $session, 'xlsx'));
+    }
+
+    public function exportCountryDetail(Request $request, Event $event, string $country, $day = 'all')
+    {
+        $this->authorize('view', $event);
+        $day = $this->validatedDay($event, $day);
+        $session = $this->validatedSession($event, $day, $request->query('session'));
+
+        return Excel::download(new AttendanceWorkbook($event, $day, $session, ['country' => $country] + $this->filters($request)), $this->fileName($event, 'Country_'.$country, $day, $session, 'xlsx'));
     }
 
     public function exportPdf(Request $request, Event $event, $day = 'all')
@@ -120,12 +139,12 @@ class ReportController extends Controller
 
     private function cachedGrid(Event $event, int|string $day, ?int $session, array $filters): array
     {
-        $key = 'report-grid:v1:'.$day.':'.$session.':'.md5(json_encode($filters));
+        $key = 'report-grid:v2:'.$day.':'.$session.':'.md5(json_encode($filters));
 
         return $this->cache->rememberEvent($event->id, $key, fn () => $this->grid->build($event, $day, $session, $filters), ApplicationCache::REPORT_TTL);
     }
 
-    /** Area / category / gender filters from the query string, so downloads match the screen. */
+    /** Area / category / gender / country filters from the query string, so downloads match the screen. */
     private function filters(Request $request): array
     {
         return collect(AttendanceGrid::FILTERS)
