@@ -11,18 +11,23 @@ use Maatwebsite\Excel\Concerns\WithCustomStartCell;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-/** People present per area, with a count for each day when the period covers several. */
-class AreaAttendanceSummaryExport implements FromCollection, WithCustomStartCell, WithEvents, WithHeadings, WithMapping, WithTitle
+/** People present per area or per country, with a count for each day when the period covers several. */
+class GroupAttendanceSummaryExport implements FromCollection, WithCustomStartCell, WithEvents, WithHeadings, WithMapping, WithStrictNullComparison, WithTitle
 {
     use StylesReportSheet;
 
+    /** Grid row field => [column heading, sheet title]. */
+    public const GROUPS = ['area' => ['Area', 'Areas'], 'country' => ['Country', 'Countries']];
+
     private ?array $grid = null;
 
-    public function __construct(private readonly Event $event, private readonly int|string $day, private readonly ?int $session = null, private readonly array $filters = []) {}
+    /** @param  'area'|'country'  $by */
+    public function __construct(private readonly Event $event, private readonly int|string $day, private readonly ?int $session = null, private readonly array $filters = [], private readonly string $by = 'area') {}
 
     private function grid(): array
     {
@@ -38,9 +43,9 @@ class AreaAttendanceSummaryExport implements FromCollection, WithCustomStartCell
     {
         $slots = $this->grid()['slots'];
 
-        return $this->grid()['rows']->groupBy('area')
-            ->map(fn ($group, $area) => [
-                'area' => $area,
+        return $this->grid()['rows']->groupBy($this->by)
+            ->map(fn ($group, $label) => [
+                $this->by => $label,
                 'slots' => $slots->map(fn ($slot) => $group->filter(fn ($row) => ! in_array($row->cells[$slot['key']], ['', AttendanceGrid::NOT_PRESENT], true))->count())->all(),
                 'present' => $group->count(),
             ])
@@ -50,7 +55,7 @@ class AreaAttendanceSummaryExport implements FromCollection, WithCustomStartCell
 
     public function title(): string
     {
-        return 'Areas';
+        return self::GROUPS[$this->by][1];
     }
 
     public function startCell(): string
@@ -60,12 +65,12 @@ class AreaAttendanceSummaryExport implements FromCollection, WithCustomStartCell
 
     public function headings(): array
     {
-        return ['Area', ...($this->perDay() ? $this->grid()['slots']->pluck('label')->all() : []), 'People present'];
+        return [self::GROUPS[$this->by][0], ...($this->perDay() ? $this->grid()['slots']->pluck('label')->all() : []), 'People present'];
     }
 
     public function map($row): array
     {
-        return [$row['area'], ...($this->perDay() ? $row['slots'] : []), $row['present']];
+        return [$row[$this->by], ...($this->perDay() ? $row['slots'] : []), $row['present']];
     }
 
     public function registerEvents(): array
@@ -73,7 +78,7 @@ class AreaAttendanceSummaryExport implements FromCollection, WithCustomStartCell
         return [AfterSheet::class => function (AfterSheet $event): void {
             $sheet = $event->sheet->getDelegate();
             $columns = count($this->headings());
-            $this->writeTitleBlock($sheet, $this->event->title, 'People present by area: '.$this->grid()['periodLabel'].'  ·  Generated '.now()->format('j M Y, g:i A'));
+            $this->writeTitleBlock($sheet, $this->event->title, 'People present by '.strtolower(self::GROUPS[$this->by][0]).': '.$this->grid()['periodLabel'].'  ·  Generated '.now()->format('j M Y, g:i A'));
             $this->styleTable($sheet, $this->headerRow, $columns, range(2, $columns));
             $total = Coordinate::stringFromColumnIndex($columns);
             $sheet->getStyle($total.($this->headerRow + 1).':'.$total.$sheet->getHighestDataRow())->getFont()->setBold(true);

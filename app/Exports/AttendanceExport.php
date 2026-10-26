@@ -2,10 +2,12 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\KeepsTextAsText;
 use App\Models\Event;
 use App\Services\AttendanceGrid;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 
@@ -14,13 +16,15 @@ use Maatwebsite\Excel\Concerns\WithMapping;
  * showing when they checked in. Used as-is for CSV downloads; AttendanceWorkbook wraps it
  * with a title block and styling for Excel.
  */
-class AttendanceExport implements FromCollection, WithHeadings, WithMapping
+class AttendanceExport implements FromCollection, WithCustomValueBinder, WithHeadings, WithMapping
 {
+    use KeepsTextAsText;
+
     protected ?array $grid = null;
 
     private int $rowNumber = 0;
 
-    /** @param  array{area?: ?string, category?: ?string, gender?: ?string}  $filters */
+    /** @param  array{area?: ?string, category?: ?string, gender?: ?string, country?: ?string}  $filters */
     public function __construct(protected Event $event, protected int|string $day = 'all', protected ?int $session = null, protected array $filters = []) {}
 
     public function grid(): array
@@ -39,7 +43,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
         $grid = $this->grid();
 
         return [
-            '#', 'Name', 'Phone', 'Area', 'Category', 'Gender', 'Email',
+            '#', 'Name', 'Phone', 'Country', 'Area', 'Category', 'Gender', 'Email',
             ...$grid['slots']->pluck('label')->all(),
             ...($grid['multiDay'] ? ['Days attended'] : []),
             'Check-in method',
@@ -55,6 +59,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
             ++$this->rowNumber,
             $person->name,
             $person->phone,
+            $row->country,
             $row->area,
             $person->category,
             $person->gender,
@@ -68,6 +73,6 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
     /** 1-based column numbers of the day/session columns. */
     protected function dayColumns(): array
     {
-        return range(8, 7 + $this->grid()['slots']->count());
+        return range(9, 8 + $this->grid()['slots']->count());
     }
 }

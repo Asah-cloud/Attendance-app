@@ -14,6 +14,9 @@
     $areaKey = fn ($person) => \App\Services\AttendanceGrid::area($person);
     $categoryKey = fn ($person) => $person->category ?: 'Unspecified';
     $genderKey = fn ($person) => $person->gender ?: 'Unspecified';
+    $countryKey = fn ($person) => \App\Services\AttendanceGrid::country($person);
+    // Area and country tables also show each day and offer downloads: [summary route, per-group route, its parameter].
+    $groupDownloads = ['Area' => ['reports.area-summary', 'reports.area-detail', 'area'], 'Country' => ['reports.country-summary', 'reports.country-detail', 'country']];
     $cellClass = fn ($value) => match (true) {
         $value === \App\Services\AttendanceGrid::NOT_PRESENT => 'text-slate-300',
         $value === 'Staff' => 'text-amber-700 font-black text-[10px] uppercase',
@@ -28,7 +31,7 @@
     <input type="hidden" name="view" value="detailed">
     @if($selectedSession)<input type="hidden" name="session" value="{{ $selectedSession }}">@endif
     <span class="text-xs font-black uppercase tracking-widest text-slate-400">Filter</span>
-    @foreach(['area' => 'All areas', 'category' => 'All categories', 'gender' => 'All genders'] as $key => $placeholder)
+    @foreach(['area' => 'All areas', 'category' => 'All categories', 'gender' => 'All genders', 'country' => 'All countries'] as $key => $placeholder)
         <select name="{{ $key }}" onchange="this.form.submit()" aria-label="{{ ucfirst($key) }}" class="rounded-xl border-slate-200 text-xs font-bold">
             <option value="">{{ $placeholder }}</option>
             @foreach($filterOptions[$key] as $option)<option value="{{ $option }}" @selected(($filters[$key] ?? '') === $option)>{{ $option }}</option>@endforeach
@@ -60,27 +63,28 @@
         </section>
     @endif
 
-    {{-- By area, category and gender: present, expected and turnout for each group --}}
+    {{-- By area, country, category and gender: present, expected and turnout for each group --}}
     <section class="grid gap-6 lg:grid-cols-2">
-        @foreach(['Area' => $areaKey, 'Category' => $categoryKey, 'Gender' => $genderKey] as $heading => $key)
-            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm {{ $heading === 'Area' ? 'lg:col-span-2' : '' }}">
+        @foreach(['Area' => $areaKey, 'Country' => $countryKey, 'Category' => $categoryKey, 'Gender' => $genderKey] as $heading => $key)
+            @php($download = $groupDownloads[$heading] ?? null)
+            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm {{ $download ? 'lg:col-span-2' : '' }}">
                 <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <h2 class="text-xs font-black uppercase tracking-widest text-slate-500">By {{ strtolower($heading) }}</h2>
-                    @if($heading === 'Area')<a href="{{ route('reports.area-summary', array_filter(['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession] + $filters)) }}" class="text-xs font-bold text-blue-600">Download area summary</a>@endif
+                    @if($download)<a href="{{ route($download[0], array_filter(['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession] + $filters)) }}" class="text-xs font-bold text-blue-600">Download {{ strtolower($heading) }} summary</a>@endif
                 </div>
                 <div class="max-h-[28rem] overflow-auto"><table class="min-w-full text-sm">
                     <thead class="sticky top-0 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500"><tr>
                         <th class="px-6 py-3">{{ $heading }}</th>
-                        @if($heading === 'Area' && $slots->count() > 1)@foreach($slots as $slot)<th class="px-3 py-3 text-right">{{ $slot['label'] }}</th>@endforeach @endif
+                        @if($download && $slots->count() > 1)@foreach($slots as $slot)<th class="px-3 py-3 text-right">{{ $slot['label'] }}</th>@endforeach @endif
                         <th class="px-3 py-3 text-right">{{ $all ? 'Came' : 'Present' }}</th><th class="px-3 py-3 text-right">Expected</th><th class="px-6 py-3 text-right">Turnout</th>
                     </tr></thead>
                     <tbody class="divide-y divide-slate-100">
                         @foreach($groupTable($key) as $group)
                             <tr>
                                 <td class="px-6 py-2.5 font-bold text-slate-800">
-                                    @if($heading === 'Area')<a href="{{ route('reports.area-detail', array_filter(['event' => $event->id, 'area' => $group['label'], 'day' => $selectedDay, 'session' => $selectedSession])) }}" title="Download this area's list" class="hover:text-blue-600">{{ $group['label'] }}</a>@else{{ $group['label'] }}@endif
+                                    @if($download)<a href="{{ route($download[1], array_filter(['event' => $event->id, $download[2] => $group['label'], 'day' => $selectedDay, 'session' => $selectedSession])) }}" title="Download this {{ strtolower($heading) }}'s list" class="hover:text-blue-600">{{ $group['label'] }}</a>@else{{ $group['label'] }}@endif
                                 </td>
-                                @if($heading === 'Area' && $slots->count() > 1)
+                                @if($download && $slots->count() > 1)
                                     @foreach($slots as $slot)<td class="px-3 py-2.5 text-right text-slate-600">{{ $group['rows']->filter(fn ($row) => ! in_array($row->cells[$slot['key']], ['', \App\Services\AttendanceGrid::NOT_PRESENT], true))->count() }}</td>@endforeach
                                 @endif
                                 <td class="px-3 py-2.5 text-right font-bold text-emerald-700">{{ $group['present'] }}</td>

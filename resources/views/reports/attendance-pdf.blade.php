@@ -17,6 +17,7 @@
         $categoryBreakdown = $grid['rows']->countBy(fn ($row) => $row->person->category ?: 'Unspecified')->sortDesc();
         $genderBreakdown = $grid['rows']->countBy(fn ($row) => $row->person->gender ?: 'Unspecified')->sortDesc();
         $areaBreakdown = $grid['rows']->countBy('area')->sortDesc();
+        $countryBreakdown = $grid['rows']->countBy('country')->sortDesc();
         $filterLabel = \App\Services\AttendanceGrid::filterLabel($grid['filters']);
     @endphp
     <div class="footer">{{ $event->title }} · Attendance · {{ $grid['periodLabel'] }} <span class="page" style="float: right"></span></div>

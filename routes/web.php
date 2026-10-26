@@ -203,6 +203,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/reports/event/{event}/csv/{day?}', [ReportController::class, 'exportCsv'])->name('reports.csv');
         Route::get('/reports/event/{event}/area-summary/{day?}', [ReportController::class, 'exportAreaSummary'])->name('reports.area-summary');
         Route::get('/reports/event/{event}/area/{area}/excel/{day?}', [ReportController::class, 'exportAreaDetail'])->name('reports.area-detail');
+        Route::get('/reports/event/{event}/country-summary/{day?}', [ReportController::class, 'exportCountrySummary'])->name('reports.country-summary');
+        Route::get('/reports/event/{event}/country/{country}/excel/{day?}', [ReportController::class, 'exportCountryDetail'])->name('reports.country-detail');
         Route::get('/reports/event/{event}/pdf/{day?}', [ReportController::class, 'exportPdf'])->name('reports.pdf');
         Route::get('/events/{event}/summary/export', [ReportController::class, 'exportExcel'])->name('reports.summary.export');
         Route::get('/events/{event}/summary/pdf', [ReportController::class, 'exportPdf'])->name('reports.summary.pdf');

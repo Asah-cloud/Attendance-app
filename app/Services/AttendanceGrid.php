@@ -24,12 +24,12 @@ class AttendanceGrid
 {
     public const NOT_PRESENT = '—';
 
-    public const FILTERS = ['area', 'category', 'gender'];
+    public const FILTERS = ['area', 'category', 'gender', 'country'];
 
     public function __construct(private readonly AttendanceReportData $report) {}
 
     /**
-     * @param  array{area?: ?string, category?: ?string, gender?: ?string}  $filters
+     * @param  array{area?: ?string, category?: ?string, gender?: ?string, country?: ?string}  $filters
      */
     public function build(Event $event, int|string $day, ?int $session = null, array $filters = []): array
     {
@@ -83,6 +83,7 @@ class AttendanceGrid
             return (object) [
                 'person' => $person,
                 'area' => self::area($person),
+                'country' => self::country($person),
                 'isStaff' => $isStaff,
                 'cells' => $cells,
                 'checkIns' => $mine,
@@ -149,6 +150,12 @@ class AttendanceGrid
         return $person->room_group ?: ($person->department ?: 'Area not specified');
     }
 
+    /** The country of the person's phone number, as Messages shows it; there is no country field. */
+    public static function country(Participant $person): string
+    {
+        return PhoneNumberService::countryOf($person->phone)[1] ?? ($person->phone ? 'Country unknown' : 'No phone number');
+    }
+
     /** e.g. "Area: Accra · Gender: Male", or null when nothing is filtered. */
     public static function filterLabel(array $filters): ?string
     {
@@ -159,7 +166,8 @@ class AttendanceGrid
     {
         return (! isset($filters['area']) || self::area($person) === $filters['area'])
             && (! isset($filters['category']) || ($person->category ?: 'Unspecified') === $filters['category'])
-            && (! isset($filters['gender']) || ($person->gender ?: 'Unspecified') === $filters['gender']);
+            && (! isset($filters['gender']) || ($person->gender ?: 'Unspecified') === $filters['gender'])
+            && (! isset($filters['country']) || self::country($person) === $filters['country']);
     }
 
     /**

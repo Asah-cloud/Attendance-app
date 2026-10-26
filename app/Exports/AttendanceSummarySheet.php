@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Services\AttendanceGrid;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -15,9 +16,9 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 /**
  * First sheet of the Excel download: the headline numbers, how many came each day, and
- * the same split by area, category and gender.
+ * the same split by area, category, gender and country.
  */
-class AttendanceSummarySheet implements FromArray, WithEvents, WithTitle
+class AttendanceSummarySheet implements FromArray, WithEvents, WithStrictNullComparison, WithTitle
 {
     /** @var array<int, array{row: int, width: int, rows: int}> Table header rows, for styling. */
     private array $tables = [];
@@ -82,6 +83,9 @@ class AttendanceSummarySheet implements FromArray, WithEvents, WithTitle
             $section($heading, [ucfirst($field), 'People present'], $rows->countBy(fn ($row) => $row->person->{$field} ?: 'Unspecified')->sortDesc()
                 ->map(fn ($count, $label) => [$label, $count])->values()->all());
         }
+
+        $section('By country', ['Country (from phone number)', 'People present'], $rows->countBy('country')->sortDesc()
+            ->map(fn ($count, $label) => [$label, $count])->values()->all());
 
         return $lines;
     }
