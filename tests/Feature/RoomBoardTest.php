@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\RoomAssignments;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventRegistration;
@@ -62,18 +63,60 @@ it('moves people between rooms and back to needs-a-room, re-arming the room emai
     expect($this->kofi->fresh()->roomAssignment()->whereIn('status', ['assigned', 'checked_in'])->exists())->toBeFalse();
 });
 
-it('asks before putting someone in a room for, or with, the other gender', function () {
-    moveOnBoard($this->ama, $this->a1->id)->assertStatus(409)
-        ->assertJson(['ok' => false, 'confirm' => 'A01 is set aside for male guests. Put Ama Serwaa there anyway?']);
-    expect($this->ama->fresh()->roomAssignment)->toBeNull();
+it('switches an empty room kept for the other gender to the person dropped in', function () {
+    moveOnBoard($this->ama, $this->a1->id)->assertOk()
+        ->assertJson(['ok' => true, 'room_gender' => 'Female', 'message' => 'Room assigned. A01 is now for female guests.']);
 
-    moveOnBoard($this->ama, $this->a1->id, confirmed: true)->assertOk();
-    expect($this->ama->fresh()->roomAssignment->accommodation_room_id)->toBe($this->a1->id);
+    expect($this->ama->fresh()->roomAssignment->accommodation_room_id)->toBe($this->a1->id)
+        ->and($this->a1->fresh()->gender_restriction)->toBe('Female')
+        ->and($this->a1->fresh()->effectiveGender())->toBe('Female')
+        // Only that room switches; the building stays for men.
+        ->and($this->a1->floor->block->fresh()->gender_restriction)->toBe('Male');
 
-    $this->a2->floor->block->update(['gender_restriction' => null]);
-    moveOnBoard($this->ama, $this->a2->id, confirmed: true)->assertOk();
-    moveOnBoard($this->kofi, $this->a2->id)->assertStatus(409)
-        ->assertJson(['confirm' => 'A02 already has guests of another gender. Put Kofi Mensah there anyway?']);
+    $this->actingAs($this->manager)->get(route('events.accommodation.board', $this->event))
+        ->assertSee('data-room-gender="'.$this->a1->id.'" class="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300">Female</span>', false);
+});
+
+it('refuses a room where someone of the other gender is staying, with no way round it', function () {
+    moveOnBoard($this->ama, $this->a1->id)->assertOk();
+
+    moveOnBoard($this->kofi, $this->a1->id)->assertStatus(422)
+        ->assertJson(['ok' => false, 'message' => "A01 has female guests, so Kofi Mensah can't go there."]);
+    expect($this->kofi->fresh()->roomAssignment)->toBeNull();
+
+    // The old "put them there anyway?" confirmation no longer exists.
+    $this->actingAs($this->manager)->postJson(route('events.accommodation.board.move', $this->event), [
+        'registration_id' => $this->kofi->id, 'room_id' => $this->a1->id, 'confirmed' => true,
+    ])->assertStatus(422);
+    expect($this->kofi->fresh()->roomAssignment)->toBeNull();
+});
+
+it('places people of the same gender, and people with no gender recorded, as normal', function () {
+    moveOnBoard($this->kofi, $this->a1->id)->assertOk()->assertJsonMissing(['room_gender' => 'Male']);
+    expect($this->a1->fresh()->gender_restriction)->toBeNull();
+
+    $unknown = boardGuest($this->event, 'Sam Doe', '');
+    moveOnBoard($unknown, $this->a1->id)->assertOk();
+    expect($this->a1->fresh()->gender_restriction)->toBeNull();
+});
+
+it('switches a room kept for the other gender that already holds only the person\'s own gender', function () {
+    RoomAssignment::create(['event_registration_id' => $this->kofi->id, 'accommodation_room_id' => $this->a2->id, 'status' => 'assigned', 'method' => 'manual']);
+    $this->a2->update(['gender_restriction' => 'Female']);
+    $yaw = boardGuest($this->event, 'Yaw Owusu', 'M');
+
+    moveOnBoard($yaw, $this->a2->id)->assertOk()->assertJson(['room_gender' => 'Male']);
+    expect($this->a2->fresh()->gender_restriction)->toBe('Male');
+});
+
+it('applies the same gender rule on the guests list', function () {
+    moveOnBoard($this->ama, $this->a1->id)->assertOk();
+
+    Livewire\Livewire::actingAs($this->manager)->test(RoomAssignments::class, ['event' => $this->event])
+        ->set("selectedRoom.{$this->kofi->id}", $this->a1->id)
+        ->call('assign', $this->kofi->id)
+        ->assertDispatched('notify', message: "A01 has female guests, so Kofi Mensah can't go there.", type: 'error');
+    expect($this->kofi->fresh()->roomAssignment)->toBeNull();
 });
 
 it('refuses a full room and a checked-in guest', function () {

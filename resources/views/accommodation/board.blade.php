@@ -128,7 +128,7 @@
                                             <div data-room-card data-drop-zone class="{{ $used >= $room->capacity ? 'is-full' : '' }} group rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-xl shadow-black/20 backdrop-blur-xl transition [&.is-full]:border-rose-400/30">
                                                 <div class="flex items-center justify-between gap-2">
                                                     <p class="text-base font-black">{{ $room->name }}
-                                                        @if($room->gender_restriction)<span class="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300">{{ $room->gender_restriction }}</span>@endif
+                                                        <span data-room-gender="{{ $room->id }}" @class(['ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300', 'hidden' => ! $room->gender_restriction])>{{ $room->gender_restriction }}</span>
                                                         @if($room->status === 'reserved')<span class="ml-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-200">Reserved</span>@endif</p>
                                                     <span class="flex shrink-0 items-center gap-2">
                                                         <span data-count-for="{{ $room->id }}" class="text-xs font-bold text-slate-300 group-[.is-full]:text-rose-300">{{ $used }} / {{ $room->capacity }} beds</span>

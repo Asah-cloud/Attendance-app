@@ -34,8 +34,8 @@ class RoomBoardController extends Controller
     }
 
     /**
-     * Move one person to a room (or, with no room, back to "needs a room"). A move that would put
-     * someone in a room for the other gender, or alongside the other gender, needs confirming.
+     * Move one person to a room (or, with no room, back to "needs a room"). A room holding the
+     * other gender refuses; an empty room kept for the other gender switches to this person's.
      */
     public function move(Request $request, Event $event, RoomAllocationService $allocator): JsonResponse
     {
@@ -43,7 +43,6 @@ class RoomBoardController extends Controller
         $data = $request->validate([
             'registration_id' => ['required', 'integer'],
             'room_id' => ['nullable', 'integer'],
-            'confirmed' => ['nullable', 'boolean'],
         ]);
         $registration = $event->registrations()->with(['participant', 'roomAssignment'])->findOrFail($data['registration_id']);
 
@@ -53,12 +52,8 @@ class RoomBoardController extends Controller
             return response()->json($result, $result['ok'] ? 200 : 422);
         }
 
-        $room = AccommodationRoom::with(['floor.block.site', 'activeAssignments.registration.participant'])->findOrFail($data['room_id']);
+        $room = AccommodationRoom::with('floor.block.site')->findOrFail($data['room_id']);
         abort_unless($room->floor->block->site->event_id === $event->id, 404);
-
-        if (! $request->boolean('confirmed') && ($warning = $this->genderWarning($registration, $room))) {
-            return response()->json(['ok' => false, 'confirm' => $warning], 409);
-        }
 
         $previousRoom = $registration->roomAssignment?->accommodation_room_id;
         $result = $allocator->assignManually($registration, $room, $request->user()->id, false, false, $event->accommodation_published);
@@ -68,23 +63,5 @@ class RoomBoardController extends Controller
         }
 
         return response()->json($result + ['room' => $room->label()], $result['ok'] ? 200 : 422);
-    }
-
-    private function genderWarning(EventRegistration $registration, AccommodationRoom $room): ?string
-    {
-        $gender = strtolower((string) $registration->participant->gender);
-        if ($gender === '') {
-            return null;
-        }
-        $restriction = strtolower((string) $room->effectiveGender());
-        if ($restriction && ! str_starts_with($restriction, $gender[0])) {
-            return "{$room->name} is set aside for {$restriction} guests. Put {$registration->participant->name} there anyway?";
-        }
-        $others = $room->activeAssignments->filter(fn ($assignment) => $assignment->event_registration_id !== $registration->id
-            && ($other = strtolower((string) $assignment->registration?->participant?->gender)) !== '' && $other[0] !== $gender[0]);
-
-        return $others->isNotEmpty()
-            ? "{$room->name} already has guests of another gender. Put {$registration->participant->name} there anyway?"
-            : null;
     }
 }

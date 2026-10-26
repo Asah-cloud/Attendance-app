@@ -93,21 +93,24 @@ function putBack(evt) {
     refreshCounts();
 }
 
-async function save(evt, confirmed = false) {
+async function save(evt) {
     const roomId = evt.to.dataset.roomId || null;
     const response = await fetch(board.dataset.moveUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-        body: JSON.stringify({ registration_id: Number(evt.item.dataset.registrationId), room_id: roomId ? Number(roomId) : null, confirmed }),
+        body: JSON.stringify({ registration_id: Number(evt.item.dataset.registrationId), room_id: roomId ? Number(roomId) : null }),
     }).catch(() => null);
     const data = response ? await response.json().catch(() => ({})) : {};
 
-    if (response?.status === 409 && data.confirm) {
-        return window.confirm(data.confirm) ? save(evt, true) : putBack(evt);
-    }
     if (!response?.ok || !data.ok) {
         notify(data.message || 'That move could not be saved. Please try again.', 'error');
         return putBack(evt);
+    }
+    if (data.room_gender) {
+        // An empty room kept for the other gender has switched to this person's.
+        const badge = board.querySelector(`[data-room-gender="${roomId}"]`);
+        if (badge) { badge.textContent = data.room_gender; badge.classList.remove('hidden'); }
+        return notify(`${evt.item.dataset.name} → ${evt.to.dataset.roomName}. It is now for ${data.room_gender.toLowerCase()} guests.`);
     }
     notify(roomId ? `${evt.item.dataset.name} → ${evt.to.dataset.roomName}` : `${evt.item.dataset.name} now needs a room`);
 }

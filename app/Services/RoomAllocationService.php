@@ -388,11 +388,12 @@ class RoomAllocationService
     }
 
     /**
-     * Manually place a registration in a specific room, bypassing gender/category/accessibility
-     * restrictions (a deliberate manager override) - shared by the accommodation controller's
-     * plain form and the Livewire room-assignment table so both enforce the same rules.
+     * Manually place a registration in a specific room - shared by the room board, the
+     * accommodation controller's plain form and the Livewire room-assignment table so all enforce
+     * the same rules. Category and step-free settings can be overridden; gender can't
+     * (see manualGenderCheck), though an empty room switches to the person's gender.
      *
-     * @return array{ok: bool, message: string}
+     * @return array{ok: bool, message: string, room_gender?: string}
      */
     public function assignManually(EventRegistration $registration, AccommodationRoom $room, int $assignedByUserId, bool $isLocked, bool $sendNotification, bool $eventPublished): array
     {
@@ -408,6 +409,13 @@ class RoomAllocationService
         }
         if ($room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->count() >= $room->capacity) {
             return ['ok' => false, 'message' => 'That room is already full.'];
+        }
+        $genderCheck = $this->manualGenderCheck($registration, $room);
+        if (! $genderCheck['ok']) {
+            return ['ok' => false, 'message' => $genderCheck['message']];
+        }
+        if (isset($genderCheck['switchTo'])) {
+            $room->update(['gender_restriction' => $genderCheck['switchTo']]);
         }
 
         RoomAssignment::updateOrCreate(['event_registration_id' => $registration->id], [
@@ -428,7 +436,37 @@ class RoomAllocationService
             $fresh->update(['notification_sent_at' => now()]);
         }
 
-        return ['ok' => true, 'message' => 'Room assigned.'];
+        return isset($genderCheck['switchTo'])
+            ? ['ok' => true, 'message' => "Room assigned. {$room->name} is now for ".strtolower($genderCheck['switchTo']).' guests.', 'room_gender' => $genderCheck['switchTo']]
+            : ['ok' => true, 'message' => 'Room assigned.'];
+    }
+
+    /**
+     * Keeps a room to one gender when a manager places someone by hand. Someone of the other
+     * gender already staying there means no. A room kept for the other gender (by its own, its
+     * floor's or its building's setting) with none of them in it switches its own setting to this
+     * person's gender. People whose gender isn't male or female can go anywhere.
+     *
+     * @return array{ok: bool, message?: string, switchTo?: string}
+     */
+    private function manualGenderCheck(EventRegistration $registration, AccommodationRoom $room): array
+    {
+        $registration->loadMissing('participant');
+        $gender = $this->normalizeGender($registration->participant->gender);
+        if (! in_array($gender, ['male', 'female'], true)) {
+            return ['ok' => true];
+        }
+
+        $other = $room->activeAssignments()->where('event_registration_id', '!=', $registration->id)->with('registration.participant')->get()
+            ->map(fn ($assignment) => $this->normalizeGender($assignment->registration?->participant?->gender))
+            ->first(fn ($value) => in_array($value, ['male', 'female'], true) && $value !== $gender);
+        if ($other) {
+            return ['ok' => false, 'message' => "{$room->name} has {$other} guests, so {$registration->participant->name} can't go there."];
+        }
+
+        $restriction = $this->normalizeGender($room->effectiveGender());
+
+        return $restriction && $restriction !== $gender ? ['ok' => true, 'switchTo' => ucfirst($gender)] : ['ok' => true];
     }
 
     /** @return array{ok: bool, message: string} */
