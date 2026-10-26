@@ -13,10 +13,10 @@ been done, how changes are shipped, and what is still open. For how the system i
 
 | | |
 |---|---|
-| Production | Running `main` with PR #42, deployed 26 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
+| Production | Running `main` with PR #44, deployed 26 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
 | Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
-| Open PRs | Dependabot only: #3, #4, #5, #27, #32 (not reviewed yet) |
-| Tests | 658 passing. CI green on `main` |
+| Open PRs | Dependabot only: #3, #4, #5, #27, #32, #43 (not reviewed yet) |
+| Tests | 664 passing. CI green on `main` |
 | Server working copy | Should be clean: `git status --short` on the server prints nothing |
 
 ---
@@ -259,6 +259,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #40 | 26 Oct | **Reports by country:** a country filter and "By country" split in the Detailed view, a country summary download and a download per country, a Country column in the attendee sheets, and "By country" in the Excel summary and PDF. Country comes from the phone number. Downloads now keep the "+" on international numbers and write zero counts as 0 |
 | #41 | 26 Oct | **Rooms never mix genders when placed by hand** (room board and Guests list): a room with someone of the other gender refuses, with no "anyway" option; an empty room kept for the other gender (by room, floor or building) switches its own setting to the person's gender, and the board badge updates. Category and step-free settings stay overridable (`RoomAllocationService::manualGenderCheck`) |
 | #42 | 26 Oct | Vite 8.2.1 → 8.3.5 (`npm audit fix`, lock file only): clears 7 build-tool advisories (Vite, launch-editor) that made the weekly health check report "attention needed" since 19 Oct |
+| #44 | 26 Oct | **Registrations report** (Reports → Registrations tab): who is registered, at any time, including before an event starts. By status (Confirmed by default), filtered and split by category, gender, country and area, with a Checked in column; Excel (Summary + People) and PDF downloads follow the filters. Summary sheets now share `WritesSummarySections`. Fixed the "Never came" sheet's header styling, which missed its last column after #40 added Country |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
@@ -312,6 +313,7 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
 | Check-in | `AttendanceController` (`checkInByPhone`, `selfCheckIn`), `attendance/public-scan.blade.php` |
 | Sign-in bell | `RecordLoginActivity`, `SignInActivityController`, `components/sign-in-bell.blade.php` |
 | Event links | `Event::uniqueSlug/findBySlug`, `EventSlugRedirect` |
+| Registration report | `RegistrationReport` (rows, filters, splits), `RegistrationReportController`, `RegistrationReportWorkbook` + `RegistrationSummarySheet` / `RegistrationListSheet`, `reports/registrations{,-pdf}.blade.php`, tabs in `reports/_tabs.blade.php` |
 | Attendance reports | `AttendanceGrid` (all counting; `area()` and `country()` for the splits), `GroupAttendanceSummaryExport` (area or country summary), `AttendanceInsights` (Advanced view), `ReportController`, `reports/views/{simple,detailed,advanced}`, `AttendanceWorkbook` + sheets in `app/Exports`, `reports/attendance-pdf.blade.php` |
 
 ---
@@ -320,7 +322,7 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
 
 1. **After #38: run "Assign rooms now" again** on live events that have people waiting for a room; the
    old bug may have left them unplaced.
-2. **Dependabot PRs #3, #4, #5, #27, #32** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
+2. **Dependabot PRs #3, #4, #5, #27, #32, #43** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
    (spatie/laravel-permission 7 → 8) are major upgrades and need care.
 3. **`LogResendEmailEvents` logs every email event twice** (listener discovery plus `subscribe`).
    Rename its methods the way `RecordLoginActivity` does.
