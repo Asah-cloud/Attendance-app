@@ -227,7 +227,7 @@ or `manual`. Each registration's `room_group` (its "area", per event) keeps peop
 | Confirming a registration | `allocateOne` | Places one person inline |
 | Room plan import (a listed group, N to a room) | `planBatch` / `commitPlan` | Spare beds stay free |
 | Attendee room picker, while self-selection is open | `selectableRooms` / `claim` | Open until `accommodation_self_select_closes_at` |
-| Room board (drag and drop) or the guests list | `assignManually` | A manager override: may break restrictions; the board warns before mixing genders |
+| Room board (drag and drop) or the guests list | `assignManually` | A manager override for category and step-free settings, but never for gender: a room with someone of the other gender refuses, and an empty room kept for the other gender switches its own setting to this person's (`manualGenderCheck`) |
 
 **Rules for automatic assignment and the picker:**
 - A room only takes people who match its (or its block's) gender and category restriction, and only

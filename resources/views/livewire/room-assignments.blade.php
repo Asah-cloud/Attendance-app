@@ -12,7 +12,7 @@
             </form>
         </details>
     </div>
-    <p class="mt-2 text-xs text-slate-400">Rooms set to <strong>reserved</strong> are skipped by "Assign rooms now" — pick them here to hand-place special guests, then tick <strong>Lock</strong>. "Closed" rooms can't be assigned at all. A room marked <strong>differs</strong> doesn't match this attendee's gender, category, or step-free needs — you can still assign it as a deliberate override. Untick <strong>Email now</strong> to hold off notifying an attendee.</p>
+    <p class="mt-2 text-xs text-slate-400">Rooms set to <strong>reserved</strong> are skipped by "Assign rooms now" — pick them here to hand-place special guests, then tick <strong>Lock</strong>. "Closed" rooms can't be assigned at all. A room marked <strong>differs</strong> doesn't match this attendee's gender, category, or step-free needs — you can still assign it, except that a room never mixes genders: an empty room switches to this attendee's gender, and a room with guests of the other gender refuses. Untick <strong>Email now</strong> to hold off notifying an attendee.</p>
 
     <div class="mt-4 overflow-x-auto" wire:loading.class="opacity-50">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
