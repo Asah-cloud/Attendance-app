@@ -186,6 +186,8 @@ For organizations that collect attendee lists outside the system (e.g., a physic
 
 The Detailed view can be filtered by **area, category, gender and country**, and every download follows the filter. It splits attendance by the same four, with present, expected and turnout per group. **Country** comes from each attendee's phone number (`AttendanceGrid::country`, using `PhoneNumberService::countryOf`, as Messages does): there is no country field, so it shows "No phone number" or "Country unknown" where the phone can't tell.
 
+A fourth tab, **Registrations** (`RegistrationReportController`, `RegistrationReport`), counts registrations rather than check-ins, so it works before an event starts ("who is coming") as well as after. It shows people by status (Confirmed by default, or Pending, Waitlisted, Cancelled… or all), filters and splits them by category, gender, country and area, lists everyone with a "Checked in" column ("Not yet" or "2 of 3 days"), and downloads as an Excel workbook (Summary and People sheets) or a PDF with the same filters. Support staff are left out, as in the attendance reports.
+
 Downloads: an Excel workbook (`AttendanceWorkbook`: summary, people present, people not present), CSV (`AttendanceExport`), PDF, an **area or country summary** (`GroupAttendanceSummaryExport`, one row per group with a count per day) and a workbook for **one area or one country** (click its name). Sheets write text as text (`KeepsTextAsText`) so international phone numbers keep their "+". Printable attendee badges (`4759873`) are generated from `EventRegistrationFormController::badges`.
 
 ### 6.9 Billing and subscriptions

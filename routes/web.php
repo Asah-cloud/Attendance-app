@@ -26,6 +26,7 @@ use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
+use App\Http\Controllers\RegistrationReportController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoomBoardController;
 use App\Http\Controllers\RoomPlanController;
@@ -195,6 +196,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/messages/{message}/report.csv', [CustomMessageController::class, 'reportCsv'])->name('events.messages.report.csv');
     });
     // Reporting & Exports — the live report view is standard, exports are the paid advanced_reports feature
+    // Registered first: the report route below would read "registrations" as a day.
+    Route::get('/reports/event/{event}/registrations', [RegistrationReportController::class, 'show'])->name('reports.registrations');
     Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
     // The old summary page is now the Simple view of the Reports page.
     Route::get('/events/{event}/summary', [ReportController::class, 'summary'])->name('reports.summary');
@@ -206,6 +209,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/reports/event/{event}/country-summary/{day?}', [ReportController::class, 'exportCountrySummary'])->name('reports.country-summary');
         Route::get('/reports/event/{event}/country/{country}/excel/{day?}', [ReportController::class, 'exportCountryDetail'])->name('reports.country-detail');
         Route::get('/reports/event/{event}/pdf/{day?}', [ReportController::class, 'exportPdf'])->name('reports.pdf');
+        Route::get('/reports/event/{event}/registrations/excel', [RegistrationReportController::class, 'exportExcel'])->name('reports.registrations.excel');
+        Route::get('/reports/event/{event}/registrations/pdf', [RegistrationReportController::class, 'exportPdf'])->name('reports.registrations.pdf');
         Route::get('/events/{event}/summary/export', [ReportController::class, 'exportExcel'])->name('reports.summary.export');
         Route::get('/events/{event}/summary/pdf', [ReportController::class, 'exportPdf'])->name('reports.summary.pdf');
     });

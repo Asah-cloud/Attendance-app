@@ -52,7 +52,7 @@ class NotPresentSheet implements FromArray, WithCustomStartCell, WithCustomValue
                 AttendanceGrid::filterLabel($this->grid['filters']),
                 $this->grid['absent']->count().' of '.$this->grid['totalExpected'].' people',
             ])->filter()->join('  ·  '));
-            $this->styleTable($sheet, $this->headerRow, 7, [1]);
+            $this->styleTable($sheet, $this->headerRow, count($this->headings()), [1]);
         }];
     }
 }
