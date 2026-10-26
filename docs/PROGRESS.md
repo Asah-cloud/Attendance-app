@@ -15,7 +15,7 @@ been done, how changes are shipped, and what is still open. For how the system i
 |---|---|
 | Production | Running `main` with PR #44, deployed 26 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
 | Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
-| Open PRs | Dependabot only: #3, #4, #5, #27, #32 (not reviewed yet) |
+| Open PRs | Dependabot only: #3, #4, #5, #27, #32, #43 (not reviewed yet) |
 | Tests | 664 passing. CI green on `main` |
 | Server working copy | Should be clean: `git status --short` on the server prints nothing |
 
@@ -322,7 +322,7 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
 
 1. **After #38: run "Assign rooms now" again** on live events that have people waiting for a room; the
    old bug may have left them unplaced.
-2. **Dependabot PRs #3, #4, #5, #27, #32** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
+2. **Dependabot PRs #3, #4, #5, #27, #32, #43** are open and unreviewed. #4 (Tailwind 3 → 4) and #5
    (spatie/laravel-permission 7 → 8) are major upgrades and need care.
 3. **`LogResendEmailEvents` logs every email event twice** (listener discovery plus `subscribe`).
    Rename its methods the way `RecordLoginActivity` does.
