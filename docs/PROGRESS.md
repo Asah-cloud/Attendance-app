@@ -13,10 +13,10 @@ been done, how changes are shipped, and what is still open. For how the system i
 
 | | |
 |---|---|
-| Production | Running `main` with PR #40, deployed 26 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
+| Production | Running `main` with PR #42, deployed 26 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
 | Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
 | Open PRs | Dependabot only: #3, #4, #5, #27, #32 (not reviewed yet) |
-| Tests | 654 passing. CI green on `main` |
+| Tests | 658 passing. CI green on `main` |
 | Server working copy | Should be clean: `git status --short` on the server prints nothing |
 
 ---
@@ -258,6 +258,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #39 | 25 Oct | **Gender and category per floor** (new columns on `accommodation_floors`), alongside buildings and rooms; a room's own setting wins, then its floor's, then its building's. Saving a building, floor or room says how many people already there no longer fit (they are not moved). Category boxes suggest the event's categories. The room board shows a floor's gender. Fixed "Buildings &amp;amp; rooms" in the inventory heading |
 | #40 | 26 Oct | **Reports by country:** a country filter and "By country" split in the Detailed view, a country summary download and a download per country, a Country column in the attendee sheets, and "By country" in the Excel summary and PDF. Country comes from the phone number. Downloads now keep the "+" on international numbers and write zero counts as 0 |
 | #41 | 26 Oct | **Rooms never mix genders when placed by hand** (room board and Guests list): a room with someone of the other gender refuses, with no "anyway" option; an empty room kept for the other gender (by room, floor or building) switches its own setting to the person's gender, and the board badge updates. Category and step-free settings stay overridable (`RoomAllocationService::manualGenderCheck`) |
+| #42 | 26 Oct | Vite 8.2.1 → 8.3.5 (`npm audit fix`, lock file only): clears 7 build-tool advisories (Vite, launch-editor) that made the weekly health check report "attention needed" since 19 Oct |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
@@ -323,8 +324,10 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
    (spatie/laravel-permission 7 → 8) are major upgrades and need care.
 3. **`LogResendEmailEvents` logs every email event twice** (listener discovery plus `subscribe`).
    Rename its methods the way `RecordLoginActivity` does.
-4. **The weekly health check reported "attention needed"** on 19 Oct because of an `npm audit`
-   warning. Review it.
+4. **JavaScript errors on every signed-in page** (not caused by any recent change; seen with Vite 8.2
+   and 8.3): `Cannot redefine property: $persist`, which usually means Alpine is started twice (the
+   app's own `alpinejs` plus the copy Livewire 4 ships), and a malformed SVG icon path
+   (`Expected arc flag`). Pages and the room board still work. Check `resources/js/app.js`.
 5. **Lighter public pages:** public pages load the whole app bundle (~123 KB compressed), including
    admin and scanner code. A separate small bundle would make first loads on phones faster.
 6. **236 older participant records on no event** (from the Sept set-up). Some duplicate registered
