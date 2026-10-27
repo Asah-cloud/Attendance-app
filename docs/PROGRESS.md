@@ -266,6 +266,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #48 | 27 Oct | **Print badges by country:** Badge Studio's Print panel gains a Country picker beside Category (country as in reports: entered, else from the phone; "Country not given" when neither). It narrows the list, and only the ticked people of that country print |
 | #49 | 27 Oct | The **possible duplicate attendees** box on the Attendees page opens and closes (closed by default, with a "1 name shared by 2 entries" summary); its open/closed state is remembered per event, so it stays open while you cancel entries |
 | #50 | 27 Oct | **Possible duplicates: keep both.** Each same-name group gets "Different people, keep both" (sets `event_registrations.duplicate_dismissed_at`; the group stays hidden until someone new with that name registers) and, for two people, "Same person? Compare and merge" (opens Merge Duplicates' compare page). "Cancel this one" stays |
+| #51 | 27 Oct | **Papua New Guinea and 12 other Pacific countries** added to the country list and phone lookup (Fiji, Solomon Islands, Vanuatu, Samoa, Tonga, Kiribati, Tuvalu, Nauru, Palau, Micronesia, Marshall Islands, Timor-Leste); +675 numbers now read as Papua New Guinea instead of "Country unknown". Also PhpSpreadsheet 5.9.0 → 5.10.0 (lock file only): CI's `composer audit` started failing on 27 Oct for a new XXE / denial-of-service advisory (CVE-2026-108357) |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.

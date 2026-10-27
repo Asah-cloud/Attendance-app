@@ -78,12 +78,14 @@ it('names the country of a phone number from its dialling code', function () {
         ->and($country('+18685550123'))->toBe('TT')
         ->and($country('+50937001234'))->toBe('HT')
         ->and($country('+22890123456'))->toBe('TG')
+        ->and(PhoneNumberService::countryOf('+675 7012 3456'))->toBe(['PG', 'Papua New Guinea'])
+        ->and($country('+6797012345'))->toBe('FJ')
         ->and(PhoneNumberService::countryOf('+2348031234567'))->toBe(['NG', 'Nigeria'])
         ->and($country('+999123456789'))->toBeNull()
         ->and($country('0123456'))->toBeNull()
         ->and($country(null))->toBeNull();
 
-    expect(PhoneNumberService::countryNames())->toContain('Jamaica', 'Trinidad and Tobago', 'Haiti', 'Canada', 'United States')
+    expect(PhoneNumberService::countryNames())->toContain('Jamaica', 'Trinidad and Tobago', 'Haiti', 'Canada', 'United States', 'Papua New Guinea', 'Fiji', 'Samoa')
         ->not->toContain('USA / Canada')
         ->and(array_count_values(PhoneNumberService::countryNames())['Jamaica'])->toBe(1);
 });
