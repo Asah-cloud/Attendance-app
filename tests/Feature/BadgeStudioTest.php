@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
 use App\Models\User;
+use App\Services\BadgePdfService;
 use App\Support\BadgeDesign;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\FontMetrics;
@@ -178,6 +179,26 @@ it('offers the attendee\'s country as an optional badge field', function () {
     $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
         ->assertSee('data-field="country"', false)->assertSee('United Kingdom');
     $this->get(route('events.badges.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
+it('lets a manager pick a country and print only those badges', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ghana = badgeRegistration($event, 'Kofi Mensah');
+    $ghana->participant->update(['phone' => '0241234567']);
+    $jamaica = badgeRegistration($event, 'Marcia Brown');
+    $jamaica->participant->update(['country' => 'Jamaica']);
+    $unknown = badgeRegistration($event, 'No Details');
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('<label for="print-country">Country</label>', false)
+        ->assertSeeInOrder(['All countries', 'Country not given', 'Ghana', 'Jamaica'])
+        ->assertSee('data-name="Marcia Brown" data-category="Delegate" data-country="Jamaica"', false)
+        ->assertSee('data-name="No Details" data-category="Delegate" data-country="Country not given"', false);
+
+    // The studio sends the ticked people of the chosen country; only their badges print.
+    $response = $this->post(route('events.badges.pdf', $event), ['attendees' => [$jamaica->id], 'paper' => 'badge']);
+    $response->assertOk()->assertHeader('content-type', 'application/pdf');
+    expect(app(BadgePdfService::class)->registrations($event, ['attendees' => [$jamaica->id]], false)->pluck('participant.name')->all())->toBe(['Marcia Brown']);
 });
 
 it('lets a manager select Poppins and prints a working PDF with it', function () {

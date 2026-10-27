@@ -11,6 +11,7 @@ use App\Models\EventRegistrationField;
 use App\Models\Participant;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
+use App\Services\AttendanceGrid;
 use App\Services\BadgePdfService;
 use App\Services\ParticipantRegistrationService;
 use App\Services\PhoneNumberService;
@@ -247,6 +248,8 @@ class EventRegistrationFormController extends Controller
             ->get();
 
         $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();
+        // For printing one country's badges: as in reports, the country entered, else the phone's.
+        $countries = $registrations->map(fn ($registration) => AttendanceGrid::country($registration->participant))->unique()->sort()->values();
         $palette = ['#7C3AED', '#0F766E', '#B45309', '#BE123C', '#1D4ED8', '#4338CA'];
         $categoryColors = $categories->mapWithKeys(fn ($category, $index) => [
             $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
@@ -256,7 +259,7 @@ class EventRegistrationFormController extends Controller
             ->whereNotNull($staffMode ? 'staff_badge_settings' : 'badge_fields')->orderBy('title')->get(['id', 'title']);
         $fields = BadgeDesign::fields($event);
 
-        return view('events.badges', compact('event', 'registrations', 'categories', 'categoryColors', 'templates', 'fields', 'staffMode'));
+        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'categoryColors', 'templates', 'fields', 'staffMode'));
     }
 
     public function badgesPdf(Request $request, Event $event): Response
