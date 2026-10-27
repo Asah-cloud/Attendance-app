@@ -13,10 +13,10 @@ been done, how changes are shipped, and what is still open. For how the system i
 
 | | |
 |---|---|
-| Production | Running `main` with PR #45, deployed 27 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
+| Production | Running `main` with PR #46, deployed 27 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
 | Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
 | Open PRs | Dependabot only: #3, #4, #5, #27, #32, #43 (not reviewed yet) |
-| Tests | 668 passing. CI green on `main` |
+| Tests | 675 passing. CI green on `main` |
 | Server working copy | Should be clean: `git status --short` on the server prints nothing |
 
 ---
@@ -261,6 +261,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #42 | 26 Oct | Vite 8.2.1 → 8.3.5 (`npm audit fix`, lock file only): clears 7 build-tool advisories (Vite, launch-editor) that made the weekly health check report "attention needed" since 19 Oct |
 | #44 | 26 Oct | **Registrations report** (Reports → Registrations tab): who is registered, at any time, including before an event starts. By status (Confirmed by default), filtered and split by category, gender, country and area, with a Checked in column; Excel (Summary + People) and PDF downloads follow the filters. Summary sheets now share `WritesSummarySections`. Fixed the "Never came" sheet's header styling, which missed its last column after #40 added Country |
 | #45 | 27 Oct | **Phone is optional** on the public registration form and when adding or editing an attendee (email is still required on the public form; phone check-in still needs a phone). **Country field** on attendees (`participants.country`), chosen from a list when adding, editing or recording a walk-in; reports use it before the phone's country. The no-country group is now "Country not given" |
+| #46 | 27 Oct | **Badge Studio text styling:** each text field gets a text case (As typed / UPPER CASE / lower case / Title Case), a border (None / Rectangle / Rounded) with its own colour and thickness, and a fill colour; "Make all text UPPER CASE" and "Reset text case" buttons. Preview and PDF share the rules (`BadgeDesign::textStyle`, mirrored in `public/js/badge-studio.js`); older designs keep their look |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
@@ -314,6 +315,7 @@ Found in a system check on 24 Oct and confirmed with tests and on the local demo
 | Check-in | `AttendanceController` (`checkInByPhone`, `selfCheckIn`), `attendance/public-scan.blade.php` |
 | Sign-in bell | `RecordLoginActivity`, `SignInActivityController`, `components/sign-in-bell.blade.php` |
 | Event links | `Event::uniqueSlug/findBySlug`, `EventSlugRedirect` |
+| Badge Studio | `BadgeDesign` (field defaults, `values`, `textStyle`), `EventRegistrationFormController::badges/updateBadgeSettings`, `public/js/badge-studio.js` (editor; not built by Vite), `events/partials/badge{,-style}.blade.php`, `BadgePdfService` |
 | Registration report | `RegistrationReport` (rows, filters, splits), `RegistrationReportController`, `RegistrationReportWorkbook` + `RegistrationSummarySheet` / `RegistrationListSheet`, `reports/registrations{,-pdf}.blade.php`, tabs in `reports/_tabs.blade.php` |
 | Attendance reports | `AttendanceGrid` (all counting; `area()` and `country()` for the splits), `GroupAttendanceSummaryExport` (area or country summary), `AttendanceInsights` (Advanced view), `ReportController`, `reports/views/{simple,detailed,advanced}`, `AttendanceWorkbook` + sheets in `app/Exports`, `reports/attendance-pdf.blade.php` |
 

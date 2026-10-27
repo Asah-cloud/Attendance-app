@@ -8,6 +8,13 @@ use Illuminate\Support\Facades\Storage;
 
 final class BadgeDesign
 {
+    /** Fields that show pictures rather than text: no text case, border or fill. */
+    public const GRAPHIC_FIELDS = ['qr', 'company_logo', 'event_logo'];
+
+    public const CASES = ['none' => 'As typed', 'upper' => 'UPPER CASE', 'lower' => 'lower case', 'title' => 'Title Case'];
+
+    public const BORDERS = ['none' => 'No border', 'square' => 'Rectangle', 'rounded' => 'Rounded'];
+
     public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'department' => 'Department', 'category' => 'Category', 'group' => 'Area / Group', 'member' => 'Member or staff ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
 
     public static function defaults(string $layout = 'standard'): array
@@ -28,10 +35,39 @@ final class BadgeDesign
 
         $bold = ['name', 'event', 'company', 'category'];
 
-        $defaults = collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => ! in_array($key, ['event_logo', 'custom', 'group'], true), 'color' => null, 'bold' => in_array($key, $bold, true)])->all();
+        $defaults = collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => ! in_array($key, ['event_logo', 'custom', 'group'], true), 'color' => null, 'bold' => in_array($key, $bold, true),
+            'case' => 'none', 'border' => 'none', 'border_color' => null, 'border_width' => 0.5, 'fill' => null])->all();
         $defaults['custom']['text'] = '';
 
         return $defaults;
+    }
+
+    /**
+     * CSS for a text field's case, border and fill. A border with no colour of its own takes the
+     * text colour; any border or fill gets a little padding so the text doesn't touch it. The
+     * category field keeps its category colour unless a fill is chosen.
+     */
+    public static function textStyle(string $key, array $field, ?string $categoryColor = null): string
+    {
+        if (in_array($key, self::GRAPHIC_FIELDS, true)) {
+            return '';
+        }
+        $border = $field['border'] ?? 'none';
+        $fill = ($field['fill'] ?? null) ?: ($key === 'category' ? $categoryColor : null);
+        $transform = ['upper' => 'uppercase', 'lower' => 'lowercase', 'title' => 'capitalize'][$field['case'] ?? 'none'] ?? 'none';
+        $css = ['text-transform:'.$transform];
+        if ($border !== 'none') {
+            $css[] = 'border:'.((float) ($field['border_width'] ?? 0.5)).'mm solid '.(($field['border_color'] ?? null) ?: 'currentColor');
+            $css[] = 'border-radius:'.($border === 'rounded' ? '2mm' : '0');
+        }
+        if ($fill) {
+            $css[] = 'background:'.$fill;
+        }
+        if ($border !== 'none' || ($field['fill'] ?? null)) {
+            $css[] = 'padding:0.8mm 1.5mm';
+        }
+
+        return implode(';', $css).';';
     }
 
     public static function fields(Event $event): array
