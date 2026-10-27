@@ -54,14 +54,16 @@
               ].join(" ")
             : name;
     }
+    /** Whether a row in the print list matches the chosen category and country. */
+    function inPrintGroup(row) {
+        return (
+            (!$("print-category").value || row.dataset.category === $("print-category").value) &&
+            (!$("print-country").value || row.dataset.country === $("print-country").value)
+        );
+    }
     function ids() {
         return [...document.querySelectorAll("#attendee-list input:checked")]
-            .filter(
-                (x) =>
-                    !$("print-category").value ||
-                    x.parentElement.dataset.category ===
-                        $("print-category").value,
-            )
+            .filter((x) => inPrintGroup(x.parentElement))
             .map((x) => x.value);
     }
     function updatePrint() {
@@ -538,16 +540,14 @@
         const words = $("attendee-search")
                 .value.toLocaleLowerCase()
                 .split(/\s+/)
-                .filter(Boolean),
-            category = $("print-category").value;
+                .filter(Boolean);
         document
             .querySelectorAll("#attendee-list label")
             .forEach((row) => {
                 const name = row.dataset.name.toLocaleLowerCase();
                 row.classList.toggle(
                     "hidden",
-                    !words.every((word) => name.includes(word)) ||
-                        (category && row.dataset.category !== category),
+                    !words.every((word) => name.includes(word)) || !inPrintGroup(row),
                 );
             });
         const visible = [
@@ -563,6 +563,7 @@
     }
     $("attendee-search").addEventListener("input", filter);
     $("print-category").addEventListener("change", filter);
+    $("print-country").addEventListener("change", filter);
     $("attendee-list").addEventListener("change", filter);
     $("print-paper").addEventListener("change", updatePrint);
     $("select-all").addEventListener("change", () => {
