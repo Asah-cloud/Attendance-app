@@ -13,6 +13,7 @@ use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\BadgePdfService;
 use App\Services\ParticipantRegistrationService;
+use App\Services\PhoneNumberService;
 use App\Services\RegistrationLifecycleService;
 use App\Support\BadgeDesign;
 use App\Support\Pdf\PdfQrCode;
@@ -62,7 +63,9 @@ class EventRegistrationFormController extends Controller
         $genderField = $event->registrationFields()->where('field_key', 'gender')->first();
         $possibleDuplicates = $this->possibleDuplicateRegistrations($event);
 
-        return view('events.registrations', compact('event', 'registrations', 'status', 'search', 'categoryField', 'genderField', 'possibleDuplicates'));
+        $countries = PhoneNumberService::countryNames();
+
+        return view('events.registrations', compact('event', 'registrations', 'status', 'search', 'categoryField', 'genderField', 'possibleDuplicates', 'countries'));
     }
 
     /**
@@ -103,7 +106,8 @@ class EventRegistrationFormController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'country' => ['nullable', Rule::in(PhoneNumberService::countryNames())],
             'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
             'category' => $this->categoryRule($event),
         ]);
@@ -191,7 +195,8 @@ class EventRegistrationFormController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30', 'required_without:email'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'country' => ['nullable', Rule::in(PhoneNumberService::countryNames())],
             'secondary_phone' => ['nullable', 'string', 'max:30'],
             'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
             'category' => $this->categoryRule($event),

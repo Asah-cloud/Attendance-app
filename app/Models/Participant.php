@@ -86,7 +86,7 @@ class Participant extends Model
             || (bool) $this->secondary_phone;
     }
 
-    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'secondary_phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group'];
+    protected $fillable = ['company_id', 'linked_user_id', 'name', 'email', 'phone', 'secondary_phone', 'member_id', 'category', 'department', 'is_support_staff', 'staff_code', 'staff_qr_token', 'gender', 'dietary_notes', 'room_group', 'country'];
 
     protected function casts(): array
     {

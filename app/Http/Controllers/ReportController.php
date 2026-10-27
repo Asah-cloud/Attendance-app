@@ -30,7 +30,7 @@ class ReportController extends Controller
         $filters = $view === 'detailed' ? $this->filters($request) : [];
         $grid = $this->cachedGrid($event, $selectedDay, $selectedSession, $filters);
 
-        $people = $event->confirmedParticipants()->get(['participants.id', 'participants.gender', 'participants.department', 'participants.phone']);
+        $people = $event->confirmedParticipants()->get(['participants.id', 'participants.gender', 'participants.department', 'participants.phone', 'participants.country']);
         $filterOptions = [
             'area' => $people->map(fn ($person) => AttendanceGrid::area($person))->unique()->sort()->values(),
             'category' => $people->map(fn ($person) => $person->category ?: 'Unspecified')->unique()->sort()->values(),

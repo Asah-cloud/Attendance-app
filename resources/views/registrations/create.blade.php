@@ -40,8 +40,8 @@
                     <div class="grid gap-5 sm:grid-cols-2">
                         @foreach(['name' => 'full_name', 'email' => 'email', 'phone' => 'phone'] as $name => $key)
                             <div class="{{ $key === 'full_name' ? 'sm:col-span-2' : '' }}">
-                                <label class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $labels[$key]->label }}</label>
-                                <input type="{{ $key === 'email' ? 'email' : ($key === 'phone' ? 'tel' : 'text') }}" name="{{ $name }}" value="{{ old($name) }}" required
+                                <label class="text-xs font-extrabold uppercase tracking-wide text-slate-500">{{ $labels[$key]->label }}@if($key === 'phone') <span class="font-semibold normal-case tracking-normal text-slate-400">(optional)</span>@endif</label>
+                                <input type="{{ $key === 'email' ? 'email' : ($key === 'phone' ? 'tel' : 'text') }}" name="{{ $name }}" value="{{ old($name) }}" @required($key !== 'phone')
                                        class="mt-2 w-full rounded-xl border-slate-200 bg-slate-50/60 px-4 py-3 text-sm font-medium shadow-sm transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10">
                                 <x-input-error :messages="$errors->get($name)" class="mt-1.5" />
                             </div>

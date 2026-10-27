@@ -48,7 +48,7 @@ class PublicEventRegistrationController extends Controller
             $participant = $participants->resolveParticipant($event, [
                 'name' => $validated['name'],
                 'email' => $validated['email'],
-                'phone' => $validated['phone'],
+                'phone' => $validated['phone'] ?? null,
                 'gender' => $validated['gender'],
                 'category' => $validated['category'],
             ], trusted: false);
@@ -233,7 +233,7 @@ class PublicEventRegistrationController extends Controller
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['required', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30'],
             'gender' => ['required', Rule::in($genderField->options ?? ['Male', 'Female'])],
             'category' => $categoryField && $categoryField->field_type === 'select'
                 ? ['required', Rule::in($categoryField->options ?? [])]

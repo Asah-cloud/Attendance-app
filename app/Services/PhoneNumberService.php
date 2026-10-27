@@ -81,6 +81,20 @@ class PhoneNumberService
     }
 
     /**
+     * Country names a manager can choose for someone: the names countryOf() gives, so a chosen
+     * country and one read from a phone group together in reports. "+1" numbers stay
+     * "USA / Canada" there, but here the two are separate.
+     *
+     * @return array<int, string>
+     */
+    public static function countryNames(): array
+    {
+        return collect(self::DIAL_CODES)->pluck(1)
+            ->flatMap(fn (string $name) => $name === 'USA / Canada' ? ['Canada', 'United States'] : [$name])
+            ->unique()->sort(SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
+    }
+
+    /**
      * The country a phone number belongs to, as [ISO code, name], or null when
      * there is no number or its country can't be told. Ghana follows
      * isGhanaNumber(). Other numbers need their country code: written with
