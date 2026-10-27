@@ -72,11 +72,20 @@ it('names the country of a phone number from its dialling code', function () {
         ->and($country('08031234567'))->toBe('NG')
         ->and($country('00447700900123'))->toBe('GB')
         ->and($country('+14155552671'))->toBe('US')
+        // Caribbean +1 numbers are told apart by area code.
+        ->and(PhoneNumberService::countryOf('+1 876 555 0123'))->toBe(['JM', 'Jamaica'])
+        ->and($country('0016585550123'))->toBe('JM')
+        ->and($country('+18685550123'))->toBe('TT')
+        ->and($country('+50937001234'))->toBe('HT')
         ->and($country('+22890123456'))->toBe('TG')
         ->and(PhoneNumberService::countryOf('+2348031234567'))->toBe(['NG', 'Nigeria'])
         ->and($country('+999123456789'))->toBeNull()
         ->and($country('0123456'))->toBeNull()
         ->and($country(null))->toBeNull();
+
+    expect(PhoneNumberService::countryNames())->toContain('Jamaica', 'Trinidad and Tobago', 'Haiti', 'Canada', 'United States')
+        ->not->toContain('USA / Canada')
+        ->and(array_count_values(PhoneNumberService::countryNames())['Jamaica'])->toBe(1);
 });
 
 it('routes Ghana numbers to SMS and foreign numbers to email in smart mode', function () {
