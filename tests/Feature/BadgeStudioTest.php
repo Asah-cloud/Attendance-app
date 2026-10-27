@@ -153,6 +153,33 @@ it('makes the imported area or group available as an optional badge field', func
         ->and(BadgeDesign::values($event, $registration->fresh())['group'])->toBe('Area 7 / Young Adults');
 });
 
+it('offers the attendee\'s country as an optional badge field', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $chosen = badgeRegistration($event, 'Grace Thompson');
+    $chosen->participant->update(['phone' => '0241234567', 'country' => 'United Kingdom']);
+    $fromPhone = badgeRegistration($event, 'Chidi Okeke');
+    $fromPhone->participant->update(['phone' => '+2348031234567']);
+    $unknown = badgeRegistration($event, 'No Details');
+
+    expect(BadgeDesign::LABELS['country'])->toBe('Country')
+        ->and(BadgeDesign::defaults()['country']['visible'])->toBeFalse()
+        // The country entered wins over the phone's; nothing is printed when neither tells.
+        ->and(BadgeDesign::values($event, $chosen->fresh())['country'])->toBe('United Kingdom')
+        ->and(BadgeDesign::values($event, $fromPhone->fresh())['country'])->toBe('Nigeria')
+        ->and(BadgeDesign::values($event, $unknown->fresh())['country'])->toBe('');
+
+    $fields = BadgeDesign::defaults();
+    $fields['country'] = array_replace($fields['country'], ['visible' => true, 'case' => 'upper']);
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect($event->fresh()->badge_fields['country']['visible'])->toBeTrue();
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('data-field="country"', false)->assertSee('United Kingdom');
+    $this->get(route('events.badges.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
 it('lets a manager select Poppins and prints a working PDF with it', function () {
     [$event, $manager] = badgeStudioFixture();
     badgeRegistration($event);

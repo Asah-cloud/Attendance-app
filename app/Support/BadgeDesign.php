@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Services\PhoneNumberService;
 use Illuminate\Support\Facades\Storage;
 
 final class BadgeDesign
@@ -15,14 +16,14 @@ final class BadgeDesign
 
     public const BORDERS = ['none' => 'No border', 'square' => 'Rectangle', 'rounded' => 'Rounded'];
 
-    public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'department' => 'Department', 'category' => 'Category', 'group' => 'Area / Group', 'member' => 'Member or staff ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
+    public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'department' => 'Department', 'category' => 'Category', 'group' => 'Area / Group', 'country' => 'Country', 'member' => 'Member or staff ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
 
     public static function defaults(string $layout = 'standard'): array
     {
         $positions = [
             'company' => [22, 7, 70, 9, 12], 'event' => [7, 22, 86, 12, 17],
             'meta' => [7, 35, 86, 9, 9], 'name' => [7, 49, 86, 17, 25],
-            'department' => [7, 66, 53, 6, 10], 'category' => [7, 73, 53, 7, 11], 'group' => [7, 87, 51, 5, 9], 'member' => [7, 82, 51, 8, 10],
+            'department' => [7, 66, 53, 6, 10], 'category' => [7, 73, 53, 7, 11], 'group' => [7, 87, 51, 5, 9], 'country' => [7, 44, 86, 5, 9], 'member' => [7, 82, 51, 8, 10],
             'room' => [7, 92, 86, 5, 8], 'custom' => [7, 16, 86, 5, 9],
             'qr' => [64, 75, 29, 21, 10],
             'company_logo' => [7, 6, 12, 10, 10], 'event_logo' => [78, 7, 14, 10, 10],
@@ -35,7 +36,7 @@ final class BadgeDesign
 
         $bold = ['name', 'event', 'company', 'category'];
 
-        $defaults = collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => ! in_array($key, ['event_logo', 'custom', 'group'], true), 'color' => null, 'bold' => in_array($key, $bold, true),
+        $defaults = collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => ! in_array($key, ['event_logo', 'custom', 'group', 'country'], true), 'color' => null, 'bold' => in_array($key, $bold, true),
             'case' => 'none', 'border' => 'none', 'border_color' => null, 'border_width' => 0.5, 'fill' => null])->all();
         $defaults['custom']['text'] = '';
 
@@ -106,6 +107,8 @@ final class BadgeDesign
             'name' => $name, 'department' => $registration?->participant->department ?: '',
             'category' => $registration?->participant->category ?: 'Attendee',
             'group' => $registration?->participant->room_group ?: '',
+            // As entered for the person, else read from their phone; blank rather than "Country not given".
+            'country' => $registration ? ($registration->participant->country ?: (PhoneNumberService::countryOf($registration->participant->phone)[1] ?? '')) : 'Ghana',
             'member' => $registration?->participant->staff_code ?: ($registration?->participant->member_id ?: 'Event Pass'),
             'room' => $event->accommodation_published && $assignment ? $assignment->room->name : '',
         ];
