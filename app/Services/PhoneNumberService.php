@@ -48,6 +48,11 @@ class PhoneNumberService
         '1767' => ['DM', 'Dominica'], '1869' => ['KN', 'Saint Kitts and Nevis'],
         '1809' => ['DO', 'Dominican Republic'], '1829' => ['DO', 'Dominican Republic'], '1849' => ['DO', 'Dominican Republic'],
         '53' => ['CU', 'Cuba'], '501' => ['BZ', 'Belize'], '509' => ['HT', 'Haiti'], '592' => ['GY', 'Guyana'], '597' => ['SR', 'Suriname'],
+        // The Pacific Islands.
+        '675' => ['PG', 'Papua New Guinea'], '679' => ['FJ', 'Fiji'], '677' => ['SB', 'Solomon Islands'],
+        '678' => ['VU', 'Vanuatu'], '685' => ['WS', 'Samoa'], '676' => ['TO', 'Tonga'], '686' => ['KI', 'Kiribati'],
+        '688' => ['TV', 'Tuvalu'], '674' => ['NR', 'Nauru'], '680' => ['PW', 'Palau'],
+        '691' => ['FM', 'Micronesia'], '692' => ['MH', 'Marshall Islands'], '670' => ['TL', 'Timor-Leste'],
     ];
 
     /**
