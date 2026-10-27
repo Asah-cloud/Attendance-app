@@ -10,6 +10,28 @@
         f.visible = Boolean(Number(f.visible));
         f.bold = Boolean(Number(f.bold));
         f.color = f.color || null;
+        f.case = f.case || "none";
+        f.border = f.border || "none";
+        f.border_color = f.border_color || null;
+        f.border_width = Number(f.border_width || 0.5);
+        f.fill = f.fill || null;
+    }
+    const GRAPHIC = ["qr", "company_logo", "event_logo"];
+    const TRANSFORM = { upper: "uppercase", lower: "lowercase", title: "capitalize" };
+    /** Mirrors BadgeDesign::textStyle() so the preview matches the PDF. */
+    function textStyle(key, f) {
+        if (GRAPHIC.includes(key)) return {};
+        const boxed = f.border !== "none" || f.fill;
+        return {
+            textTransform: TRANSFORM[f.case] || "none",
+            border:
+                f.border === "none"
+                    ? ""
+                    : `${f.border_width}mm solid ${f.border_color || "currentColor"}`,
+            borderRadius: f.border === "rounded" ? "2mm" : "",
+            padding: boxed ? "0.8mm 1.5mm" : "",
+            ...(key === "category" ? {} : { background: f.fill || "" }),
+        };
     }
     let selected = "name",
         dirty = c.hasErrors,
@@ -64,7 +86,7 @@
         root.replaceChildren();
         for (const [key, f] of Object.entries(fields))
             for (const [prop, val] of Object.entries(f)) {
-                if (prop === "color" && !val) continue; // no override: let the server fall back to the default
+                if (["color", "border_color", "fill"].includes(prop) && !val) continue; // no override: let the server fall back to the default
                 const el = document.createElement("input");
                 el.type = "hidden";
                 el.name = `badge_fields[${key}][${prop}]`;
@@ -96,6 +118,15 @@
         $("field-color").disabled = isGraphic || f.color === null;
         for (const id of ["field-size", "field-align"])
             $(id).disabled = isGraphic;
+        $("field-text-style").classList.toggle("hidden", isGraphic);
+        $("field-case").value = f.case;
+        $("field-border").value = f.border;
+        $("field-border-options").classList.toggle("hidden", f.border === "none");
+        $("field-border-color").value = f.border_color || f.color || $("accent").value;
+        $("field-border-width").value = String(f.border_width);
+        $("field-fill-on").checked = f.fill !== null;
+        $("field-fill").value = f.fill || "#FFFFFF";
+        $("field-fill").disabled = f.fill === null;
         $("field-text-wrap").classList.toggle("hidden", selected !== "custom");
         if (selected === "custom") $("field-text").value = f.text || "";
         canvas
@@ -137,9 +168,10 @@
             ...document.querySelectorAll("input[data-category]"),
         ].find((x) => x.dataset.category === data.values.category);
         fieldElement("category").style.background =
-            $("category-treatment").value === "category" && color
+            fields.category.fill ||
+            ($("category-treatment").value === "category" && color
                 ? color.value
-                : $("primary").value;
+                : $("primary").value);
     }
     function warnings() {
         const results = [],
@@ -278,6 +310,7 @@
                 fontWeight: f.bold ? "bold" : "normal",
                 color: f.color || "",
                 display: f.visible ? "" : "none",
+                ...textStyle(key, f),
             });
             if (key === "qr") {
                 const img = el.querySelector("img");
@@ -338,6 +371,30 @@
     for (const el of document.querySelectorAll(".field-visibility-toggle"))
         el.addEventListener("change", () => {
             fields[el.dataset.field].visible = el.checked;
+            markDirty();
+            render();
+        });
+    const restyle = (change) => {
+        change(fields[selected]);
+        markDirty();
+        render();
+    };
+    $("field-case").addEventListener("change", () => restyle((f) => (f.case = $("field-case").value)));
+    $("field-border").addEventListener("change", () =>
+        restyle((f) => {
+            f.border = $("field-border").value;
+            if (f.border !== "none" && !f.border_color) f.border_color = $("field-border-color").value;
+        }),
+    );
+    $("field-border-color").addEventListener("input", () => restyle((f) => (f.border_color = $("field-border-color").value)));
+    $("field-border-width").addEventListener("change", () => restyle((f) => (f.border_width = Number($("field-border-width").value))));
+    $("field-fill-on").addEventListener("change", () => restyle((f) => (f.fill = $("field-fill-on").checked ? $("field-fill").value : null)));
+    $("field-fill").addEventListener("input", () => {
+        if ($("field-fill-on").checked) restyle((f) => (f.fill = $("field-fill").value));
+    });
+    for (const [id, value] of [["all-upper", "upper"], ["all-case-reset", "none"]])
+        $(id).addEventListener("click", () => {
+            for (const [key, f] of Object.entries(fields)) if (!GRAPHIC.includes(key)) f.case = value;
             markDirty();
             render();
         });

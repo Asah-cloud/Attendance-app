@@ -195,6 +195,57 @@ it('lets a manager give a field a custom colour and bold weight, or leave it to 
         ->and($event->badge_fields['name']['color'])->toBeNull();
 });
 
+it('saves text case, a border and a fill per field, and draws them on the badge and in the PDF', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event, 'Ama Serwaa');
+    $fields = BadgeDesign::defaults();
+    $fields['name'] = array_replace($fields['name'], ['case' => 'upper', 'border' => 'rounded', 'border_color' => '#1D4ED8', 'border_width' => 1, 'fill' => '#FEF3C7']);
+    $fields['event'] = array_replace($fields['event'], ['case' => 'title', 'border' => 'square']);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $saved = $event->fresh()->badge_fields;
+    expect(array_intersect_key($saved['name'], array_flip(['case', 'border', 'border_color', 'border_width', 'fill'])))
+        ->toBe(['case' => 'upper', 'border' => 'rounded', 'border_color' => '#1D4ED8', 'border_width' => 1, 'fill' => '#FEF3C7'])
+        // Untouched fields keep the defaults: as typed, no border, no fill.
+        ->and(array_intersect_key($saved['meta'], array_flip(['case', 'border', 'fill'])))->toBe(['case' => 'none', 'border' => 'none', 'fill' => null]);
+
+    expect(BadgeDesign::textStyle('name', $saved['name']))->toBe('text-transform:uppercase;border:1mm solid #1D4ED8;border-radius:2mm;background:#FEF3C7;padding:0.8mm 1.5mm;')
+        // A border with no colour of its own takes the text colour.
+        ->and(BadgeDesign::textStyle('event', $saved['event']))->toBe('text-transform:capitalize;border:0.5mm solid currentColor;border-radius:0;padding:0.8mm 1.5mm;')
+        ->and(BadgeDesign::textStyle('meta', $saved['meta']))->toBe('text-transform:none;')
+        // The category keeps its colour unless given a fill; pictures get none of it.
+        ->and(BadgeDesign::textStyle('category', $saved['category'], '#0F766E'))->toBe('text-transform:none;background:#0F766E;')
+        ->and(BadgeDesign::textStyle('qr', array_replace($saved['qr'], ['border' => 'rounded'])))->toBe('');
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('text-transform:uppercase;border:1mm solid #1D4ED8;border-radius:2mm;background:#FEF3C7', false)
+        ->assertSee('Make all text UPPER CASE')->assertSee('Rounded');
+    $this->get(route('events.badges.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
+it('keeps designs saved before text case and borders existed looking the same', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $old = collect(BadgeDesign::defaults())->map(fn ($field) => array_diff_key($field, array_flip(['case', 'border', 'border_color', 'border_width', 'fill'])))->all();
+    $event->update(['badge_fields' => $old]);
+
+    $fields = BadgeDesign::fields($event->fresh());
+    expect($fields['name']['case'])->toBe('none')->and($fields['name']['border'])->toBe('none')
+        ->and(BadgeDesign::textStyle('name', $fields['name']))->toBe('text-transform:none;');
+});
+
+it('rejects an unknown text case, border style or border thickness', function (string $property, mixed $value) {
+    [$event, $manager] = badgeStudioFixture();
+    $fields = BadgeDesign::defaults();
+    $fields['name'][$property] = $value;
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertSessionHasErrors("badge_fields.name.{$property}");
+})->with([['case', 'shouting'], ['border', 'dotted'], ['border_width', 5], ['fill', 'yellow'], ['border_color', 'blue']]);
+
 it('rejects an invalid field colour', function () {
     [$event, $manager] = badgeStudioFixture();
     $fields = BadgeDesign::defaults();

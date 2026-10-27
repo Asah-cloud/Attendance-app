@@ -32,6 +32,7 @@
 <label for="name-format">{{ ucfirst($subjectSingular) }} names</label><select id="name-format" name="badge_name_format"><option value="full" @selected(old('badge_name_format',$event->badge_name_format ?? 'full')==='full')>Show full name</option><option value="initials" @selected(old('badge_name_format',$event->badge_name_format)==='initials')>Use middle initials</option></select>
 <label for="category-treatment">Category colour</label><select id="category-treatment" name="badge_design"><option value="default" @selected(old('badge_design',$event->badge_design)!=='category')>Use primary colour</option><option value="category" @selected(old('badge_design',$event->badge_design)==='category')>Colour by category</option></select>
 <div id="category-colors">@foreach($categories as $category)<label>{{ $category }}<input type="hidden" name="categories[]" value="{{ $category }}"><input type="color" name="colors[]" data-category="{{ $category }}" value="{{ $categoryColors[$category] }}"></label>@endforeach</div>
+<label>All text</label><div class="row"><button type="button" id="all-upper" class="btn secondary wide">Make all text UPPER CASE</button><button type="button" id="all-case-reset" class="btn secondary wide">Reset text case</button></div>
 <button type="button" id="reset-fields" class="btn secondary wide">Reset field positions</button>
 </section>
 <section class="panel" id="artwork-panel"><h2>Company artwork</h2><label for="artwork">Upload PNG, JPG or WebP</label><input type="file" id="artwork" name="badge_image" accept="image/png,image/jpeg,image/webp"><p class="help">Maximum 4 MB. For a full background, export at the badge's proportions and leave space for names and the QR code. Artwork fills the badge without cropping.</p><p class="help" id="resolution-help"></p>
@@ -56,6 +57,13 @@
 <label class="check"><input id="field-bold" type="checkbox"> Bold</label>
 <label class="check"><input id="field-custom-color" type="checkbox"> Custom text colour</label>
 <input type="color" id="field-color">
+<div id="field-text-style">
+<label for="field-case">Text case</label><select id="field-case">@foreach(\App\Support\BadgeDesign::CASES as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select>
+<label for="field-border">Border</label><select id="field-border">@foreach(\App\Support\BadgeDesign::BORDERS as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select>
+<div class="row" id="field-border-options"><div><label for="field-border-color">Border colour</label><input type="color" id="field-border-color"></div><div><label for="field-border-width">Thickness</label><select id="field-border-width"><option value="0.3">Thin</option><option value="0.5">Medium</option><option value="1">Thick</option><option value="1.5">Extra thick</option></select></div></div>
+<label class="check"><input id="field-fill-on" type="checkbox"> Fill colour behind the text</label>
+<input type="color" id="field-fill">
+</div>
 <div class="row">@foreach(['x'=>'Left (%)','y'=>'Top (%)','w'=>'Width (%)','h'=>'Height (%)'] as $key=>$label)<div><label for="field-{{ $key }}">{{ $label }}</label><input type="number" id="field-{{ $key }}" data-property="{{ $key }}" min="{{ in_array($key,['x','y']) ? 0 : ($key==='w'?5:3) }}" max="{{ in_array($key,['x','y']) ? 95 : 100 }}" step="0.1"></div>@endforeach</div>
 <label for="field-size">Font size (pt)</label><input type="number" id="field-size" data-property="size" min="6" max="48" step="0.5"><label for="field-align">Text alignment</label><select id="field-align"><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></select>
 <div id="field-text-wrap" class="hidden"><label for="field-text">Custom text</label><input type="text" id="field-text" maxlength="200" placeholder="e.g. Sponsored by Acme"></div>
