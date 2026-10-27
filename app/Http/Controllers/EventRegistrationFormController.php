@@ -97,7 +97,22 @@ class EventRegistrationFormController extends Controller
                     ->whereIn(DB::raw('LOWER(TRIM(name))'), $duplicateNames->all());
             })
             ->get()
-            ->groupBy(fn ($registration) => Str::of($registration->participant->name)->lower()->squish()->toString());
+            ->groupBy(fn ($registration) => Str::of($registration->participant->name)->lower()->squish()->toString())
+            // A group the manager marked as different people stays hidden until someone new joins it.
+            ->filter(fn ($group) => $group->contains(fn ($registration) => $registration->duplicate_dismissed_at === null));
+    }
+
+    /** "Different people, keep both": stop flagging these same-name registrations as possible duplicates. */
+    public function keepDuplicates(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+        $validated = $request->validate(['registrations' => ['required', 'array', 'min:2'], 'registrations.*' => ['integer']]);
+        $registrations = $event->registrations()->with('participant')->whereIn('id', $validated['registrations'])->get();
+        abort_unless($registrations->count() === count(array_unique($validated['registrations'])), 404);
+
+        $event->registrations()->whereIn('id', $registrations->modelKeys())->update(['duplicate_dismissed_at' => now()]);
+
+        return back()->with('success', 'Kept as different people: '.$registrations->count().' records named '.$registrations->first()->participant->name.' stay separate.');
     }
 
     public function storeRegistration(Request $request, Event $event, ParticipantRegistrationService $participants): RedirectResponse

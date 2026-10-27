@@ -254,6 +254,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/events/{event}/registrations/export', [EventRegistrationFormController::class, 'export'])->name('events.registrations.export');
         Route::patch('/events/{event}/registrations/{registration}/approve', [EventRegistrationFormController::class, 'approve'])->name('events.registrations.approve');
         Route::patch('/events/{event}/registrations/{registration}/reject', [EventRegistrationFormController::class, 'reject'])->name('events.registrations.reject');
+        Route::patch('/events/{event}/registrations/duplicates/keep', [EventRegistrationFormController::class, 'keepDuplicates'])->name('events.registrations.duplicates.keep');
         Route::patch('/events/{event}/registrations/{registration}/cancel', [EventRegistrationFormController::class, 'cancelRegistration'])->name('events.registrations.cancel');
         Route::post('/events/{event}/registrations/{registration}/resend', [EventRegistrationFormController::class, 'resend'])->name('events.registrations.resend');
         Route::patch('/events/{event}/registrations/{registration}/participant', [EventRegistrationFormController::class, 'updateParticipant'])->name('events.registrations.participant.update');

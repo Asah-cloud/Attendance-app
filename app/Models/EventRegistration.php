@@ -43,6 +43,7 @@ class EventRegistration extends Model
         'accessibility_required',
         'accommodation_notes',
         'food_required',
+        'duplicate_dismissed_at',
     ];
 
     protected function casts(): array
@@ -51,6 +52,7 @@ class EventRegistration extends Model
             'registered_at' => 'datetime',
             'approved_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'duplicate_dismissed_at' => 'datetime',
             'consented_at' => 'datetime',
             'custom_answers' => 'array',
             'reminder_sent_at' => 'datetime',
