@@ -40,6 +40,14 @@ class PhoneNumberService
         '962' => ['JO', 'Jordan'], '964' => ['IQ', 'Iraq'], '965' => ['KW', 'Kuwait'], '966' => ['SA', 'Saudi Arabia'],
         '968' => ['OM', 'Oman'], '971' => ['AE', 'United Arab Emirates'], '972' => ['IL', 'Israel'], '973' => ['BH', 'Bahrain'],
         '974' => ['QA', 'Qatar'],
+        // The Caribbean. Most islands share +1 with the USA and Canada and are told apart by
+        // their area code, so these are four digits: +1 876 is Jamaica, not "USA / Canada".
+        '1876' => ['JM', 'Jamaica'], '1658' => ['JM', 'Jamaica'], '1868' => ['TT', 'Trinidad and Tobago'],
+        '1246' => ['BB', 'Barbados'], '1242' => ['BS', 'Bahamas'], '1268' => ['AG', 'Antigua and Barbuda'],
+        '1473' => ['GD', 'Grenada'], '1758' => ['LC', 'Saint Lucia'], '1784' => ['VC', 'Saint Vincent and the Grenadines'],
+        '1767' => ['DM', 'Dominica'], '1869' => ['KN', 'Saint Kitts and Nevis'],
+        '1809' => ['DO', 'Dominican Republic'], '1829' => ['DO', 'Dominican Republic'], '1849' => ['DO', 'Dominican Republic'],
+        '53' => ['CU', 'Cuba'], '501' => ['BZ', 'Belize'], '509' => ['HT', 'Haiti'], '592' => ['GY', 'Guyana'], '597' => ['SR', 'Suriname'],
     ];
 
     /**
@@ -127,7 +135,7 @@ class PhoneNumberService
             return null;
         }
 
-        foreach ([3, 2, 1] as $length) {
+        foreach ([4, 3, 2, 1] as $length) {
             $code = substr($international, 0, $length);
             if (isset(self::DIAL_CODES[$code])) {
                 return self::DIAL_CODES[$code];
