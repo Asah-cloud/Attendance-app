@@ -71,9 +71,17 @@
             @endif
         </form>
         @if($possibleDuplicates->isNotEmpty())
-            <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <h2 class="text-sm font-black uppercase tracking-wider text-amber-800">Possible duplicate attendees</h2>
-                <p class="mt-1 text-xs text-amber-700">These attendees share a name but not a phone number or email, so they weren't automatically combined into one record. Review them and cancel the extra entry if it's the same person.</p>
+            {{-- Closed by default; opening or closing it is remembered for this event, so it stays open while you cancel entries. --}}
+            <details id="possible-duplicates" data-remember="duplicates-open:{{ $event->id }}" class="group mb-6 rounded-2xl border border-amber-200 bg-amber-50">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-5">
+                    <span>
+                        <span class="block text-sm font-black uppercase tracking-wider text-amber-800">Possible duplicate attendees</span>
+                        <span class="mt-1 block text-xs font-bold text-amber-700">{{ $possibleDuplicates->count() }} {{ \Illuminate\Support\Str::plural('name', $possibleDuplicates->count()) }} shared by {{ $possibleDuplicates->flatten()->count() }} entries · <span class="group-open:hidden">Show</span><span class="hidden group-open:inline">Hide</span></span>
+                    </span>
+                    <svg class="h-5 w-5 shrink-0 text-amber-700 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </summary>
+                <div class="px-5 pb-5">
+                <p class="text-xs text-amber-700">These attendees share a name but not a phone number or email, so they weren't automatically combined into one record. Review them and cancel the extra entry if it's the same person.</p>
                 <div class="mt-4 space-y-4">
                     @foreach($possibleDuplicates as $group)
                         <div class="rounded-xl bg-white p-4 shadow-sm">
@@ -91,7 +99,15 @@
                         </div>
                     @endforeach
                 </div>
-            </div>
+                </div>
+            </details>
+            <script>
+                (() => {
+                    const box = document.getElementById('possible-duplicates');
+                    try { box.open = localStorage.getItem(box.dataset.remember) === '1'; } catch (e) {}
+                    box.addEventListener('toggle', () => { try { localStorage.setItem(box.dataset.remember, box.open ? '1' : '0'); } catch (e) {} });
+                })();
+            </script>
         @endif
         <div id="attendee-results"><div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-4">Attendee</th><th class="px-5 py-4">Contact</th><th class="px-5 py-4">Type</th><th class="px-5 py-4">Gender</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Registered</th><th class="px-5 py-4">Actions</th></tr></thead>

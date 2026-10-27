@@ -301,6 +301,9 @@ it('flags attendees sharing a name but no phone or email as possible duplicates'
     $content = $this->actingAs($manager)->get(route('events.registrations.index', $event))
         ->assertOk()
         ->assertSee('Possible duplicate attendees')
+        // A box that opens and closes, closed until opened, with the count on its summary line.
+        ->assertSee('<details id="possible-duplicates" data-remember="duplicates-open:'.$event->id.'"', false)
+        ->assertSee('1 name shared by 2 entries')
         ->getContent();
 
     // "Cancel this one" only renders inside the duplicates panel, so its count confirms
