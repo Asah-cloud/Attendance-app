@@ -13,7 +13,7 @@ been done, how changes are shipped, and what is still open. For how the system i
 
 | | |
 |---|---|
-| Production | Running `main` with PR #48, deployed 27 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
+| Production | Running `main` with PR #49, deployed 27 Oct 2026. `git log --oneline -1` on the server shows the exact commit |
 | Open work | None in progress. Follow-ups are in [section 7](#7-open-items-and-next-steps) |
 | Open PRs | Dependabot only: #3, #4, #5, #27, #32, #43 (not reviewed yet) |
 | Tests | 677 passing. CI green on `main` |
@@ -264,7 +264,7 @@ Ordered by PR. #8–#14 (13–15 Oct) are covered briefly; everything since in m
 | #46 | 27 Oct | **Badge Studio text styling:** each text field gets a text case (As typed / UPPER CASE / lower case / Title Case), a border (None / Rectangle / Rounded) with its own colour and thickness, and a fill colour; "Make all text UPPER CASE" and "Reset text case" buttons. Preview and PDF share the rules (`BadgeDesign::textStyle`, mirrored in `public/js/badge-studio.js`); older designs keep their look |
 | #47 | 27 Oct | **Country on badges:** an optional Country field in Badge Studio (off by default, between the date and the name). It prints the country entered for the person, else their phone's country, and nothing when neither is known. **Jamaica and 15 other Caribbean countries** added to the country list and phone lookup; +1 numbers are now told apart by area code (`PhoneNumberService` checks 4-digit codes first), so +1 876 reads as Jamaica, not "USA / Canada" |
 | #48 | 27 Oct | **Print badges by country:** Badge Studio's Print panel gains a Country picker beside Category (country as in reports: entered, else from the phone; "Country not given" when neither). It narrows the list, and only the ticked people of that country print |
-| *(branch `fix/collapsible-duplicates`)* | 27 Oct | The **possible duplicate attendees** box on the Attendees page opens and closes (closed by default, with a "1 name shared by 2 entries" summary); its open/closed state is remembered per event, so it stays open while you cancel entries |
+| #49 | 27 Oct | The **possible duplicate attendees** box on the Attendees page opens and closes (closed by default, with a "1 name shared by 2 entries" summary); its open/closed state is remembered per event, so it stays open while you cancel entries |
 
 ### Room assignment fixes (#38)
 Found in a system check on 24 Oct and confirmed with tests and on the local demo.
