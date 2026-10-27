@@ -61,7 +61,7 @@ class AttendanceSummarySheet implements FromArray, WithEvents, WithStrictNullCom
                 ->map(fn ($count, $label) => [$label, $count])->values()->all());
         }
 
-        $this->section('By country', ['Country (from phone number)', 'People present'], $rows->countBy('country')->sortDesc()
+        $this->section('By country', ['Country', 'People present'], $rows->countBy('country')->sortDesc()
             ->map(fn ($count, $label) => [$label, $count])->values()->all());
 
         return $this->lines;

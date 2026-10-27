@@ -72,7 +72,7 @@
         <section class="grid gap-6 lg:grid-cols-2">
             @foreach($report['breakdowns'] as $heading => $counts)
                 <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <h2 class="border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">By {{ strtolower($heading) }}@if($heading === 'Country') <span class="normal-case tracking-normal text-slate-400">(from phone number)</span>@endif</h2>
+                    <h2 class="border-b border-slate-100 px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500">By {{ strtolower($heading) }}@if($heading === 'Country') <span class="normal-case tracking-normal text-slate-400">(as entered, or from the phone number)</span>@endif</h2>
                     <div class="max-h-[24rem] overflow-auto"><table class="min-w-full text-sm">
                         <thead class="sticky top-0 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500"><tr><th class="px-6 py-3">{{ $heading }}</th><th class="px-3 py-3 text-right">People</th><th class="w-2/5 px-6 py-3">Share</th></tr></thead>
                         <tbody class="divide-y divide-slate-100">

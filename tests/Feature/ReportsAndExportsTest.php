@@ -187,7 +187,7 @@ it('splits attendance by the country of each phone number and downloads a countr
     $event = reportsCountryEvent($company);
 
     expect((new GroupAttendanceSummaryExport($event, 1, null, [], 'country'))->collection()->pluck('present', 'country')->sortKeys()->all())
-        ->toBe(['Ghana' => 1, 'Nigeria' => 1, 'No phone number' => 1]);
+        ->toBe(['Country not given' => 1, 'Ghana' => 1, 'Nigeria' => 1]);
 
     $response = $this->actingAs($manager)->get(route('reports.country-summary', ['event' => $event, 'day' => 1]));
     $response->assertOk();
@@ -197,7 +197,7 @@ it('splits attendance by the country of each phone number and downloads a countr
     $rows = $export->collection()->map(fn ($person) => array_combine($export->headings(), $export->map($person)))->keyBy('Name');
     expect($rows['Chidi']['Country'])->toBe('Nigeria')
         ->and($rows['Chidi']['Day 1'])->not->toBe('')
-        ->and($rows['Nophone']['Country'])->toBe('No phone number');
+        ->and($rows['Nophone']['Country'])->toBe('Country not given');
 });
 
 it('filters reports by country, on the page and in every download', function () {
@@ -217,7 +217,7 @@ it('filters reports by country, on the page and in every download', function () 
         ->assertSee('Chidi')
         ->assertDontSee('Kofi');
 
-    foreach (['Nigeria', 'No phone number'] as $country) {
+    foreach (['Nigeria', 'Country not given'] as $country) {
         $response = $this->actingAs($manager)->get(route('reports.country-detail', ['event' => $event, 'country' => $country, 'day' => 1]));
         $response->assertOk();
         expect($response->headers->get('Content-Disposition'))->toContain('Country_');

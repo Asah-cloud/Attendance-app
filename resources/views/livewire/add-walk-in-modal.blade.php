@@ -17,6 +17,15 @@
                     </div>
 
                     <div>
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-1">Country (Optional)</label>
+                        <select wire:model="country" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="">Choose a country</option>
+                            @foreach(\App\Services\PhoneNumberService::countryNames() as $option)<option value="{{ $option }}">{{ $option }}</option>@endforeach
+                        </select>
+                        @error('country') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
                         <label class="block text-xs font-black text-gray-400 uppercase mb-1">Email Address (Optional)</label>
                         <input type="email" wire:model="email" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Leave blank to auto-generate">
                         @error('email') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror

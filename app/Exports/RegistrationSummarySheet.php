@@ -40,7 +40,7 @@ class RegistrationSummarySheet implements FromArray, WithEvents, WithStrictNullC
             ['Not checked in yet', $total - $report['checkedIn']],
         ]);
         foreach ($report['breakdowns'] as $heading => $counts) {
-            $this->section('By '.strtolower($heading), [$heading === 'Country' ? 'Country (from phone number)' : $heading, 'People', 'Share'],
+            $this->section('By '.strtolower($heading), [$heading, 'People', 'Share'],
                 $counts->map(fn ($count, $label) => [$label, $count, $share($count)])->values()->all());
         }
 

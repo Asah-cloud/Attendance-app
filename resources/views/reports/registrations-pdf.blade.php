@@ -20,7 +20,7 @@
         <h1>{{ $event->title }}</h1>
         <div class="meta">
             {{ $event->event_date->format('j M Y') }}@if($event->end_date && ! $event->end_date->isSameDay($event->event_date)) – {{ $event->end_date->format('j M Y') }}@endif
-            · Everyone registered, whether or not they have checked in. Country comes from the phone number. Generated {{ now()->format('j M Y, g:i A') }}
+            · Everyone registered, whether or not they have checked in. Country is as entered, or read from the phone number. Generated {{ now()->format('j M Y, g:i A') }}
         </div>
     </div>
 

@@ -5,8 +5,10 @@ namespace App\Livewire;
 use App\Models\Event;
 use App\Services\ApplicationCache;
 use App\Services\ParticipantRegistrationService;
+use App\Services\PhoneNumberService;
 use App\Services\RegistrationLifecycleService;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class AddWalkInModal extends Component
@@ -21,6 +23,8 @@ class AddWalkInModal extends Component
     public $email = '';
 
     public $phone = '';
+
+    public $country = '';
 
     public $category = '';
 
@@ -42,6 +46,7 @@ class AddWalkInModal extends Component
             'name' => 'required|string|max:255',
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:30',
+            'country' => ['nullable', Rule::in(PhoneNumberService::countryNames())],
             'room_group' => 'nullable|string|max:255',
         ]);
 
@@ -51,6 +56,7 @@ class AddWalkInModal extends Component
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
+            'country' => $this->country,
             'category' => $category,
             'room_group' => $this->room_group,
         ], 'walk_in');
@@ -59,7 +65,7 @@ class AddWalkInModal extends Component
 
         app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
 
-        $this->reset(['name', 'email', 'phone', 'category', 'room_group', 'showModal']);
+        $this->reset(['name', 'email', 'phone', 'country', 'category', 'room_group', 'showModal']);
 
         // Tell the parent page to refresh its attendee list grid
         $this->dispatch('refreshAttendeeList');

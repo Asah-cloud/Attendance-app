@@ -150,10 +150,10 @@ class AttendanceGrid
         return $person->room_group ?: ($person->department ?: 'Area not specified');
     }
 
-    /** The country of the person's phone number, as Messages shows it; there is no country field. */
+    /** The person's country as entered, else the country of their phone number (as Messages reads it). */
     public static function country(Participant $person): string
     {
-        return PhoneNumberService::countryOf($person->phone)[1] ?? ($person->phone ? 'Country unknown' : 'No phone number');
+        return $person->country ?: (PhoneNumberService::countryOf($person->phone)[1] ?? ($person->phone ? 'Country unknown' : 'Country not given'));
     }
 
     /** e.g. "Area: Accra · Gender: Male", or null when nothing is filtered. */

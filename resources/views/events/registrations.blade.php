@@ -30,12 +30,16 @@
         <x-event-closed-banner :event="$event" />
         <livewire:registration-stats :event="$event" />
         @if($errors->any())<div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
-        <details data-tour="event-attendees-manual" class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','category'])) open @endif>
+        <details data-tour="event-attendees-manual" class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','country','category'])) open @endif>
             <summary class="cursor-pointer font-black text-slate-900">Manually register an attendee</summary>
             <form method="POST" action="{{ route('events.registrations.store', $event) }}" class="mt-5 grid gap-4 md:grid-cols-2">@csrf
                 <input name="name" value="{{ old('name') }}" required placeholder="Full name" class="rounded-xl border-slate-200">
                 <input type="email" name="email" value="{{ old('email') }}" placeholder="Email" class="rounded-xl border-slate-200">
-                <input name="phone" value="{{ old('phone') }}" placeholder="Phone (required without email)" class="rounded-xl border-slate-200">
+                <input name="phone" value="{{ old('phone') }}" placeholder="Phone (optional)" class="rounded-xl border-slate-200">
+                <select name="country" aria-label="Country" class="rounded-xl border-slate-200">
+                    <option value="">Country (optional)</option>
+                    @foreach($countries as $option)<option value="{{ $option }}" @selected(old('country') === $option)>{{ $option }}</option>@endforeach
+                </select>
                 <select name="gender" required class="rounded-xl border-slate-200">
                     <option value="">Select gender</option>
                     @foreach($genderField->options ?? ['Male', 'Female'] as $option)<option value="{{ $option }}" @selected(old('gender') === $option)>{{ $option }}</option>@endforeach
@@ -107,8 +111,12 @@
                             @csrf @method('PATCH')
                             <input name="name" value="{{ old('name', $registration->participant->name) }}" required placeholder="Full name" class="rounded-xl border-slate-200 text-sm">
                             <input type="email" name="email" value="{{ old('email', $registration->participant->email) }}" placeholder="Email" class="rounded-xl border-slate-200 text-sm">
-                            <input name="phone" value="{{ old('phone', $registration->participant->phone) }}" placeholder="Phone" class="rounded-xl border-slate-200 text-sm">
+                            <input name="phone" value="{{ old('phone', $registration->participant->phone) }}" placeholder="Phone (optional)" class="rounded-xl border-slate-200 text-sm">
                             <input name="secondary_phone" value="{{ old('secondary_phone', $registration->participant->secondary_phone) }}" placeholder="Secondary phone (optional)" class="rounded-xl border-slate-200 text-sm">
+                            <select name="country" aria-label="Country" class="rounded-xl border-slate-200 text-sm">
+                                <option value="">Country (optional)</option>
+                                @foreach($countries as $option)<option value="{{ $option }}" @selected(old('country', $registration->participant->country) === $option)>{{ $option }}</option>@endforeach
+                            </select>
                             <select name="gender" required class="rounded-xl border-slate-200 text-sm">
                                 <option value="">Select gender</option>
                                 @foreach($genderField->options ?? ['Male', 'Female'] as $option)<option value="{{ $option }}" @selected(old('gender', $registration->participant->gender) === $option)>{{ $option }}</option>@endforeach

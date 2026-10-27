@@ -1,11 +1,14 @@
 <?php
 
+use App\Livewire\AddWalkInModal;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\EventRegistrationSubmitted;
+use App\Services\AttendanceGrid;
+use App\Services\RegistrationReport;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -665,4 +668,74 @@ it('prevents managers from controlling another company registrations', function 
     $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
         'name' => 'Hacked Name', 'category' => 'Guest',
     ])->assertForbidden();
+});
+
+it('lets people register publicly without a phone number', function () {
+    $event = publicRegistrationEvent();
+
+    $this->get(route('events.register', $event))->assertOk()
+        ->assertSee('(optional)')
+        ->assertDontSee('name="phone" value="" required', false);
+
+    $this->post(route('events.register.store', $event), registrationPayload(['phone' => '']))->assertRedirect();
+
+    $participant = Participant::where('email', 'public@example.com')->firstOrFail();
+    expect($participant->phone)->toBeNull()
+        ->and($event->registrations()->where('participant_id', $participant->id)->exists())->toBeTrue();
+});
+
+it('lets a manager add someone with no phone or email, and set and change their country', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))->assertOk()
+        ->assertSee('Phone (optional)')->assertSee('Country (optional)')
+        ->assertSee('<option value="United Kingdom"', false)->assertDontSee('USA / Canada');
+
+    $this->actingAs($manager)->post(route('events.registrations.store', $event), [
+        'name' => 'No Contact', 'email' => '', 'phone' => '', 'gender' => 'Male', 'category' => 'Member', 'country' => 'Togo',
+    ])->assertSessionHasNoErrors()->assertSessionHas('success');
+    $participant = Participant::where('name', 'No Contact')->firstOrFail();
+    expect($participant->only('phone', 'country'))->toBe(['phone' => null, 'country' => 'Togo']);
+
+    $registration = $event->registrations()->where('participant_id', $participant->id)->firstOrFail();
+    $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'No Contact', 'gender' => 'Male', 'category' => 'Member', 'country' => 'United States',
+    ])->assertSessionHasNoErrors()->assertSessionHas('success');
+    expect($participant->fresh()->country)->toBe('United States')
+        ->and($participant->auditLogs()->latest('id')->first()->changes['country'])->toBe(['old' => 'Togo', 'new' => 'United States']);
+
+    $this->actingAs($manager)->patch(route('events.registrations.participant.update', [$event, $registration]), [
+        'name' => 'No Contact', 'gender' => 'Male', 'category' => 'Member', 'country' => 'Atlantis',
+    ])->assertSessionHasErrors('country');
+    expect($participant->fresh()->country)->toBe('United States');
+});
+
+it('records a walk-in with a country', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+
+    Livewire\Livewire::actingAs($manager)->test(AddWalkInModal::class, ['event' => $event])
+        ->set('name', 'Walk In Guest')->set('country', 'Liberia')
+        ->call('registerWalkIn')->assertHasNoErrors();
+
+    expect(Participant::where('name', 'Walk In Guest')->value('country'))->toBe('Liberia');
+});
+
+it('reports the country entered for someone ahead of the one read from their phone', function () {
+    $event = publicRegistrationEvent();
+    $abroad = Participant::create(['company_id' => $event->company_id, 'name' => 'Lives Abroad', 'phone' => '0241234567', 'country' => 'United Kingdom']);
+    $local = Participant::create(['company_id' => $event->company_id, 'name' => 'Lives Here', 'phone' => '0241234568']);
+    $unknown = Participant::create(['company_id' => $event->company_id, 'name' => 'No Details']);
+    foreach ([$abroad, $local, $unknown] as $person) {
+        $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    }
+
+    expect(AttendanceGrid::country($abroad))->toBe('United Kingdom')
+        ->and(AttendanceGrid::country($local))->toBe('Ghana')
+        ->and(AttendanceGrid::country($unknown))->toBe('Country not given')
+        ->and(app(RegistrationReport::class)->build($event)['breakdowns']['Country']->sortKeys()->all())
+        ->toBe(['Country not given' => 1, 'Ghana' => 1, 'United Kingdom' => 1]);
 });

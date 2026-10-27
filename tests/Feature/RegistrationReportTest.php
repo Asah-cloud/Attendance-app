@@ -67,7 +67,7 @@ it('filters by status, category, gender, country and area', function () {
         ->and($names(['status' => 'all', 'category' => 'Pastor']))->toBe(['Grace', 'Kofi'])
         ->and($names(['gender' => 'Female']))->toBe(['Ama'])
         ->and($names(['status' => 'all', 'country' => 'United Kingdom']))->toBe(['Grace'])
-        ->and($names(['status' => 'all', 'country' => 'No phone number']))->toBe(['Yaw'])
+        ->and($names(['status' => 'all', 'country' => 'Country not given']))->toBe(['Yaw'])
         ->and($names(['area' => 'Accra']))->toBe(['Ama', 'Kofi'])
         // An unknown status falls back to confirmed.
         ->and($names(['status' => 'nonsense']))->toBe(['Ama', 'Chidi', 'Kofi']);
