@@ -742,3 +742,52 @@ it('reports the country entered for someone ahead of the one read from their pho
         ->and(app(RegistrationReport::class)->build($event)['breakdowns']['Country']->sortKeys()->all())
         ->toBe(['Country not given' => 1, 'Ghana' => 1, 'United Kingdom' => 1]);
 });
+
+it('lets a manager keep same-name attendees as different people, until someone new with that name registers', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $register = function (string $phone) use ($event) {
+        $person = Participant::create(['company_id' => $event->company_id, 'name' => 'John Mensah', 'phone' => $phone, 'category' => 'Guest']);
+
+        return $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    };
+    $first = $register('0244000001');
+    $second = $register('0244000002');
+
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))->assertOk()
+        ->assertSee('Different people, keep both')
+        ->assertSee(route('participants.duplicates.compare', ['ids' => [$first->participant_id, $second->participant_id]]));
+
+    $this->actingAs($manager)->patch(route('events.registrations.duplicates.keep', $event), ['registrations' => [$first->id, $second->id]])
+        ->assertRedirect()->assertSessionHas('success', 'Kept as different people: 2 records named John Mensah stay separate.');
+
+    // Both stay registered and the box no longer flags them.
+    expect($first->fresh()->status)->toBe('confirmed')->and($second->fresh()->status)->toBe('confirmed');
+    $this->actingAs($manager)->get(route('events.registrations.index', $event))->assertOk()
+        ->assertDontSee('Possible duplicate attendees');
+
+    // A third John Mensah brings the name back for review, with all three listed.
+    $register('0244000003');
+    $content = $this->actingAs($manager)->get(route('events.registrations.index', $event))->assertOk()
+        ->assertSee('Possible duplicate attendees')->assertSee('1 name shared by 3 entries')
+        ->assertSee('Different people, keep all 3')
+        ->getContent();
+    expect(substr_count($content, 'Cancel this one'))->toBe(3);
+});
+
+it('refuses to mark another event\'s registrations as different people', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $other = Event::create(['company_id' => $event->company_id, 'title' => 'Other Event', 'event_date' => now()->addWeek()]);
+    unlockAllEventFeatures($other);
+    $ids = collect(['0244000001', '0244000002'])->map(function ($phone) use ($other) {
+        $person = Participant::create(['company_id' => $other->company_id, 'name' => 'John Mensah', 'phone' => $phone, 'category' => 'Guest']);
+
+        return $other->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed'])->id;
+    })->all();
+
+    $this->actingAs($manager)->patch(route('events.registrations.duplicates.keep', $event), ['registrations' => $ids])->assertNotFound();
+    expect(EventRegistration::whereIn('id', $ids)->whereNotNull('duplicate_dismissed_at')->count())->toBe(0);
+});

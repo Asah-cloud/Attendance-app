@@ -81,11 +81,22 @@
                     <svg class="h-5 w-5 shrink-0 text-amber-700 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                 </summary>
                 <div class="px-5 pb-5">
-                <p class="text-xs text-amber-700">These attendees share a name but not a phone number or email, so they weren't automatically combined into one record. Review them and cancel the extra entry if it's the same person.</p>
+                <p class="text-xs text-amber-700">These attendees share a name but not a phone number or email, so they weren't automatically combined into one record. If they are different people, choose <strong>keep both</strong> and they won't be flagged again. If it's the same person, merge the records or cancel the extra entry.</p>
                 <div class="mt-4 space-y-4">
                     @foreach($possibleDuplicates as $group)
                         <div class="rounded-xl bg-white p-4 shadow-sm">
-                            <p class="text-sm font-black text-slate-900">{{ $group->first()->participant->name }}</p>
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-sm font-black text-slate-900">{{ $group->first()->participant->name }}</p>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    @if($group->count() === 2)
+                                        @role('manager')<a href="{{ route('participants.duplicates.compare', ['ids' => $group->pluck('participant_id')->all()]) }}" class="text-xs font-bold text-blue-700">Same person? Compare and merge</a>@endrole
+                                    @endif
+                                    <form method="POST" action="{{ route('events.registrations.duplicates.keep', $event) }}">@csrf @method('PATCH')
+                                        @foreach($group as $registration)<input type="hidden" name="registrations[]" value="{{ $registration->id }}">@endforeach
+                                        <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white hover:bg-emerald-700">Different people, keep {{ $group->count() === 2 ? 'both' : 'all '.$group->count() }}</button>
+                                    </form>
+                                </div>
+                            </div>
                             <div class="mt-2 divide-y divide-slate-100">
                                 @foreach($group as $registration)
                                     <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
