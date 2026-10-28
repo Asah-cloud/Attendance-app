@@ -16,6 +16,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use setasign\Fpdi\Fpdi;
 use Spatie\Permission\Models\Role;
 
 function badgeStudioFixture(): array
@@ -527,7 +528,8 @@ it('records each printed badge with the details on it, but not samples', functio
         ->assertSee(route('events.badges.printed.list', $event), false);
 });
 
-it('records badges printed in background batches, in the staff design for staff', function () {
+it('saves the details of badges made in background batches, in the staff design for staff', function () {
+    Storage::fake('local');
     [$event, $manager] = badgeStudioFixture();
     $staff = badgeRegistration($event, 'Esi Owusu', 'Usher', staff: true);
     $fields = BadgeDesign::defaults();
@@ -537,8 +539,11 @@ it('records badges printed in background batches, in the staff design for staff'
 
     (new GenerateBadgeExportBatch($export->id, [$staff->id], 1))->handle(app(BadgePdfService::class));
 
-    expect(BadgePrint::sole()->details)->not->toHaveKey('Category')
-        ->and(BadgePrint::sole()->user_id)->toBe($manager->id);
+    // Saved with the batch, and recorded as printed only once the finished PDF is downloaded.
+    $details = json_decode(Storage::disk('local')->get("badge-exports/{$export->id}/batch-1.json"), true);
+    expect(BadgePrint::count())->toBe(0)
+        ->and($details[$staff->id])->toHaveKey('Attendee name', 'Esi Owusu')
+        ->and($details[$staff->id])->not->toHaveKey('Category');
 });
 
 it('lets a manager mark badges as printed or not printed by hand', function () {
@@ -617,4 +622,72 @@ it('treats the most recently printed badge as the latest, whatever order prints 
 
     $rows = IOFactory::load($this->actingAs($manager)->get(route('events.badges.printed.list', $event))->getFile()->getPathname())->getActiveSheet()->toArray(null, false, false);
     expect($rows[4][2])->toBe('Ama Mensah')->and($rows[4][4])->toBe(2)->and(end($rows[4]))->toBe('Marked as printed');
+});
+
+it('makes a large print as one PDF in batches, listed for a day and counted as printed when downloaded', function () {
+    Storage::fake('local');
+    [$event, $manager] = badgeStudioFixture();
+    $ids = collect(range(1, 80))->map(fn ($n) => badgeRegistration($event, "Person {$n}")->id);
+
+    $this->actingAs($manager)->postJson(route('events.badges.exports.store', $event), ['attendees' => $ids->all()])->assertAccepted();
+    $export = BadgeExport::sole();
+    expect($export->status)->toBe('ready')
+        ->and($export->total_batches)->toBe(2)
+        ->and($export->badge_count)->toBe(80)
+        ->and($export->file_path)->toEndWith('badges.pdf')
+        ->and((new Fpdi)->setSourceFile(Storage::disk('local')->path($export->file_path)))->toBe(80)
+        ->and(Storage::disk('local')->exists("badge-exports/{$export->id}/batch-1.pdf"))->toBeFalse()
+        ->and(BadgePrint::count())->toBe(0);
+
+    $this->get(route('events.badges', $event))->assertSee('Recent large prints')->assertSee('80 badges')->assertSee(route('badge-exports.download', $export), false);
+    $this->get(route('events.staff-badges', $event))->assertDontSee('Recent large prints');
+
+    $this->get(route('badge-exports.download', $export))->assertOk()->assertDownload('badges-'.$event->slug.'.pdf');
+    expect(BadgePrint::count())->toBe(80)->and($export->fresh()->recorded_at)->not->toBeNull();
+    $this->get(route('badge-exports.download', $export))->assertOk();
+    expect(BadgePrint::count())->toBe(80);
+});
+
+it('selects the people on an uploaded list by phone, email or name, and says why others were not', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Mensah');
+    $ama->participant->update(['phone' => '241112222']);
+    $kofi = badgeRegistration($event, 'Kofi Boateng');
+    $kofi->participant->update(['email' => 'kofi@example.com']);
+    $esi = badgeRegistration($event, 'Esi Owusu');
+    badgeRegistration($event, 'John Mensah');
+    badgeRegistration($event, 'John Mensah');
+    badgeRegistration($event, 'Yaw Darko', status: 'pending');
+    badgeRegistration($event, 'Usher Kwame', staff: true);
+    $csv = implode("\n", [
+        'Full Name,Mobile,E-mail',
+        'A. Mensah,+233 24 111 2222,',
+        'K Boateng,,KOFI@example.com',
+        'esi  owusu,,',
+        'Esi Owusu,,',
+        'John Mensah,,',
+        'Yaw Darko,,',
+        'Usher Kwame,,',
+        'Nobody Here,,',
+        ',,',
+    ]);
+
+    $result = $this->actingAs($manager)->post(route('events.badges.select-list', $event), ['file' => UploadedFile::fake()->createWithContent('committee.csv', $csv)], ['Accept' => 'application/json'])
+        ->assertOk()->json();
+
+    expect($result['ids'])->toBe([$ama->id, $kofi->id, $esi->id])
+        ->and($result['rows'])->toBe(8)
+        ->and($result['problems'])->toBe([
+            ['row' => 6, 'name' => 'John Mensah', 'reason' => '2 people on this event match: add a phone number or email to the list to choose'],
+            ['row' => 7, 'name' => 'Yaw Darko', 'reason' => 'Registration is pending, not confirmed'],
+            ['row' => 8, 'name' => 'Usher Kwame', 'reason' => 'Event staff: print from staff badges'],
+            ['row' => 9, 'name' => 'Nobody Here', 'reason' => 'Not registered for this event'],
+        ]);
+
+    // A plain column of names with no headings works too.
+    $plain = $this->post(route('events.badges.select-list', $event), ['file' => UploadedFile::fake()->createWithContent('names.csv', "Esi Owusu\nKofi Boateng")], ['Accept' => 'application/json'])->json();
+    expect($plain['ids'])->toBe([$esi->id, $kofi->id]);
+
+    [$otherEvent] = badgeStudioFixture();
+    $this->post(route('events.badges.select-list', $otherEvent), ['file' => UploadedFile::fake()->createWithContent('names.csv', 'Esi Owusu')], ['Accept' => 'application/json'])->assertForbidden();
 });

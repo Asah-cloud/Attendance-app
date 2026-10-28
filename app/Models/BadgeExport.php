@@ -10,11 +10,11 @@ class BadgeExport extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['event_id', 'user_id', 'status', 'total_batches', 'completed_batches', 'options', 'file_path', 'error', 'expires_at'];
+    protected $fillable = ['event_id', 'user_id', 'status', 'total_batches', 'completed_batches', 'badge_count', 'options', 'file_path', 'recorded_at', 'error', 'expires_at'];
 
     protected function casts(): array
     {
-        return ['options' => 'array', 'expires_at' => 'datetime'];
+        return ['options' => 'array', 'expires_at' => 'datetime', 'recorded_at' => 'datetime'];
     }
 
     public function event(): BelongsTo

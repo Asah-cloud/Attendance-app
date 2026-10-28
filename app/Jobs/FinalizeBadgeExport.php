@@ -6,14 +6,14 @@ use App\Models\BadgeExport;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
+use setasign\Fpdi\Fpdi;
 use Throwable;
-use ZipArchive;
 
 class FinalizeBadgeExport implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 90;
+    public int $timeout = 300;
 
     public int $tries = 1;
 
@@ -22,29 +22,35 @@ class FinalizeBadgeExport implements ShouldQueue
         $this->onQueue('badges');
     }
 
+    /** Join the batch PDFs into one file, so a large print is printed in one go. */
     public function handle(): void
     {
         $export = BadgeExport::findOrFail($this->exportId);
-        $relative = "badge-exports/{$export->id}/badges.zip";
-        $absolute = Storage::disk('local')->path($relative);
-        $zip = new ZipArchive;
-        if ($zip->open($absolute, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new \RuntimeException('Could not create badge ZIP file.');
-        }
+        $directory = "badge-exports/{$export->id}";
+        $pdf = new Fpdi;
+        $pdf->SetAutoPageBreak(false);
         for ($batch = 1; $batch <= $export->total_batches; $batch++) {
-            $pdf = Storage::disk('local')->path("badge-exports/{$export->id}/batch-{$batch}.pdf");
-            if (! is_file($pdf)) {
-                $zip->close();
+            $path = Storage::disk('local')->path("{$directory}/batch-{$batch}.pdf");
+            if (! is_file($path)) {
                 throw new \RuntimeException("Badge batch {$batch} is missing.");
             }
-            $zip->addFile($pdf, sprintf('badges-%02d.pdf', $batch));
+            $pages = $pdf->setSourceFile($path);
+            for ($page = 1; $page <= $pages; $page++) {
+                $template = $pdf->importPage($page);
+                $size = $pdf->getTemplateSize($template);
+                $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $pdf->useTemplate($template);
+            }
         }
-        $zip->close();
-        $export->update(['status' => 'ready', 'file_path' => $relative, 'error' => null]);
+        $pdf->Output('F', Storage::disk('local')->path("{$directory}/badges.pdf"));
+        for ($batch = 1; $batch <= $export->total_batches; $batch++) {
+            Storage::disk('local')->delete("{$directory}/batch-{$batch}.pdf");
+        }
+        $export->update(['status' => 'ready', 'file_path' => "{$directory}/badges.pdf", 'error' => null]);
     }
 
     public function failed(?Throwable $exception): void
     {
-        BadgeExport::find($this->exportId)?->update(['status' => 'failed', 'error' => 'The badge ZIP could not be completed. Please try again.']);
+        BadgeExport::find($this->exportId)?->update(['status' => 'failed', 'error' => 'The badge PDF could not be completed. Please try again.']);
     }
 }

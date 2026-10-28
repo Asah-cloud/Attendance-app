@@ -38,10 +38,22 @@ class BadgePrint extends Model
      */
     public static function record(Event $event, Collection $registrations, ?int $userId, bool $marked = false): void
     {
+        self::recordDetails($event->id, self::details($event, $registrations), $userId, $marked);
+    }
+
+    /**
+     * The personal details shown on each of these badges, by registration ID, to record now or once
+     * a large print is downloaded.
+     *
+     * @param  Collection<int, EventRegistration>  $registrations
+     * @return array<int, array<string, string>>
+     */
+    public static function details(Event $event, Collection $registrations): array
+    {
         $fields = BadgeDesign::fields($event);
         $shown = array_filter(self::PERSONAL_FIELDS, fn ($key) => $fields[$key]['visible'] ?? false);
-        $now = now();
-        $rows = $registrations->map(function (EventRegistration $registration) use ($event, $fields, $shown, $userId, $marked, $now) {
+
+        return $registrations->mapWithKeys(function (EventRegistration $registration) use ($event, $fields, $shown) {
             $values = BadgeDesign::values($event, $registration);
             $details = collect($shown)->mapWithKeys(fn ($key) => [BadgeDesign::LABELS[$key] => (string) $values[$key]])->all();
             // The same for everyone in one print, but often changed between prints (PARTICIPANT, HEALTH, MUSIC...).
@@ -49,9 +61,16 @@ class BadgePrint extends Model
                 $details[BadgeDesign::LABELS['custom']] = $fields['custom']['text'];
             }
 
-            return ['event_id' => $event->id, 'event_registration_id' => $registration->id, 'user_id' => $userId,
-                'details' => json_encode($details), 'marked' => $marked, 'created_at' => $now, 'updated_at' => $now];
-        });
+            return [$registration->id => $details];
+        })->all();
+    }
+
+    /** @param  array<int, array<string, string>>  $details  From details(), by registration ID. */
+    public static function recordDetails(int $eventId, array $details, ?int $userId, bool $marked = false): void
+    {
+        $now = now();
+        $rows = collect($details)->map(fn ($printed, $registrationId) => ['event_id' => $eventId, 'event_registration_id' => $registrationId, 'user_id' => $userId,
+            'details' => json_encode($printed), 'marked' => $marked, 'created_at' => $now, 'updated_at' => $now]);
         foreach ($rows->chunk(200) as $chunk) {
             self::insert($chunk->values()->all());
         }

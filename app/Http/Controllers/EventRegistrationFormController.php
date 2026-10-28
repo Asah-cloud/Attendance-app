@@ -14,6 +14,7 @@ use App\Models\Participant;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\AttendanceGrid;
+use App\Services\BadgeListMatcher;
 use App\Services\BadgePdfService;
 use App\Services\ParticipantRegistrationService;
 use App\Services\PhoneNumberService;
@@ -33,6 +34,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Facades\Excel;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -269,6 +271,9 @@ class EventRegistrationFormController extends Controller
         // For printing one country's badges: as in reports, the country entered, else the phone's.
         $countries = $registrations->map(fn ($registration) => AttendanceGrid::country($registration->participant))->unique()->sort()->values();
         $genders = $registrations->map(fn ($registration) => $registration->participant->gender ?: 'Unspecified')->unique()->sort()->values();
+        $recentExports = BadgeExport::where('event_id', $event->id)->where('user_id', request()->user()->id)
+            ->where('expires_at', '>', now())->latest()->get()
+            ->filter(fn (BadgeExport $export) => (bool) ($export->options['staff'] ?? false) === $staffMode)->take(5);
         $printed = BadgePrint::where('event_id', $event->id)->whereIn('event_registration_id', $registrations->pluck('id'))
             ->selectRaw('event_registration_id, count(*) as times, max(created_at) as last_printed')
             ->groupBy('event_registration_id')->get()->keyBy('event_registration_id');
@@ -281,7 +286,7 @@ class EventRegistrationFormController extends Controller
             ->whereNotNull($staffMode ? 'staff_badge_settings' : 'badge_fields')->orderBy('title')->get(['id', 'title']);
         $fields = BadgeDesign::fields($event);
 
-        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'genders', 'printed', 'categoryColors', 'templates', 'fields', 'staffMode'));
+        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'genders', 'printed', 'recentExports', 'categoryColors', 'templates', 'fields', 'staffMode'));
     }
 
     public function badgesPdf(Request $request, Event $event): Response
@@ -371,6 +376,7 @@ class EventRegistrationFormController extends Controller
             'user_id' => $request->user()->id,
             'status' => 'queued',
             'total_batches' => $chunks->count(),
+            'badge_count' => $ids->count(),
             'options' => $options,
             'expires_at' => now()->addDay(),
         ]);
@@ -378,7 +384,7 @@ class EventRegistrationFormController extends Controller
         $jobs[] = new FinalizeBadgeExport($export->id);
         Bus::chain($jobs)->dispatch();
 
-        return response()->json(['status_url' => route('badge-exports.show', $export), 'message' => "Queued {$ids->count()} badges in {$chunks->count()} batches."], 202);
+        return response()->json(['status_url' => route('badge-exports.show', $export), 'message' => "Preparing {$ids->count()} badges in {$chunks->count()} batches. You can leave this page: the finished PDF stays under Recent large prints for a day."], 202);
     }
 
     public function badgeExportStatus(Request $request, BadgeExport $badgeExport): JsonResponse
@@ -401,7 +407,16 @@ class EventRegistrationFormController extends Controller
         abort_if($badgeExport->expires_at->isPast(), 410, 'This badge export has expired.');
         abort_unless($badgeExport->status === 'ready' && $badgeExport->file_path && Storage::disk('local')->exists($badgeExport->file_path), 404);
 
-        return response()->download(Storage::disk('local')->path($badgeExport->file_path), 'badges-'.$badgeExport->event->slug.'.zip');
+        // The first download records its badges as printed; downloading it again doesn't count them twice.
+        if (BadgeExport::whereKey($badgeExport->id)->whereNull('recorded_at')->update(['recorded_at' => now()]) === 1) {
+            foreach (Storage::disk('local')->files("badge-exports/{$badgeExport->id}") as $file) {
+                if (str_ends_with($file, '.json')) {
+                    BadgePrint::recordDetails($badgeExport->event_id, json_decode(Storage::disk('local')->get($file), true), $badgeExport->user_id);
+                }
+            }
+        }
+
+        return response()->download(Storage::disk('local')->path($badgeExport->file_path), (($badgeExport->options['staff'] ?? false) ? 'staff-badges-' : 'badges-').$badgeExport->event->slug.'.'.pathinfo($badgeExport->file_path, PATHINFO_EXTENSION));
     }
 
     /** Mark badges as printed without making a PDF (or, with DELETE, clear their printed record). */
@@ -424,6 +439,28 @@ class EventRegistrationFormController extends Controller
         BadgePrint::record($event, $registrations, $request->user()->id, marked: true);
 
         return response()->json(['message' => $registrations->count().' marked as printed.']);
+    }
+
+    /** Select for printing the people on an uploaded list (Excel or CSV) who are on this event. */
+    public function selectBadgesFromList(Request $request, Event $event, BadgeListMatcher $matcher): JsonResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+        $request->validate(['file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120']]);
+        $file = $request->file('file');
+        if (in_array(strtolower($file->getClientOriginalExtension()), ['csv', 'txt'], true)) {
+            // Read here: the spreadsheet reader guesses the separator and, for a plain column of
+            // names, picks the space between first name and surname.
+            $lines = preg_split('/\r\n|\r|\n/', (string) preg_replace('/^\xEF\xBB\xBF/', '', $file->get()));
+            $delimiter = collect([',', ';', "\t"])->sortByDesc(fn ($candidate) => substr_count($lines[0] ?? '', $candidate))->first();
+            $rows = array_map(fn ($line) => str_getcsv($line, $delimiter, '"', ''), $lines);
+        } else {
+            $rows = Excel::toArray(new class implements ToArray
+            {
+                public function array(array $array): void {}
+            }, $file)[0] ?? [];
+        }
+
+        return response()->json($matcher->match($event, $rows, $request->routeIs('events.staff-badges.select-list')));
     }
 
     public function badgePrintList(Request $request, Event $event): BinaryFileResponse

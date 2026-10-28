@@ -36,7 +36,8 @@ class GenerateBadgeExportBatch implements ShouldQueue
         }
         $registrations = $badges->registrations($export->event, $options, $staffMode);
         Storage::disk('local')->put("badge-exports/{$export->id}/batch-{$this->batchNumber}.pdf", $badges->render($export->event, $registrations, $options, $staffMode));
-        BadgePrint::record($export->event, $registrations, $export->user_id);
+        // Recorded as printed when the finished PDF is downloaded, with the details as made now.
+        Storage::disk('local')->put("badge-exports/{$export->id}/batch-{$this->batchNumber}.json", json_encode(BadgePrint::details($export->event, $registrations)));
         $export->increment('completed_batches');
     }
 
