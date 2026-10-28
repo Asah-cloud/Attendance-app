@@ -161,8 +161,9 @@
                     </div>
 
                     <div class="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-left">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Column order (first row is skipped as a header)</p>
-                        <p class="text-xs leading-6 text-gray-600">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Columns</p>
+                        <p class="text-xs leading-6 text-gray-600 mb-2">Put headings in the first row, in any order: <strong>Name</strong> <span class="text-gray-400">(required)</span>, Gender, Room group or Area, Category, Phone, Email, Country.</p>
+                        <p class="text-xs leading-6 text-gray-600">Without headings, columns are read in this order:
                             <strong>A</strong> ID &nbsp;·&nbsp; <strong>B</strong> Name <span class="text-gray-400">(required)</span> &nbsp;·&nbsp; <strong>C</strong> Gender &nbsp;·&nbsp; <strong>D</strong> Room group <span class="text-gray-400">(people sharing this value are roomed together where possible)</span> &nbsp;·&nbsp; <strong>E</strong> Category &nbsp;·&nbsp; <strong>F</strong> Phone &nbsp;·&nbsp; <strong>G</strong> Email
                         </p>
                     </div>
