@@ -394,6 +394,20 @@ it('reuses a company design with an independent copy of the artwork', function (
     Storage::disk('public')->assertExists($template->badge_image_path);
 });
 
+it('points the PDF at the artwork file once instead of embedding a copy on every badge', function () {
+    Storage::fake('public');
+    [$event, $manager] = badgeStudioFixture();
+    $artwork = UploadedFile::fake()->image('art.jpg', 600, 800)->store('badge-images', 'public');
+    $event->update(['badge_size' => 'A6', 'badge_layout' => 'background', 'badge_fields' => BadgeDesign::defaults(), 'badge_image_path' => $artwork]);
+    $registrations = collect(['Ama Mensah', 'Kofi Boateng', 'Esi Owusu'])->map(fn ($name) => badgeRegistration($event, $name)->load('participant'));
+
+    $html = view('events.badges-pdf', ['event' => $event, 'registrations' => $registrations, 'categoryColors' => collect(), 'fields' => BadgeDesign::fields($event), 'paper' => 'badge', 'cutGuides' => false])->render();
+
+    expect(substr_count($html, Storage::disk('public')->path($artwork)))->toBe(3)
+        ->and($html)->not->toContain(base64_encode(Storage::disk('public')->get($artwork)));
+    $this->actingAs($manager)->post(route('events.badges.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
 it('does not allow copying another company template', function () {
     [$event,$manager] = badgeStudioFixture();
     [$other] = badgeStudioFixture();

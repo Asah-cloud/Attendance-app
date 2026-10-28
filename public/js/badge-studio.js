@@ -673,6 +673,10 @@
                 $("print-error").textContent = "Badge ZIP is ready and downloading.";
                 return;
             }
+            if (response.status === 419)
+                throw new Error("Your session has expired. Reload the page and try again.");
+            if (response.status === 422)
+                throw new Error((await response.json().catch(() => ({}))).message || "No one matches your print selection.");
             if (
                 !response.ok ||
                 !response.headers
@@ -680,7 +684,7 @@
                     ?.includes("application/pdf")
             )
                 throw new Error(
-                    "Could not generate the PDF. Check your selection and reload if your session has expired.",
+                    "The server could not make this PDF. Try printing fewer badges at a time, and tell your administrator if it keeps happening.",
                 );
             const blob = await response.blob(),
                 url = URL.createObjectURL(blob),
