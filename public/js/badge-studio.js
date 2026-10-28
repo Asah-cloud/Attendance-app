@@ -79,13 +79,18 @@
         Object.assign(rest.style, { display: "block", lineHeight: "1.2", fontSize: fields.name.small_size + "pt" });
         el.replaceChildren(big, rest);
     }
-    /** Whether a row in the print list matches the chosen category and country. */
-    function inPrintGroup(row) {
-        return (
-            (!$("print-category").value || row.dataset.category === $("print-category").value) &&
-            (!$("print-country").value || row.dataset.country === $("print-country").value)
+    /** Whether a person (their data-* attributes) matches the gender, category and country chosen in the selects named prefix-gender etc. */
+    function inGroup(el, prefix) {
+        return ["gender", "category", "country"].every(
+            (key) => !$(`${prefix}-${key}`).value || el.dataset[key] === $(`${prefix}-${key}`).value,
         );
     }
+    /** Every word typed must appear in the name, in any order; stray spaces are ignored. */
+    function matchesWords(name, query) {
+        const lower = name.toLocaleLowerCase();
+        return query.toLocaleLowerCase().split(/\s+/).filter(Boolean).every((word) => lower.includes(word));
+    }
+    const inPrintGroup = (row) => inGroup(row, "print");
     function ids() {
         return [...document.querySelectorAll("#attendee-list input:checked")]
             .filter((x) => inPrintGroup(x.parentElement))
@@ -476,6 +481,29 @@
         }
         render();
     });
+    // Narrows the preview list to matching people. Options are removed rather than hidden,
+    // which Safari ignores; the current person stays chosen while they still match.
+    const previewOptions = [...$("preview-attendee").options];
+    function filterPreview() {
+        const select = $("preview-attendee"),
+            current = select.value,
+            matches = previewOptions.filter(
+                (o) => matchesWords(o.textContent, $("preview-search").value) && inGroup(o, "preview"),
+            ),
+            none = new Option("No one matches", "", false, false);
+        none.disabled = true;
+        select.replaceChildren(...(matches.length ? matches : [none]));
+        $("preview-count").textContent = `${matches.length} of ${previewOptions.length} shown`;
+        if (!matches.length) return;
+        select.value = matches.some((o) => o.value === current) ? current : matches[0].value;
+        if (select.value !== current) select.dispatchEvent(new Event("change"));
+    }
+    if ($("preview-search")) {
+        $("preview-search").addEventListener("input", filterPreview);
+        for (const key of ["gender", "category", "country"])
+            $(`preview-${key}`).addEventListener("change", filterPreview);
+        filterPreview();
+    }
     $("artwork").addEventListener("change", () => {
         const file = $("artwork").files[0];
         if (!file) {
@@ -571,18 +599,12 @@
               : "All attendee fields fit without overlapping. Download a sample to check the print result.";
     });
     function filter() {
-        // Every word typed must appear in the name, in any order; stray spaces are ignored.
-        const words = $("attendee-search")
-                .value.toLocaleLowerCase()
-                .split(/\s+/)
-                .filter(Boolean);
         document
             .querySelectorAll("#attendee-list label")
             .forEach((row) => {
-                const name = row.dataset.name.toLocaleLowerCase();
                 row.classList.toggle(
                     "hidden",
-                    !words.every((word) => name.includes(word)) || !inPrintGroup(row),
+                    !matchesWords(row.dataset.name, $("attendee-search").value) || !inPrintGroup(row),
                 );
             });
         const visible = [
@@ -598,6 +620,7 @@
     }
     $("attendee-search").addEventListener("input", filter);
     $("print-category").addEventListener("change", filter);
+    $("print-gender").addEventListener("change", filter);
     $("print-country").addEventListener("change", filter);
     $("attendee-list").addEventListener("change", filter);
     $("print-paper").addEventListener("change", updatePrint);

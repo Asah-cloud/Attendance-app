@@ -192,13 +192,35 @@ it('lets a manager pick a country and print only those badges', function () {
     $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
         ->assertSee('<label for="print-country">Country</label>', false)
         ->assertSeeInOrder(['All countries', 'Country not given', 'Ghana', 'Jamaica'])
-        ->assertSee('data-name="Marcia Brown" data-category="Delegate" data-country="Jamaica"', false)
-        ->assertSee('data-name="No Details" data-category="Delegate" data-country="Country not given"', false);
+        ->assertSee('data-name="Marcia Brown" data-category="Delegate" data-gender="Unspecified" data-country="Jamaica"', false)
+        ->assertSee('data-name="No Details" data-category="Delegate" data-gender="Unspecified" data-country="Country not given"', false);
 
     // The studio sends the ticked people of the chosen country; only their badges print.
     $response = $this->post(route('events.badges.pdf', $event), ['attendees' => [$jamaica->id], 'paper' => 'badge']);
     $response->assertOk()->assertHeader('content-type', 'application/pdf');
     expect(app(BadgePdfService::class)->registrations($event, ['attendees' => [$jamaica->id]], false)->pluck('participant.name')->all())->toBe(['Marcia Brown']);
+});
+
+it('lets a manager search and filter the people to preview and print by gender, category and country', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Serwaa', 'Speaker');
+    $ama->participant->update(['gender' => 'Female', 'country' => 'Ghana']);
+    $kofi = badgeRegistration($event, 'Kofi Mensah');
+    $kofi->participant->update(['gender' => 'Male']);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('id="preview-search"', false)
+        ->assertSeeInOrder(['id="preview-gender"', 'All genders', 'Female', 'Male', 'id="preview-category"', 'Delegate', 'Speaker', 'id="preview-country"', 'Country not given', 'Ghana'], false)
+        ->assertSee('data-gender="Female" data-category="Speaker" data-country="Ghana">Ama Serwaa</option>', false)
+        ->assertSee('<label for="print-gender">Gender</label>', false)
+        ->assertSee('data-name="Kofi Mensah" data-category="Delegate" data-gender="Male"', false);
+});
+
+it('leaves out the preview search when there is no one to choose between', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event, 'Ama Serwaa');
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()->assertDontSee('id="preview-search"', false);
 });
 
 it('lets a manager select Poppins and prints a working PDF with it', function () {
