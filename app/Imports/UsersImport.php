@@ -8,6 +8,7 @@ use App\Models\Participant;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Services\ParticipantRegistrationService;
+use App\Services\PhoneNumberService;
 use App\Services\RegistrationLifecycleService;
 use Maatwebsite\Excel\Concerns\OnEachRow;
 use Maatwebsite\Excel\Row;
@@ -33,6 +34,17 @@ class UsersImport implements OnEachRow
 
     /** @var array<string, int> */
     private array $counts = ['added' => 0, 'updated' => 0, 'skipped' => 0];
+
+    /**
+     * Column number of each field, read from the heading row when the file has one;
+     * null means the fixed order (A ID, B Name, C Gender, D Room group, E Category, F Phone, G Email).
+     *
+     * @var array<string, int>|null
+     */
+    private ?array $columns = null;
+
+    /** Fields in the fixed column order, then those only read from a heading (Country). */
+    private const FIELDS = ['id', 'name', 'gender', 'area', 'category', 'phone', 'email', 'country'];
 
     /**
      * What happened to each row: new_person (created), newly_registered (already in the system,
@@ -118,6 +130,19 @@ class UsersImport implements OnEachRow
         }
         $data = array_map(fn ($value) => $isFormula($value) ? null : $value, $data);
 
+        // A first row of headings ("Name", "Phone", "Country"...) says where each field is,
+        // whatever order the columns are in. Without one, the fixed order applies.
+        if ($rowIndex === 1 && ($columns = self::headingColumns($data))) {
+            // Name in column B is the fixed layout: keep reading it that way (column A stays the
+            // row's ID, so re-importing an older list still finds the same people), plus Country.
+            $this->columns = $columns['name'] === 1
+                ? array_slice(array_flip(self::FIELDS), 0, 7) + array_intersect_key($columns, ['country' => true])
+                : $columns;
+
+            return;
+        }
+        $data = $this->columns === null ? $data : array_map(fn ($field) => isset($this->columns[$field]) ? ($data[$this->columns[$field]] ?? null) : null, self::FIELDS);
+
         // Skip empty rows (checking index 1 for Name), and the header row specifically
         // (only on row 1, so a real attendee named e.g. "Staff" is never mistaken for one).
         $headerLabels = ['name', 'staff', 'full name', 'participant', 'participant name'];
@@ -125,14 +150,19 @@ class UsersImport implements OnEachRow
             return;
         }
 
+        $value = fn (int $index) => trim((string) ($data[$index] ?? '')) !== '' ? trim((string) $data[$index]) : null;
         $id = trim((string) $data[0]);
         $name = trim((string) $data[1]);
-        $gender = ! empty(trim($data[2] ?? '')) ? trim($data[2]) : null;
-        $roomGroup = ! empty(trim($data[3] ?? '')) ? trim($data[3]) : null;
-        $category = ! empty(trim($data[4] ?? '')) ? trim($data[4]) : 'Member';
+        $gender = $value(2);
+        $roomGroup = $value(3);
+        $category = $value(4) ?? 'Member';
 
-        $rawPhone = ! empty(trim($data[5] ?? '')) ? trim($data[5]) : null;
-        $rawEmail = ! empty(trim($data[6] ?? '')) ? trim($data[6]) : null;
+        $rawPhone = $value(5);
+        // Anything that isn't an email address (a country, "N/A"...) is ignored: otherwise every
+        // row with the same text would be taken for one person sharing an email.
+        $rawEmail = filter_var($value(6), FILTER_VALIDATE_EMAIL) ? $value(6) : null;
+        $country = $value(7);
+        $country = $country === null ? null : (collect(PhoneNumberService::countryNames())->first(fn ($known) => strcasecmp($known, $country) === 0) ?? $country);
         // A blank column A (e.g. a merged "Department/Role" cell that only the extractor's
         // top row kept) must not collide multiple attendees onto the same member_id — fall
         // back to the row number, which still keeps re-imports of the same file idempotent.
@@ -152,6 +182,7 @@ class UsersImport implements OnEachRow
             'category' => $category,
             'gender' => $gender,
             'room_group' => $roomGroup,
+            'country' => $country,
             // Synthetic placeholder addresses are storage fallbacks, not proof of identity.
             // Matching them can connect a reused row number from a new list to the wrong person.
             'lookup_emails' => array_filter([$rawEmail]),
@@ -205,6 +236,38 @@ class UsersImport implements OnEachRow
                 app(RegistrationLifecycleService::class)->allocateAccommodation($registration);
             }
         }
+    }
+
+    /**
+     * Where each field is, if this row is a row of headings: it must name the Name column and at
+     * least one other, so a first person's details are never taken for headings.
+     *
+     * @param  array<int, mixed>  $row
+     * @return array<string, int>|null
+     */
+    public static function headingColumns(array $row): ?array
+    {
+        $columns = [];
+        foreach ($row as $index => $cell) {
+            $heading = preg_replace('/[^a-z]/', '', strtolower((string) $cell));
+            $field = match (true) {
+                $heading === '' => null,
+                in_array($heading, ['id', 'no', 'sn', 'sno', 'serial', 'serialno', 'number', 'memberid', 'staffid'], true) => 'id',
+                in_array($heading, ['name', 'names', 'fullname', 'participant', 'participantname', 'staff', 'staffname'], true) => 'name',
+                in_array($heading, ['gender', 'sex'], true) => 'gender',
+                str_contains($heading, 'roomgroup') || str_contains($heading, 'area') || $heading === 'group' => 'area',
+                in_array($heading, ['category', 'role', 'type'], true) => 'category',
+                str_contains($heading, 'phone') || str_contains($heading, 'mobile') || str_contains($heading, 'contact') || str_contains($heading, 'tel') => 'phone',
+                str_contains($heading, 'email') => 'email',
+                in_array($heading, ['country', 'nationality'], true) => 'country',
+                default => null,
+            };
+            if ($field !== null && ! isset($columns[$field])) {
+                $columns[$field] = $index;
+            }
+        }
+
+        return isset($columns['name']) && count($columns) >= 2 ? $columns : null;
     }
 
     /** A row ID only re-finds someone of the same name, so a rename match is by email or phone. */
