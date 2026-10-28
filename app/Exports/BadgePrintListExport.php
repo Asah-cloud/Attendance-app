@@ -34,7 +34,7 @@ class BadgePrintListExport implements FromArray, WithCustomStartCell, WithCustom
         $this->prints = BadgePrint::where('event_id', $event->id)
             ->whereHas('registration.participant', fn ($query) => $query->where('is_support_staff', $staffMode))
             ->with(['user:id,name', 'registration.participant', 'registration.roomAssignment.room'])
-            ->latest('id')->get()
+            ->latest()->latest('id')->get()
             ->groupBy('event_registration_id')
             ->sortBy(fn ($prints) => mb_strtolower($prints->first()->registration->participant->name));
         // A field shown on badges but blank on all of them (no rooms yet, say) gets no column.

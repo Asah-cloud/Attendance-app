@@ -608,3 +608,13 @@ it('records the custom badge text used for each print and lists it, without flag
         ->and($rows[4][$custom])->toBe('HEALTH')
         ->and(end($rows[4]))->toBeNull();
 });
+
+it('treats the most recently printed badge as the latest, whatever order prints were recorded in', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Mensah');
+    BadgePrint::create(['event_id' => $event->id, 'event_registration_id' => $ama->id, 'details' => ['Attendee name' => 'Ama Mensah'], 'marked' => true])->forceFill(['created_at' => now()->subHour()])->save();
+    BadgePrint::create(['event_id' => $event->id, 'event_registration_id' => $ama->id, 'details' => ['Attendee name' => 'AMA MENSA'], 'marked' => true])->forceFill(['created_at' => now()->subHours(5)])->save();
+
+    $rows = IOFactory::load($this->actingAs($manager)->get(route('events.badges.printed.list', $event))->getFile()->getPathname())->getActiveSheet()->toArray(null, false, false);
+    expect($rows[4][2])->toBe('Ama Mensah')->and($rows[4][4])->toBe(2)->and(end($rows[4]))->toBe('Marked as printed');
+});
