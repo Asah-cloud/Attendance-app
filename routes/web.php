@@ -263,6 +263,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
             Route::get('/events/{event}/badges', [EventRegistrationFormController::class, 'badges'])->name('events.badges');
             Route::match(['get', 'post'], '/events/{event}/badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.badges.pdf');
             Route::post('/events/{event}/badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.badges.exports.store');
+            Route::post('/events/{event}/badges/select-list', [EventRegistrationFormController::class, 'selectBadgesFromList'])->name('events.badges.select-list');
             Route::get('/events/{event}/badges/printed', [EventRegistrationFormController::class, 'badgePrintList'])->name('events.badges.printed.list');
             Route::match(['post', 'delete'], '/events/{event}/badges/printed', [EventRegistrationFormController::class, 'markBadgesPrinted'])->name('events.badges.printed.mark');
             Route::get('/events/{event}/badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.badges.qr');
@@ -271,6 +272,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
             Route::get('/events/{event}/staff-badges', [EventRegistrationFormController::class, 'badges'])->name('events.staff-badges');
             Route::match(['get', 'post'], '/events/{event}/staff-badges/pdf', [EventRegistrationFormController::class, 'badgesPdf'])->name('events.staff-badges.pdf');
             Route::post('/events/{event}/staff-badges/exports', [EventRegistrationFormController::class, 'startBadgeExport'])->name('events.staff-badges.exports.store');
+            Route::post('/events/{event}/staff-badges/select-list', [EventRegistrationFormController::class, 'selectBadgesFromList'])->name('events.staff-badges.select-list');
             Route::get('/events/{event}/staff-badges/printed', [EventRegistrationFormController::class, 'badgePrintList'])->name('events.staff-badges.printed.list');
             Route::match(['post', 'delete'], '/events/{event}/staff-badges/printed', [EventRegistrationFormController::class, 'markBadgesPrinted'])->name('events.staff-badges.printed.mark');
             Route::get('/events/{event}/staff-badges/qr/{registration}', [EventRegistrationFormController::class, 'badgeQr'])->name('events.staff-badges.qr');

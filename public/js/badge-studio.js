@@ -674,7 +674,7 @@
                 } while (result.status !== "ready");
                 showPrinted(chosen, true);
                 window.location.assign(result.download_url);
-                $("print-error").textContent = "Badge ZIP is ready and downloading.";
+                $("print-error").textContent = "Badge PDF is ready and downloading.";
                 return;
             }
             if (response.status === 419)
@@ -741,6 +741,47 @@
             $("print-error").textContent = error.message;
         }
     }
+    /** Tick exactly the people on an uploaded list, clearing the filters so all of them show. */
+    $("select-list").addEventListener("change", async () => {
+        const file = $("select-list").files[0];
+        if (!file) return;
+        const box = $("list-result");
+        box.textContent = "Reading the list…";
+        const body = new FormData();
+        body.append("file", file);
+        try {
+            const response = await fetch(c.selectListUrl, {
+                method: "POST",
+                headers: { "X-CSRF-TOKEN": form.querySelector("[name=_token]").value, Accept: "application/json" },
+                body,
+            });
+            if (response.status === 419)
+                throw new Error("Your session has expired. Reload the page and try again.");
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok)
+                throw new Error(Object.values(result.errors || {})[0]?.[0] || result.message || "Could not read that list.");
+            for (const id of ["print-category", "print-gender", "print-country", "print-printed"]) $(id).value = "";
+            $("attendee-search").value = "";
+            const chosen = new Set(result.ids.map(String));
+            document.querySelectorAll("#attendee-list input").forEach((x) => (x.checked = chosen.has(x.value)));
+            filter();
+            box.textContent = `Selected ${result.ids.length} of ${result.rows} on the list.`;
+            if (result.problems.length) {
+                box.append(` ${result.problems.length} could not be selected:`);
+                const list = document.createElement("ul");
+                for (const problem of result.problems) {
+                    const item = document.createElement("li");
+                    item.textContent = `Row ${problem.row}: ${problem.name} - ${problem.reason}`;
+                    list.append(item);
+                }
+                box.append(list);
+            }
+        } catch (error) {
+            box.textContent = error.message;
+        } finally {
+            $("select-list").value = "";
+        }
+    });
     $("mark-printed").addEventListener("click", () => markPrinted(true));
     $("unmark-printed").addEventListener("click", () => markPrinted(false));
     $("sample-pdf").addEventListener("click", () => download(true));
