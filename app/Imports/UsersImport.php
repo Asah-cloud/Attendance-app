@@ -21,6 +21,9 @@ class UsersImport implements OnEachRow
     /** @var array<int, int> */
     private array $newRegistrationIds = [];
 
+    /** @var array<int, int> People created by this import (not found already in the company). */
+    private array $newParticipantIds = [];
+
     /**
      * Rows that would rename an existing participant, collected for the manager to review.
      *
@@ -64,6 +67,12 @@ class UsersImport implements OnEachRow
     public function counts(): array
     {
         return $this->counts;
+    }
+
+    /** @return array{registrations: array<int, int>, participants: array<int, int>} What undoing this import removes. */
+    public function createdIds(): array
+    {
+        return ['registrations' => array_values(array_unique($this->newRegistrationIds)), 'participants' => array_values(array_unique($this->newParticipantIds))];
     }
 
     /** @return list<array{row: int, name: string, status: string, registration_id: ?int}> */
@@ -178,6 +187,9 @@ class UsersImport implements OnEachRow
 
         [$participant, $registration] = $service->register($this->event, $details, 'import');
         $this->counts[$participant->wasRecentlyCreated ? 'added' : 'updated']++;
+        if ($participant->wasRecentlyCreated) {
+            $this->newParticipantIds[] = $participant->id;
+        }
         $this->rowResults[] = ['row' => $rowIndex, 'name' => $participant->name, 'registration_id' => $registration->id, 'status' => match (true) {
             $participant->wasRecentlyCreated => 'new_person',
             $registration->wasRecentlyCreated => 'newly_registered',

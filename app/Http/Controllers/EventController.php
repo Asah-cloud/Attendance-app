@@ -6,7 +6,10 @@ use App\Imports\UsersImport;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
+use App\Models\Participant;
+use App\Models\ParticipantImport;
 use App\Notifications\Channels\ArkeselChannel;
+use App\Services\ApplicationCache;
 use App\Services\EventBillingService;
 use App\Services\ParticipantListImporter;
 use App\Services\PdfParticipantListParser;
@@ -14,6 +17,7 @@ use App\Services\PdfParticipantListParser;
 use App\Services\RegistrationLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -90,7 +94,7 @@ class EventController extends Controller
         }
 
         if ($trial->reviewRows() === []) {
-            return $this->completeImport($event, $pdfParser, $path, $options, []);
+            return $this->completeImport($event, $pdfParser, $path, $options, [], $file->getClientOriginalName());
         }
 
         $request->session()->put($this->reviewKey($event), [
@@ -118,7 +122,7 @@ class EventController extends Controller
             'decisions.*' => ['in:update,new,skip'],
         ]);
 
-        return $this->completeImport($event, $pdfParser, $review['path'], $review['options'], $validated['decisions'] ?? []);
+        return $this->completeImport($event, $pdfParser, $review['path'], $review['options'], $validated['decisions'] ?? [], $review['file_name']);
     }
 
     /** Drop a reviewed import without saving anything. */
@@ -133,8 +137,52 @@ class EventController extends Controller
         return back()->with('success', 'Import cancelled. Nothing was changed.');
     }
 
+    /**
+     * Take back an import: remove the people it added to this event, and the people it created
+     * who are now on no event at all. Anyone already checked in stays, as with "Clear all
+     * attendees". Changes it made to people already on the list are not reversed.
+     */
+    public function undoImport(Request $request, Event $event, ParticipantImport $import)
+    {
+        $this->authorize('manageWhenOpen', $event);
+        abort_unless($import->event_id === $event->id, 404);
+
+        if ($import->undone_at) {
+            return back()->with('error', "That import ({$import->file_name}) has already been undone.");
+        }
+
+        [$removed, $kept] = DB::transaction(function () use ($request, $event, $import): array {
+            $added = fn () => $event->registrations()->whereIn('id', $import->registration_ids);
+            $total = $added()->count();
+            $removed = $added()->whereNotExists(fn ($query) => $query
+                ->selectRaw('1')
+                ->from('attendances')
+                ->whereColumn('attendances.participant_id', 'event_registrations.participant_id')
+                ->where('attendances.event_id', $event->id))->delete();
+
+            Participant::where('company_id', $event->company_id)->whereIn('id', $import->participant_ids)
+                ->doesntHave('registrations')->doesntHave('attendances')->delete();
+
+            $import->update(['undone_at' => now(), 'undone_by' => $request->user()->id]);
+
+            return [$removed, $total - $removed];
+        });
+        app(ApplicationCache::class)->invalidateEvent($event->id, $event->company_id);
+        app(ApplicationCache::class)->invalidateCompany($event->company_id);
+
+        $message = "Import of {$import->file_name} undone: {$removed} ".Str::plural('person', $removed).' removed.';
+        if ($kept > 0) {
+            $message .= " {$kept} kept because they have already checked in.";
+        }
+        if ($import->changedExistingCount() > 0) {
+            $message .= ' Changes it made to people already on the list were not reversed.';
+        }
+
+        return back()->with('success', $message);
+    }
+
     /** @param  array{send_notifications: bool, needs_room: bool}  $options */
-    private function completeImport(Event $event, PdfParticipantListParser $pdfParser, string $path, array $options, array $decisions)
+    private function completeImport(Event $event, PdfParticipantListParser $pdfParser, string $path, array $options, array $decisions, string $fileName)
     {
         try {
             $import = $this->runImport($event, $pdfParser, $path, $options['needs_room'], $decisions, false);
@@ -149,6 +197,14 @@ class EventController extends Controller
         }
 
         $counts = $import->counts();
+        $created = $import->createdIds();
+        if ($created['registrations'] !== []) {
+            $event->participantImports()->create([
+                'user_id' => auth()->id(), 'file_name' => Str::limit($fileName, 250, ''),
+                'added_count' => $counts['added'], 'updated_count' => $counts['updated'],
+                'registration_ids' => $created['registrations'], 'participant_ids' => $created['participants'],
+            ]);
+        }
         $message = "Import complete: {$counts['added']} added, {$counts['updated']} updated"
             .($counts['skipped'] ? ", {$counts['skipped']} skipped" : '').'.';
         $message .= $options['send_notifications']
