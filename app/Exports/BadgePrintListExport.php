@@ -39,7 +39,7 @@ class BadgePrintListExport implements FromArray, WithCustomStartCell, WithCustom
             ->sortBy(fn ($prints) => mb_strtolower($prints->first()->registration->participant->name));
         // A field shown on badges but blank on all of them (no rooms yet, say) gets no column.
         $used = $this->prints->flatMap(fn ($prints) => array_keys(array_filter($prints->first()->details, fn ($value) => $value !== '')))->unique();
-        $this->labels = collect(BadgePrint::PERSONAL_FIELDS)->map(fn ($key) => BadgeDesign::LABELS[$key])->filter(fn ($label) => $used->contains($label))->values()->all();
+        $this->labels = collect([...BadgePrint::PERSONAL_FIELDS, 'custom'])->map(fn ($key) => BadgeDesign::LABELS[$key])->filter(fn ($label) => $used->contains($label))->values()->all();
     }
 
     public function title(): string

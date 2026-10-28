@@ -589,3 +589,22 @@ it('downloads the printed list with the details on each latest badge and flags o
     $staffRows = IOFactory::load($this->get(route('events.staff-badges.printed.list', $event))->getFile()->getPathname())->getActiveSheet()->toArray(null, false, false);
     expect($staffRows[4][1])->toBe('Esi Owusu')->and($staffRows[4][8])->toBe('Marked as printed');
 });
+
+it('records the custom badge text used for each print and lists it, without flagging a later change of it', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Mensah');
+    $fields = BadgeDesign::defaults();
+    $fields['custom'] = [...$fields['custom'], 'visible' => true, 'text' => 'HEALTH'];
+    $event->update(['badge_fields' => $fields]);
+
+    $this->actingAs($manager)->post(route('events.badges.pdf', $event), ['attendees' => [$ama->id]])->assertOk();
+    expect(BadgePrint::sole()->details['Custom text'])->toBe('HEALTH');
+
+    $fields['custom']['text'] = 'MUSIC';
+    $event->update(['badge_fields' => $fields]);
+    $rows = IOFactory::load($this->get(route('events.badges.printed.list', $event))->getFile()->getPathname())->getActiveSheet()->toArray(null, false, false);
+    $custom = array_search('On badge: Custom text', $rows[3], true);
+    expect($custom)->not->toBeFalse()
+        ->and($rows[4][$custom])->toBe('HEALTH')
+        ->and(end($rows[4]))->toBeNull();
+});
