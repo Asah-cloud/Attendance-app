@@ -41,9 +41,13 @@ class BadgePrint extends Model
         $fields = BadgeDesign::fields($event);
         $shown = array_filter(self::PERSONAL_FIELDS, fn ($key) => $fields[$key]['visible'] ?? false);
         $now = now();
-        $rows = $registrations->map(function (EventRegistration $registration) use ($event, $shown, $userId, $marked, $now) {
+        $rows = $registrations->map(function (EventRegistration $registration) use ($event, $fields, $shown, $userId, $marked, $now) {
             $values = BadgeDesign::values($event, $registration);
             $details = collect($shown)->mapWithKeys(fn ($key) => [BadgeDesign::LABELS[$key] => (string) $values[$key]])->all();
+            // The same for everyone in one print, but often changed between prints (PARTICIPANT, HEALTH, MUSIC...).
+            if (($fields['custom']['visible'] ?? false) && filled($fields['custom']['text'] ?? null)) {
+                $details[BadgeDesign::LABELS['custom']] = $fields['custom']['text'];
+            }
 
             return ['event_id' => $event->id, 'event_registration_id' => $registration->id, 'user_id' => $userId,
                 'details' => json_encode($details), 'marked' => $marked, 'created_at' => $now, 'updated_at' => $now];
