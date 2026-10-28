@@ -39,6 +39,8 @@
                 @if($logo)<img src="{{ $logo }}" alt="{{ $key === 'company_logo' ? 'Company' : 'Event' }} logo" style="max-width:100%;max-height:100%">@endif
             @elseif($key === 'custom')
                 <div class="field-content">{{ $field['text'] ?? '' }}</div>
+            @elseif($key === 'name' && ($nameParts = \App\Support\BadgeDesign::nameParts($values['name'], $field)))
+                <div class="field-content"><span class="name-big" style="display:block;line-height:1.1">{{ $nameParts[0] }}</span><span class="name-rest" style="display:block;line-height:1.2;font-size:{{ $field['small_size'] ?? 12 }}pt">{{ $nameParts[1] }}</span></div>
             @else
                 <div class="field-content">{{ $values[$key] ?? '' }}</div>
             @endif

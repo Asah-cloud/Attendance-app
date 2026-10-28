@@ -265,6 +265,7 @@ class EventRegistrationFormController extends Controller
         $categories = $registrations->pluck('participant.category')->filter()->unique()->sort()->values();
         // For printing one country's badges: as in reports, the country entered, else the phone's.
         $countries = $registrations->map(fn ($registration) => AttendanceGrid::country($registration->participant))->unique()->sort()->values();
+        $genders = $registrations->map(fn ($registration) => $registration->participant->gender ?: 'Unspecified')->unique()->sort()->values();
         $palette = ['#7C3AED', '#0F766E', '#B45309', '#BE123C', '#1D4ED8', '#4338CA'];
         $categoryColors = $categories->mapWithKeys(fn ($category, $index) => [
             $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
@@ -274,7 +275,7 @@ class EventRegistrationFormController extends Controller
             ->whereNotNull($staffMode ? 'staff_badge_settings' : 'badge_fields')->orderBy('title')->get(['id', 'title']);
         $fields = BadgeDesign::fields($event);
 
-        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'categoryColors', 'templates', 'fields', 'staffMode'));
+        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'genders', 'categoryColors', 'templates', 'fields', 'staffMode'));
     }
 
     public function badgesPdf(Request $request, Event $event): Response
@@ -465,7 +466,7 @@ class EventRegistrationFormController extends Controller
             'badge_font' => ['sometimes', 'in:DejaVu Sans,DejaVu Serif,DejaVu Sans Mono,Poppins'],
             'badge_name_format' => ['sometimes', 'in:full,initials'],
             'badge_fields' => ['sometimes', 'array:'.implode(',', array_keys(BadgeDesign::LABELS))],
-            'badge_fields.*' => ['array:x,y,w,h,size,align,visible,color,bold,text,case,border,border_color,border_width,fill'],
+            'badge_fields.*' => ['array:x,y,w,h,size,align,visible,color,bold,text,case,border,border_color,border_width,fill,emphasis,small_size'],
             'badge_fields.*.x' => ['required_with:badge_fields', 'numeric', 'between:0,95'],
             'badge_fields.*.y' => ['required_with:badge_fields', 'numeric', 'between:0,95'],
             'badge_fields.*.w' => ['required_with:badge_fields', 'numeric', 'between:5,100'],
@@ -481,6 +482,8 @@ class EventRegistrationFormController extends Controller
             'badge_fields.*.border_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'badge_fields.*.border_width' => ['nullable', 'numeric', 'between:0.2,2'],
             'badge_fields.*.fill' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'badge_fields.*.emphasis' => ['nullable', Rule::in(array_keys(BadgeDesign::EMPHASIS))],
+            'badge_fields.*.small_size' => ['nullable', 'numeric', 'between:6,48'],
             'badge_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'remove_badge_image' => ['nullable', 'boolean'],
             'badge_primary_color' => ['sometimes', 'regex:/^#[0-9A-Fa-f]{6}$/'],

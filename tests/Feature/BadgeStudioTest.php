@@ -192,13 +192,35 @@ it('lets a manager pick a country and print only those badges', function () {
     $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
         ->assertSee('<label for="print-country">Country</label>', false)
         ->assertSeeInOrder(['All countries', 'Country not given', 'Ghana', 'Jamaica'])
-        ->assertSee('data-name="Marcia Brown" data-category="Delegate" data-country="Jamaica"', false)
-        ->assertSee('data-name="No Details" data-category="Delegate" data-country="Country not given"', false);
+        ->assertSee('data-name="Marcia Brown" data-category="Delegate" data-gender="Unspecified" data-country="Jamaica"', false)
+        ->assertSee('data-name="No Details" data-category="Delegate" data-gender="Unspecified" data-country="Country not given"', false);
 
     // The studio sends the ticked people of the chosen country; only their badges print.
     $response = $this->post(route('events.badges.pdf', $event), ['attendees' => [$jamaica->id], 'paper' => 'badge']);
     $response->assertOk()->assertHeader('content-type', 'application/pdf');
     expect(app(BadgePdfService::class)->registrations($event, ['attendees' => [$jamaica->id]], false)->pluck('participant.name')->all())->toBe(['Marcia Brown']);
+});
+
+it('lets a manager search and filter the people to preview and print by gender, category and country', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Serwaa', 'Speaker');
+    $ama->participant->update(['gender' => 'Female', 'country' => 'Ghana']);
+    $kofi = badgeRegistration($event, 'Kofi Mensah');
+    $kofi->participant->update(['gender' => 'Male']);
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('id="preview-search"', false)
+        ->assertSeeInOrder(['id="preview-gender"', 'All genders', 'Female', 'Male', 'id="preview-category"', 'Delegate', 'Speaker', 'id="preview-country"', 'Country not given', 'Ghana'], false)
+        ->assertSee('data-gender="Female" data-category="Speaker" data-country="Ghana">Ama Serwaa</option>', false)
+        ->assertSee('<label for="print-gender">Gender</label>', false)
+        ->assertSee('data-name="Kofi Mensah" data-category="Delegate" data-gender="Male"', false);
+});
+
+it('leaves out the preview search when there is no one to choose between', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event, 'Ama Serwaa');
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()->assertDontSee('id="preview-search"', false);
 });
 
 it('lets a manager select Poppins and prints a working PDF with it', function () {
@@ -283,6 +305,41 @@ it('keeps designs saved before text case and borders existed looking the same', 
     expect($fields['name']['case'])->toBe('none')->and($fields['name']['border'])->toBe('none')
         ->and(BadgeDesign::textStyle('name', $fields['name']))->toBe('text-transform:none;');
 });
+
+it('makes one name bigger with the other names on a smaller line, on the badge and in the PDF', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event, 'Adwoa Agyei Mensah');
+    $fields = BadgeDesign::defaults();
+    $fields['name'] = array_replace($fields['name'], ['size' => 30, 'emphasis' => 'first', 'small_size' => 13]);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $saved = $event->fresh()->badge_fields['name'];
+    expect($saved['emphasis'])->toBe('first')->and((float) $saved['small_size'])->toBe(13.0)
+        ->and(BadgeDesign::nameParts('Adwoa Agyei Mensah', $saved))->toBe(['Adwoa', 'Agyei Mensah'])
+        ->and(BadgeDesign::nameParts('Adwoa Agyei Mensah', ['emphasis' => 'last']))->toBe(['Mensah', 'Adwoa Agyei'])
+        // One-word names and the default print as a single line.
+        ->and(BadgeDesign::nameParts('Adwoa', $saved))->toBeNull()
+        ->and(BadgeDesign::nameParts('Adwoa Agyei Mensah', BadgeDesign::defaults()['name']))->toBeNull();
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('<span class="name-big" style="display:block;line-height:1.1">Adwoa</span>', false)
+        ->assertSee('font-size:13pt">Agyei Mensah</span>', false)
+        ->assertSee('Last name bigger');
+    $this->get(route('events.badges.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
+it('rejects an unknown name emphasis or an out of range smaller name size', function (string $property, mixed $value) {
+    [$event, $manager] = badgeStudioFixture();
+    $fields = BadgeDesign::defaults();
+    $fields['name'][$property] = $value;
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertSessionHasErrors("badge_fields.name.{$property}");
+})->with([['emphasis', 'middle'], ['small_size', 3], ['small_size', 60]]);
 
 it('rejects an unknown text case, border style or border thickness', function (string $property, mixed $value) {
     [$event, $manager] = badgeStudioFixture();
