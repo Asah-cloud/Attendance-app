@@ -284,6 +284,41 @@ it('keeps designs saved before text case and borders existed looking the same', 
         ->and(BadgeDesign::textStyle('name', $fields['name']))->toBe('text-transform:none;');
 });
 
+it('makes one name bigger with the other names on a smaller line, on the badge and in the PDF', function () {
+    [$event, $manager] = badgeStudioFixture();
+    badgeRegistration($event, 'Adwoa Agyei Mensah');
+    $fields = BadgeDesign::defaults();
+    $fields['name'] = array_replace($fields['name'], ['size' => 30, 'emphasis' => 'first', 'small_size' => 13]);
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $saved = $event->fresh()->badge_fields['name'];
+    expect($saved['emphasis'])->toBe('first')->and((float) $saved['small_size'])->toBe(13.0)
+        ->and(BadgeDesign::nameParts('Adwoa Agyei Mensah', $saved))->toBe(['Adwoa', 'Agyei Mensah'])
+        ->and(BadgeDesign::nameParts('Adwoa Agyei Mensah', ['emphasis' => 'last']))->toBe(['Mensah', 'Adwoa Agyei'])
+        // One-word names and the default print as a single line.
+        ->and(BadgeDesign::nameParts('Adwoa', $saved))->toBeNull()
+        ->and(BadgeDesign::nameParts('Adwoa Agyei Mensah', BadgeDesign::defaults()['name']))->toBeNull();
+
+    $this->actingAs($manager)->get(route('events.badges', $event))->assertOk()
+        ->assertSee('<span class="name-big" style="display:block;line-height:1.1">Adwoa</span>', false)
+        ->assertSee('font-size:13pt">Agyei Mensah</span>', false)
+        ->assertSee('Last name bigger');
+    $this->get(route('events.badges.pdf', $event))->assertOk()->assertHeader('content-type', 'application/pdf');
+});
+
+it('rejects an unknown name emphasis or an out of range smaller name size', function (string $property, mixed $value) {
+    [$event, $manager] = badgeStudioFixture();
+    $fields = BadgeDesign::defaults();
+    $fields['name'][$property] = $value;
+
+    $this->actingAs($manager)->patch(route('events.badges.settings', $event), [
+        'badge_size' => 'A6', 'badge_design' => 'default', 'badge_fields' => $fields,
+    ])->assertSessionHasErrors("badge_fields.name.{$property}");
+})->with([['emphasis', 'middle'], ['small_size', 3], ['small_size', 60]]);
+
 it('rejects an unknown text case, border style or border thickness', function (string $property, mixed $value) {
     [$event, $manager] = badgeStudioFixture();
     $fields = BadgeDesign::defaults();

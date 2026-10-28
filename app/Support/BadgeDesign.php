@@ -16,6 +16,9 @@ final class BadgeDesign
 
     public const BORDERS = ['none' => 'No border', 'square' => 'Rectangle', 'rounded' => 'Rounded'];
 
+    /** Which part of the attendee's name prints big, with the other names on a smaller line below. */
+    public const EMPHASIS = ['none' => 'All names the same size', 'first' => 'First name bigger', 'last' => 'Last name bigger'];
+
     public const LABELS = ['company' => 'Company name', 'event' => 'Event title', 'meta' => 'Date and location', 'name' => 'Attendee name', 'department' => 'Department', 'category' => 'Category', 'group' => 'Area / Group', 'country' => 'Country', 'member' => 'Member or staff ID', 'room' => 'Room assignment', 'custom' => 'Custom text', 'qr' => 'QR code', 'company_logo' => 'Company logo', 'event_logo' => 'Event logo'];
 
     public static function defaults(string $layout = 'standard'): array
@@ -39,8 +42,25 @@ final class BadgeDesign
         $defaults = collect($positions)->map(fn ($p, $key) => ['x' => $p[0], 'y' => $p[1], 'w' => $p[2], 'h' => $p[3], 'size' => $p[4], 'align' => 'left', 'visible' => ! in_array($key, ['event_logo', 'custom', 'group', 'country'], true), 'color' => null, 'bold' => in_array($key, $bold, true),
             'case' => 'none', 'border' => 'none', 'border_color' => null, 'border_width' => 0.5, 'fill' => null])->all();
         $defaults['custom']['text'] = '';
+        $defaults['name'] += ['emphasis' => 'none', 'small_size' => 12];
 
         return $defaults;
+    }
+
+    /**
+     * The name split into [big part, smaller rest] when the name field makes one name bigger,
+     * or null to print it as one line (no emphasis, or a single-word name).
+     */
+    public static function nameParts(string $name, array $field): ?array
+    {
+        $parts = preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY);
+        $emphasis = $field['emphasis'] ?? 'none';
+        if (count($parts) < 2 || ! in_array($emphasis, ['first', 'last'], true)) {
+            return null;
+        }
+        $big = $emphasis === 'first' ? array_shift($parts) : array_pop($parts);
+
+        return [$big, implode(' ', $parts)];
     }
 
     /**

@@ -16,6 +16,8 @@
         f.border_width = Number(f.border_width || 0.5);
         f.fill = f.fill || null;
     }
+    fields.name.emphasis = fields.name.emphasis || "none";
+    fields.name.small_size = Number(fields.name.small_size || 12);
     const GRAPHIC = ["qr", "company_logo", "event_logo"];
     const TRANSFORM = { upper: "uppercase", lower: "lowercase", title: "capitalize" };
     /** Mirrors BadgeDesign::textStyle() so the preview matches the PDF. */
@@ -53,6 +55,29 @@
                   p.at(-1),
               ].join(" ")
             : name;
+    }
+    /** Mirrors BadgeDesign::nameParts(): [big, rest], or null for one line. */
+    function nameParts(name) {
+        const p = name.trim().split(/\s+/u).filter(Boolean),
+            emphasis = fields.name.emphasis;
+        if (p.length < 2 || !["first", "last"].includes(emphasis)) return null;
+        const big = emphasis === "first" ? p.shift() : p.pop();
+        return [big, p.join(" ")];
+    }
+    function renderName(el, name) {
+        const parts = nameParts(name);
+        if (!parts) {
+            el.textContent = name;
+            return;
+        }
+        const [big, rest] = [document.createElement("span"), document.createElement("span")];
+        big.className = "name-big";
+        big.textContent = parts[0];
+        Object.assign(big.style, { display: "block", lineHeight: "1.1" });
+        rest.className = "name-rest";
+        rest.textContent = parts[1];
+        Object.assign(rest.style, { display: "block", lineHeight: "1.2", fontSize: fields.name.small_size + "pt" });
+        el.replaceChildren(big, rest);
     }
     /** Whether a row in the print list matches the chosen category and country. */
     function inPrintGroup(row) {
@@ -129,6 +154,10 @@
         $("field-fill-on").checked = f.fill !== null;
         $("field-fill").value = f.fill || "#FFFFFF";
         $("field-fill").disabled = f.fill === null;
+        $("field-name-wrap").classList.toggle("hidden", selected !== "name");
+        $("field-emphasis").value = fields.name.emphasis;
+        $("field-small-size").value = fields.name.small_size;
+        $("field-small-wrap").classList.toggle("hidden", fields.name.emphasis === "none");
         $("field-text-wrap").classList.toggle("hidden", selected !== "custom");
         if (selected === "custom") $("field-text").value = f.text || "";
         canvas
@@ -154,6 +183,7 @@
         f.x = Math.max(0, Math.min(95, 100 - f.w, f.x));
         f.y = Math.max(0, Math.min(95, 100 - f.h, f.y));
         f.size = Math.max(6, Math.min(48, f.size));
+        if (key === "name") f.small_size = Math.max(6, Math.min(48, f.small_size));
         for (const prop of ["x", "y", "w", "h"])
             f[prop] = Math.round(f[prop] * 100) / 100;
         if (key === "qr") f.visible = true;
@@ -162,9 +192,9 @@
         if (!data) return;
         for (const [key, val] of Object.entries(data.values)) {
             const el = fieldElement(key)?.querySelector(".field-content");
-            if (el)
-                el.textContent =
-                    key === "name" ? formatName(data.fullName) : val;
+            if (!el) continue;
+            if (key === "name") renderName(el, formatName(data.fullName));
+            else el.textContent = val;
         }
         const color = [
             ...document.querySelectorAll("input[data-category]"),
@@ -400,6 +430,11 @@
             markDirty();
             render();
         });
+    $("field-emphasis").addEventListener("change", () => restyle(() => (fields.name.emphasis = $("field-emphasis").value)));
+    $("field-small-size").addEventListener("change", () => {
+        const size = Number($("field-small-size").value);
+        if ($("field-small-size").value !== "" && Number.isFinite(size)) restyle(() => (fields.name.small_size = size));
+    });
     $("field-align").addEventListener("change", () => {
         fields[selected].align = $("field-align").value;
         markDirty();
