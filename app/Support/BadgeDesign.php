@@ -107,7 +107,9 @@ final class BadgeDesign
             return null;
         }
 
-        return 'data:'.Storage::disk('public')->mimeType($path).';base64,'.base64_encode(Storage::disk('public')->get($path));
+        // A file path, not an embedded copy: dompdf loads it once for the whole PDF, whereas
+        // a data URI repeated on every badge made 100 badges about 50 MB of HTML and ran PHP out of memory.
+        return Storage::disk('public')->path($path);
     }
 
     public static function values(Event $event, ?EventRegistration $registration): array
