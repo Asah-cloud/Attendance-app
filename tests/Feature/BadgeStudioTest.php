@@ -3,6 +3,7 @@
 use App\Jobs\FinalizeBadgeExport;
 use App\Jobs\GenerateBadgeExportBatch;
 use App\Models\BadgeExport;
+use App\Models\BadgePrint;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\Participant;
@@ -14,6 +15,7 @@ use Dompdf\FontMetrics;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 
 function badgeStudioFixture(): array
@@ -498,4 +500,92 @@ it('queues large badge exports in bounded batches and protects their progress', 
 
     [, $otherManager] = badgeStudioFixture();
     $this->actingAs($otherManager)->getJson(route('badge-exports.show', $export))->assertForbidden();
+});
+
+it('records each printed badge with the details on it, but not samples', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Mensah', 'Pastor');
+    $kofi = badgeRegistration($event, 'Kofi Boateng');
+    $fields = BadgeDesign::defaults();
+    $fields['country']['visible'] = true;
+    $event->update(['badge_fields' => $fields]);
+    $ama->participant->update(['country' => 'Ghana']);
+
+    $this->actingAs($manager)->post(route('events.badges.pdf', $event), ['sample' => true])->assertOk();
+    expect(BadgePrint::count())->toBe(0);
+
+    $this->post(route('events.badges.pdf', $event), ['attendees' => [$ama->id]])->assertOk();
+    $print = BadgePrint::sole();
+    expect($print->event_registration_id)->toBe($ama->id)
+        ->and($print->user_id)->toBe($manager->id)
+        ->and($print->marked)->toBeFalse()
+        ->and($print->details)->toBe(['Attendee name' => 'Ama Mensah', 'Department' => '', 'Category' => 'Pastor', 'Country' => 'Ghana', 'Member or staff ID' => 'Event Pass', 'Room assignment' => '']);
+
+    $this->get(route('events.badges', $event))->assertOk()
+        ->assertSee('data-printed="yes"', false)->assertSee('data-printed="no"', false)
+        ->assertSee('Printed 1 time, last', false)->assertSee('id="print-printed"', false)
+        ->assertSee(route('events.badges.printed.list', $event), false);
+});
+
+it('records badges printed in background batches, in the staff design for staff', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $staff = badgeRegistration($event, 'Esi Owusu', 'Usher', staff: true);
+    $fields = BadgeDesign::defaults();
+    $fields['category']['visible'] = false;
+    $event->update(['staff_badge_settings' => ['badge_fields' => $fields]]);
+    $export = BadgeExport::create(['event_id' => $event->id, 'user_id' => $manager->id, 'status' => 'queued', 'total_batches' => 1, 'options' => ['staff' => true], 'expires_at' => now()->addDay()]);
+
+    (new GenerateBadgeExportBatch($export->id, [$staff->id], 1))->handle(app(BadgePdfService::class));
+
+    expect(BadgePrint::sole()->details)->not->toHaveKey('Category')
+        ->and(BadgePrint::sole()->user_id)->toBe($manager->id);
+});
+
+it('lets a manager mark badges as printed or not printed by hand', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Mensah');
+    $kofi = badgeRegistration($event, 'Kofi Boateng');
+    $cancelled = badgeRegistration($event, 'Yaw Darko', status: 'cancelled');
+
+    $this->actingAs($manager)->postJson(route('events.badges.printed.mark', $event), ['attendees' => [$ama->id, $kofi->id, $cancelled->id]])
+        ->assertOk()->assertJson(['message' => '2 marked as printed.']);
+    expect(BadgePrint::where('marked', true)->pluck('event_registration_id')->sort()->values()->all())->toBe([$ama->id, $kofi->id]);
+
+    $this->deleteJson(route('events.badges.printed.mark', $event), ['attendees' => [$kofi->id]])
+        ->assertOk()->assertJson(['message' => '1 marked as not printed.']);
+    expect(BadgePrint::pluck('event_registration_id')->all())->toBe([$ama->id]);
+
+    $this->postJson(route('events.badges.printed.mark', $event), ['attendees' => [$cancelled->id]])->assertStatus(422);
+
+    [$otherEvent] = badgeStudioFixture();
+    $this->postJson(route('events.badges.printed.mark', $otherEvent), ['attendees' => [$ama->id]])->assertForbidden();
+    $this->get(route('events.badges.printed.list', $otherEvent))->assertForbidden();
+});
+
+it('downloads the printed list with the details on each latest badge and flags ones to reprint', function () {
+    [$event, $manager] = badgeStudioFixture();
+    $ama = badgeRegistration($event, 'Ama Mensah', 'Pastor');
+    $kofi = badgeRegistration($event, 'Kofi Boateng', 'Delegate');
+    badgeRegistration($event, 'Never Printed');
+    $staff = badgeRegistration($event, 'Esi Owusu', staff: true);
+
+    $this->actingAs($manager)->post(route('events.badges.pdf', $event), ['attendees' => [$ama->id]])->assertOk();
+    $this->post(route('events.badges.pdf', $event), ['attendees' => [$ama->id, $kofi->id]])->assertOk();
+    $this->postJson(route('events.staff-badges.printed.mark', $event), ['attendees' => [$staff->id]])->assertOk();
+    $kofi->update(['category' => 'Pastor']);
+
+    $response = $this->get(route('events.badges.printed.list', $event))->assertOk();
+    expect($response->headers->get('content-disposition'))->toContain('printed-badges-');
+    $rows = IOFactory::load($response->getFile()->getPathname())->getActiveSheet()->toArray(null, false, false);
+
+    expect($rows[3])->toBe(['#', 'Name', 'On badge: Attendee name', 'On badge: Category', 'On badge: Member or staff ID', 'Last printed', 'Times printed', 'Printed by', 'Note'])
+        ->and(array_slice($rows[4], 0, 5))->toBe([1, 'Ama Mensah', 'Ama Mensah', 'Pastor', 'Event Pass'])
+        ->and($rows[4][6])->toBe(2)
+        ->and($rows[4][7])->toBe($manager->name)
+        ->and(array_slice($rows[5], 1, 3))->toBe(['Kofi Boateng', 'Kofi Boateng', 'Delegate'])
+        ->and($rows[5][8])->toBe('Details changed since printing')
+        ->and($rows[6][1] ?? null)->toBeNull();
+
+    $staffRows = IOFactory::load($this->get(route('events.staff-badges.printed.list', $event))->getFile()->getPathname())->getActiveSheet()->toArray(null, false, false);
+    expect($staffRows[4][1])->toBe('Esi Owusu')->and($staffRows[4][8])->toBe('Marked as printed');
 });
