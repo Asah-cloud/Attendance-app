@@ -68,7 +68,24 @@
                     </div>
                 </div>
             </section>
-            
+
+            @can('manageWhenOpen', $event)
+                @php
+                    $recentImports = $event->participantImports()->with('user:id,name')->latest('id')->limit(5)->get();
+                    $lastImport = $recentImports->first();
+                @endphp
+                @if($lastImport && ! $lastImport->undone_at && $lastImport->created_at->gt(now()->subDay()))
+                    {{-- The latest import stays undoable from here for a day; older ones from the Import window. --}}
+                    <div class="mb-8 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between" data-last-import>
+                        <p class="text-sm text-amber-900">
+                            <strong>Last import:</strong> {{ $lastImport->file_name }}, {{ $lastImport->created_at->diffForHumans() }}, added {{ $lastImport->addedToEventCount() }} {{ Str::plural('person', $lastImport->addedToEventCount()) }}.
+                            Imported the wrong list? You can undo it.
+                        </p>
+                        @include('events.partials.undo-import', ['import' => $lastImport])
+                    </div>
+                @endif
+            @endcan
+
             @php $status = $event->status; @endphp
 
             @if($status === 'active')
@@ -186,6 +203,29 @@
                         </button>
                     </div>
                 </form>
+                @can('manageWhenOpen', $event)
+                    @if($recentImports->isNotEmpty())
+                        {{-- Recent imports, newest first, each undoable once. --}}
+                        <div class="border-t border-gray-100 px-8 pb-8 pt-6">
+                            <h4 class="mb-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Recent imports</h4>
+                            <ul class="space-y-3">
+                                @foreach($recentImports as $recent)
+                                    <li class="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                                        <div class="min-w-0 text-xs text-gray-600">
+                                            <p class="truncate font-black text-gray-900">{{ $recent->file_name }}</p>
+                                            <p>{{ $recent->created_at->format('j M, g:i a') }}@if($recent->user) · {{ $recent->user->name }}@endif · {{ $recent->addedToEventCount() }} added</p>
+                                        </div>
+                                        @if($recent->undone_at)
+                                            <span class="shrink-0 text-xs font-bold text-gray-400">Undone {{ $recent->undone_at->format('j M, g:i a') }}</span>
+                                        @else
+                                            @include('events.partials.undo-import', ['import' => $recent])
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                @endcan
             </div>
         </div>
     </div>

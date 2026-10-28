@@ -205,6 +205,11 @@ class Event extends Model
         return $this->hasMany(EventRegistration::class);
     }
 
+    public function participantImports(): HasMany
+    {
+        return $this->hasMany(ParticipantImport::class);
+    }
+
     public function attendeeNotificationChannels(): array
     {
         return array_values(array_filter([

@@ -178,6 +178,7 @@ For organizations that collect attendee lists outside the system (e.g., a physic
 ### 6.7 Participant import and de-duplication
 
 - **Import**: `EventController::import` (spreadsheet, via `UsersImport`) bulk-registers participants into an event from a fixed column layout (documented in the README): column A = external/member ID, B = name, E = category, F = phone.
+- **Undo an import**: each import that adds people is recorded (`participant_imports`: file, who, when, the registrations and people it created). The Attendance page shows the latest one for a day with an **Undo import** button, and the Import window lists the last five. Undo (`EventController::undoImport`) removes the people it added to the event, keeping anyone already checked in, and deletes the people it created who are now on no event. Changes it made to people already on the list are not reversed, and messages already sent can't be taken back. Imports made before this existed (before 28 Oct 2026) have no record and can't be undone.
 - **De-duplication**: `ParticipantMergeController` + `ParticipantMergeService` let a manager compare two participant records and merge one into the other. The surviving record keeps its own data but back-fills blank fields from the duplicate; registrations/attendances move over unless the survivor already has one for the same event/day (in which case the duplicate's is discarded to respect the unique constraint); every merge is recorded in `ParticipantAuditLog`.
 
 ### 6.8 Reporting and exports
