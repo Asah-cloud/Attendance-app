@@ -79,10 +79,10 @@
         Object.assign(rest.style, { display: "block", lineHeight: "1.2", fontSize: fields.name.small_size + "pt" });
         el.replaceChildren(big, rest);
     }
-    /** Whether a person (their data-* attributes) matches the gender, category and country chosen in the selects named prefix-gender etc. */
+    /** Whether a person (their data-* attributes) matches the gender, category, country (and printed or not) chosen in the selects named prefix-gender etc. */
     function inGroup(el, prefix) {
-        return ["gender", "category", "country"].every(
-            (key) => !$(`${prefix}-${key}`).value || el.dataset[key] === $(`${prefix}-${key}`).value,
+        return ["gender", "category", "country", "printed"].every(
+            (key) => !$(`${prefix}-${key}`)?.value || el.dataset[key] === $(`${prefix}-${key}`).value,
         );
     }
     /** Every word typed must appear in the name, in any order; stray spaces are ignored. */
@@ -101,6 +101,8 @@
         $("print-count").textContent = `${count} attendees selected`;
         for (const id of ["sample-pdf", "download-pdf"])
             $(id).disabled = dirty || !count;
+        for (const id of ["mark-printed", "unmark-printed"])
+            $(id).disabled = !count;
         $("paper-help").textContent =
             $("badge-size").value === "A5"
                 ? "A4: one A5 badge centred on each sheet."
@@ -622,6 +624,7 @@
     $("print-category").addEventListener("change", filter);
     $("print-gender").addEventListener("change", filter);
     $("print-country").addEventListener("change", filter);
+    $("print-printed").addEventListener("change", filter);
     $("attendee-list").addEventListener("change", filter);
     $("print-paper").addEventListener("change", updatePrint);
     $("select-all").addEventListener("change", () => {
@@ -669,6 +672,7 @@
                         : `Preparing badge batch ${result.completed} of ${result.total}…`;
                     if (result.status === "failed") throw new Error(result.error || "Badge export failed.");
                 } while (result.status !== "ready");
+                showPrinted(chosen, true);
                 window.location.assign(result.download_url);
                 $("print-error").textContent = "Badge ZIP is ready and downloading.";
                 return;
@@ -691,6 +695,7 @@
                 link = document.createElement("a");
             link.href = url;
             link.download = sample ? "badge-sample.pdf" : "attendee-badges.pdf";
+            if (!sample) showPrinted(chosen, true);
             link.click();
             setTimeout(() => URL.revokeObjectURL(url), 10000);
             $("print-error").textContent = "";
@@ -700,6 +705,44 @@
             updatePrint();
         }
     }
+    /** Show these people as printed (or not) in the list, without reloading. */
+    function showPrinted(chosen, printed) {
+        for (const id of chosen) {
+            const row = document.querySelector(`#attendee-list input[value="${id}"]`)?.parentElement;
+            if (!row) continue;
+            row.dataset.printed = printed ? "yes" : "no";
+            row.querySelector(".printed-tag").classList.toggle("hidden", !printed);
+            row.querySelector(".printed-tag").title = printed ? "Printed just now" : "";
+        }
+        filter();
+    }
+    async function markPrinted(printed) {
+        const chosen = ids();
+        if (!chosen.length) return;
+        if (!printed && !confirm(`Clear the printed record for ${chosen.length} selected? They will show as not printed.`)) return;
+        $("print-error").textContent = "Saving…";
+        try {
+            const response = await fetch(c.printedUrl, {
+                method: printed ? "POST" : "DELETE",
+                headers: {
+                    "X-CSRF-TOKEN": form.querySelector("[name=_token]").value,
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ attendees: chosen }),
+            });
+            if (response.status === 419)
+                throw new Error("Your session has expired. Reload the page and try again.");
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.message || "Could not save. Try again.");
+            showPrinted(chosen, printed);
+            $("print-error").textContent = result.message;
+        } catch (error) {
+            $("print-error").textContent = error.message;
+        }
+    }
+    $("mark-printed").addEventListener("click", () => markPrinted(true));
+    $("unmark-printed").addEventListener("click", () => markPrinted(false));
     $("sample-pdf").addEventListener("click", () => download(true));
     $("download-pdf").addEventListener("click", () => download(false));
     form.addEventListener("submit", () => {

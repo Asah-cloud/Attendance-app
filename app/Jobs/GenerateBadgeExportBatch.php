@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\BadgeExport;
+use App\Models\BadgePrint;
 use App\Services\BadgePdfService;
+use App\Support\BadgeDesign;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
@@ -28,8 +30,13 @@ class GenerateBadgeExportBatch implements ShouldQueue
         $export->update(['status' => 'processing']);
         $options = $export->options;
         $options['attendees'] = $this->registrationIds;
-        $registrations = $badges->registrations($export->event, $options, (bool) ($options['staff'] ?? false));
-        Storage::disk('local')->put("badge-exports/{$export->id}/batch-{$this->batchNumber}.pdf", $badges->render($export->event, $registrations, $options, (bool) ($options['staff'] ?? false)));
+        $staffMode = (bool) ($options['staff'] ?? false);
+        if ($staffMode) {
+            BadgeDesign::applyStaffSettings($export->event);
+        }
+        $registrations = $badges->registrations($export->event, $options, $staffMode);
+        Storage::disk('local')->put("badge-exports/{$export->id}/batch-{$this->batchNumber}.pdf", $badges->render($export->event, $registrations, $options, $staffMode));
+        BadgePrint::record($export->event, $registrations, $export->user_id);
         $export->increment('completed_batches');
     }
 

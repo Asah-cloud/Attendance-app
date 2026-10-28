@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\BadgePrintListExport;
 use App\Jobs\FinalizeBadgeExport;
 use App\Jobs\GenerateBadgeExportBatch;
 use App\Models\BadgeExport;
+use App\Models\BadgePrint;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationField;
@@ -31,6 +33,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -253,7 +256,7 @@ class EventRegistrationFormController extends Controller
         $this->authorize('manageWhenOpen', $event);
         $staffMode = request()->routeIs('events.staff-badges');
         if ($staffMode) {
-            $this->applyStaffBadgeSettings($event);
+            BadgeDesign::applyStaffSettings($event);
         }
         $event->loadMissing('company');
         $registrations = $event->registrations()
@@ -266,6 +269,9 @@ class EventRegistrationFormController extends Controller
         // For printing one country's badges: as in reports, the country entered, else the phone's.
         $countries = $registrations->map(fn ($registration) => AttendanceGrid::country($registration->participant))->unique()->sort()->values();
         $genders = $registrations->map(fn ($registration) => $registration->participant->gender ?: 'Unspecified')->unique()->sort()->values();
+        $printed = BadgePrint::where('event_id', $event->id)->whereIn('event_registration_id', $registrations->pluck('id'))
+            ->selectRaw('event_registration_id, count(*) as times, max(created_at) as last_printed')
+            ->groupBy('event_registration_id')->get()->keyBy('event_registration_id');
         $palette = ['#7C3AED', '#0F766E', '#B45309', '#BE123C', '#1D4ED8', '#4338CA'];
         $categoryColors = $categories->mapWithKeys(fn ($category, $index) => [
             $category => $event->badge_category_colors[$category] ?? $palette[$index % count($palette)],
@@ -275,7 +281,7 @@ class EventRegistrationFormController extends Controller
             ->whereNotNull($staffMode ? 'staff_badge_settings' : 'badge_fields')->orderBy('title')->get(['id', 'title']);
         $fields = BadgeDesign::fields($event);
 
-        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'genders', 'categoryColors', 'templates', 'fields', 'staffMode'));
+        return view('events.badges', compact('event', 'registrations', 'categories', 'countries', 'genders', 'printed', 'categoryColors', 'templates', 'fields', 'staffMode'));
     }
 
     public function badgesPdf(Request $request, Event $event): Response
@@ -283,7 +289,7 @@ class EventRegistrationFormController extends Controller
         $this->authorize('manageWhenOpen', $event);
         $staffMode = $request->routeIs('events.staff-badges.pdf');
         if ($staffMode) {
-            $this->applyStaffBadgeSettings($event);
+            BadgeDesign::applyStaffSettings($event);
         }
         $options = $request->validate([
             'attendees' => ['sometimes', 'array', 'min:1'],
@@ -333,7 +339,12 @@ class EventRegistrationFormController extends Controller
         $metrics->registerFont(['family' => 'Poppins', 'style' => 'normal', 'weight' => 'bold'], base_path('resources/fonts/Poppins-Bold.ttf'));
         $pdf->setPaper($paper === 'a4' ? 'a4' : ($event->badge_size === 'A5' ? 'a5' : 'a6'), $paper === 'a4' && $event->badge_size !== 'A5' ? 'landscape' : 'portrait');
 
-        return $pdf->download('badges-'.$event->slug.'.pdf');
+        $response = $pdf->download('badges-'.$event->slug.'.pdf');
+        if (! $request->boolean('sample')) {
+            BadgePrint::record($event, $registrations, $request->user()->id);
+        }
+
+        return $response;
     }
 
     public function startBadgeExport(Request $request, Event $event): JsonResponse
@@ -341,7 +352,7 @@ class EventRegistrationFormController extends Controller
         $this->authorize('manageWhenOpen', $event);
         $staffMode = $request->routeIs('events.staff-badges.exports.store');
         if ($staffMode) {
-            $this->applyStaffBadgeSettings($event);
+            BadgeDesign::applyStaffSettings($event);
         }
         $options = $request->validate([
             'attendees' => ['sometimes', 'array', 'min:1'],
@@ -393,6 +404,39 @@ class EventRegistrationFormController extends Controller
         return response()->download(Storage::disk('local')->path($badgeExport->file_path), 'badges-'.$badgeExport->event->slug.'.zip');
     }
 
+    /** Mark badges as printed without making a PDF (or, with DELETE, clear their printed record). */
+    public function markBadgesPrinted(Request $request, Event $event): JsonResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+        $staffMode = $request->routeIs('events.staff-badges.printed.*');
+        if ($staffMode) {
+            BadgeDesign::applyStaffSettings($event);
+        }
+        $options = $request->validate(['attendees' => ['required', 'array', 'min:1'], 'attendees.*' => ['integer', 'distinct']]);
+        $registrations = app(BadgePdfService::class)->registrations($event->loadMissing('company'), $options, $staffMode);
+        abort_if($registrations->isEmpty(), 422, 'No confirmed people match your selection.');
+
+        if ($request->isMethod('delete')) {
+            BadgePrint::where('event_id', $event->id)->whereIn('event_registration_id', $registrations->pluck('id'))->delete();
+
+            return response()->json(['message' => $registrations->count().' marked as not printed.']);
+        }
+        BadgePrint::record($event, $registrations, $request->user()->id, marked: true);
+
+        return response()->json(['message' => $registrations->count().' marked as printed.']);
+    }
+
+    public function badgePrintList(Request $request, Event $event): BinaryFileResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+        $staffMode = $request->routeIs('events.staff-badges.printed.*');
+        if ($staffMode) {
+            BadgeDesign::applyStaffSettings($event);
+        }
+
+        return Excel::download(new BadgePrintListExport($event->loadMissing('company'), $staffMode), ($staffMode ? 'printed-staff-badges-' : 'printed-badges-').$event->slug.'.xlsx');
+    }
+
     public function badgeQr(Event $event, EventRegistration $registration): Response
     {
         $this->authorize('manageWhenOpen', $event);
@@ -433,7 +477,7 @@ class EventRegistrationFormController extends Controller
         $this->authorize('manageWhenOpen', $event);
         $staffMode = $request->routeIs('events.staff-badges.settings');
         if ($staffMode) {
-            $this->applyStaffBadgeSettings($event);
+            BadgeDesign::applyStaffSettings($event);
         }
         if ($request->filled('template_id')) {
             $request->validate(['template_id' => ['required', 'integer']]);
@@ -441,7 +485,7 @@ class EventRegistrationFormController extends Controller
                 ->whereNotNull($staffMode ? 'staff_badge_settings' : 'badge_fields')
                 ->findOrFail($request->integer('template_id'));
             if ($staffMode) {
-                $this->applyStaffBadgeSettings($template);
+                BadgeDesign::applyStaffSettings($template);
             }
             $settings = $template->only(['badge_size', 'badge_design', 'badge_layout', 'badge_primary_color', 'badge_accent_color', 'badge_image_position_x', 'badge_image_position_y', 'badge_fields', 'badge_font', 'badge_name_format', 'badge_category_colors']);
             $settings['badge_image_path'] = null;
@@ -556,36 +600,6 @@ class EventRegistrationFormController extends Controller
         return back()->with('success', ($staffMode ? 'Staff badge' : 'Attendee badge').' design saved. The preview is ready to print.');
     }
 
-    private const BADGE_SETTING_KEYS = [
-        'badge_size', 'badge_design', 'badge_layout', 'badge_image_path', 'badge_primary_color',
-        'badge_accent_color', 'badge_image_position_x', 'badge_image_position_y', 'badge_fields',
-        'badge_font', 'badge_name_format', 'badge_category_colors',
-    ];
-
-    private function applyStaffBadgeSettings(Event $event): void
-    {
-        $settings = $event->staff_badge_settings ?? [
-            'badge_size' => 'A6',
-            'badge_design' => 'default',
-            'badge_layout' => 'standard',
-            'badge_image_path' => null,
-            'badge_primary_color' => '#0F766E',
-            'badge_accent_color' => '#0F172A',
-            'badge_image_position_x' => 50,
-            'badge_image_position_y' => 50,
-            'badge_fields' => BadgeDesign::defaults(),
-            'badge_font' => 'DejaVu Sans',
-            'badge_name_format' => 'full',
-            'badge_category_colors' => [],
-        ];
-
-        foreach (self::BADGE_SETTING_KEYS as $key) {
-            if (array_key_exists($key, $settings)) {
-                $event->setAttribute($key, $settings[$key]);
-            }
-        }
-    }
-
     private function saveBadgeSettings(Event $event, bool $staffMode): void
     {
         if (! $staffMode) {
@@ -594,7 +608,7 @@ class EventRegistrationFormController extends Controller
             return;
         }
 
-        $settings = collect(self::BADGE_SETTING_KEYS)->mapWithKeys(fn ($key) => [$key => $event->getAttribute($key)])->all();
+        $settings = collect(BadgeDesign::SETTING_KEYS)->mapWithKeys(fn ($key) => [$key => $event->getAttribute($key)])->all();
         $storedEvent = Event::findOrFail($event->id);
         $storedEvent->staff_badge_settings = $settings;
         $storedEvent->save();

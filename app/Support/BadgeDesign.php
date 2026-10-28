@@ -136,6 +136,38 @@ final class BadgeDesign
         ];
     }
 
+    /** The event columns that make up a badge design; staff badges keep their own copy in staff_badge_settings. */
+    public const SETTING_KEYS = [
+        'badge_size', 'badge_design', 'badge_layout', 'badge_image_path', 'badge_primary_color',
+        'badge_accent_color', 'badge_image_position_x', 'badge_image_position_y', 'badge_fields',
+        'badge_font', 'badge_name_format', 'badge_category_colors',
+    ];
+
+    /** Swap the event's attendee badge design for its staff badge design, in memory only. */
+    public static function applyStaffSettings(Event $event): void
+    {
+        $settings = $event->staff_badge_settings ?? [
+            'badge_size' => 'A6',
+            'badge_design' => 'default',
+            'badge_layout' => 'standard',
+            'badge_image_path' => null,
+            'badge_primary_color' => '#0F766E',
+            'badge_accent_color' => '#0F172A',
+            'badge_image_position_x' => 50,
+            'badge_image_position_y' => 50,
+            'badge_fields' => self::defaults(),
+            'badge_font' => 'DejaVu Sans',
+            'badge_name_format' => 'full',
+            'badge_category_colors' => [],
+        ];
+
+        foreach (self::SETTING_KEYS as $key) {
+            if (array_key_exists($key, $settings)) {
+                $event->setAttribute($key, $settings[$key]);
+            }
+        }
+    }
+
     public static function qrPayload(EventRegistration $registration): string
     {
         $participant = $registration->participant;
