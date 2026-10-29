@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\RoomAllocationService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -167,4 +168,88 @@ it('cancels a plan without changing anything and keeps other companies out', fun
     $outsider = User::factory()->create(['company_id' => Company::create(['name' => 'Other'])->id, 'role' => 'manager']);
     $outsider->assignRole('manager');
     $this->actingAs($outsider)->post(route('events.accommodation.plan.upload', $this->event), ['file' => sevenMen(), 'per_room' => 3])->assertForbidden();
+});
+
+function floorRoom(Event $event, string $block, string $floor, string $name, int $beds = 3): AccommodationRoom
+{
+    $site = $event->accommodationSites()->firstOrCreate(['name' => 'Main Campus']);
+
+    return $site->blocks()->firstOrCreate(['name' => $block])->floors()->firstOrCreate(['name' => $floor])
+        ->rooms()->create(['name' => $name, 'capacity' => $beds]);
+}
+
+function roomsOf(Event $event): array
+{
+    return collect(session('room-plan.'.$event->id)['preview']['rooms'])
+        ->map(fn ($room) => Str::afterLast($room['label'], ' / ').':'.count($room['people']))->all();
+}
+
+it('fills only the chosen floor, lowest room number first', function () {
+    floorRoom($this->event, 'New Block', 'First Floor', 'NB-101');
+    foreach (['NB-210', 'NB-201', 'NB-202'] as $name) {
+        $floor = floorRoom($this->event, 'New Block', 'Second Floor', $name)->floor;
+    }
+
+    $this->actingAs($this->manager)->post(route('events.accommodation.plan.upload', $this->event), ['file' => sevenMen(), 'per_room' => 3, 'floor_id' => $floor->id]);
+
+    expect(roomsOf($this->event))->toBe(['NB-201:3', 'NB-202:3', 'NB-210:1']);
+    $this->get(route('events.accommodation.plan.show', $this->event))->assertSee('New Block · Second Floor (Main Campus)');
+});
+
+it('fills only the typed or ticked rooms', function () {
+    foreach (['NB-101', 'NB-102', 'NB-103', 'NB-104', 'OB-101'] as $name) {
+        $rooms[$name] = floorRoom($this->event, str_starts_with($name, 'NB') ? 'New Block' : 'Old Block', 'First Floor', $name, 2);
+    }
+    $block = $rooms['NB-101']->floor->block;
+
+    // A range by number, within the chosen building, plus a ticked room.
+    $this->actingAs($this->manager)->post(route('events.accommodation.plan.upload', $this->event), [
+        'file' => sevenMen(), 'per_room' => 2, 'block_id' => $block->id, 'rooms' => '102-103', 'room_ids' => [$rooms['NB-104']->id],
+    ]);
+    expect(roomsOf($this->event))->toBe(['NB-102:2', 'NB-103:2', 'NB-104:2']);
+    $this->get(route('events.accommodation.plan.show', $this->event))->assertOk()
+        ->assertSee('3 chosen rooms (NB-102, NB-103, NB-104)')
+        // 7 people, 6 free beds in those rooms.
+        ->assertSee('data-short-of-beds', false)
+        ->assertSee('the chosen rooms have 6 free beds, but 7 people on the list need a room');
+
+    // A range with letters keeps to rooms with those letters, across buildings.
+    $this->post(route('events.accommodation.plan.upload', $this->event), ['file' => sevenMen(), 'per_room' => 2, 'rooms' => 'OB-101 to OB-105']);
+    expect(roomsOf($this->event))->toBe(['OB-101:2']);
+
+    // A part that matches nothing is sent back, nothing is stored.
+    $this->post(route('events.accommodation.plan.upload', $this->event), ['file' => sevenMen(), 'per_room' => 2, 'block_id' => $block->id, 'rooms' => '101, 999'])
+        ->assertSessionHasErrors(['rooms' => 'No room in the chosen place matches: 999.']);
+    $this->post(route('events.accommodation.plan.upload', $this->event), ['file' => sevenMen(), 'per_room' => 2, 'block_id' => $block->id, 'room_ids' => [$rooms['OB-101']->id]])
+        ->assertSessionHasErrors(['rooms' => 'None of the chosen rooms are in the chosen place.']);
+});
+
+it('puts people in the room named in the list\'s Room column', function () {
+    $named = floorRoom($this->event, 'New Block', 'Third Floor', 'NB-301', 2);
+    $full = floorRoom($this->event, 'New Block', 'Third Floor', 'NB-302', 1);
+    $sitting = Participant::create(['company_id' => $this->company->id, 'name' => 'Already There', 'gender' => 'Male']);
+    RoomAssignment::create(['event_registration_id' => $this->event->registrations()->create(['participant_id' => $sitting->id, 'status' => 'confirmed'])->id, 'accommodation_room_id' => $full->id, 'status' => 'assigned', 'method' => 'manual']);
+    $floor = floorRoom($this->event, 'New Block', 'First Floor', 'NB-101', 4)->floor;
+    floorRoom($this->event, 'Old Block', 'First Floor', 'OB-301');
+
+    $list = UploadedFile::fake()->createWithContent('plan.csv', implode("\n", [
+        'Name,Gender,Phone,Room',
+        'Speaker One,Male,0201000001,nb 301',
+        'Late Speaker,Male,0201000002,NB-302',
+        'Lost Guest,Male,0201000003,NB-999',
+        'Unclear Guest,Male,0201000004,301',
+        'Plain Guest,Male,0201000005,',
+    ]));
+    $this->actingAs($this->manager)->post(route('events.accommodation.plan.upload', $this->event), ['file' => $list, 'per_room' => 3, 'floor_id' => $floor->id]);
+
+    // The named room is used although it is on another floor; the rest go to the chosen floor.
+    expect(roomsOf($this->event))->toBe(['NB-301:1', 'NB-101:1'])
+        ->and(collect(session('room-plan.'.$this->event->id)['preview']['unallocated'])->pluck('reason', 'name')->all())->toBe([
+            'Late Speaker' => 'Room NB-302 on the list is full.',
+            'Lost Guest' => 'Room NB-999 on the list was not found, or is closed.',
+            'Unclear Guest' => 'More than one room matches 301: write it as on the room list.',
+        ]);
+
+    $this->post(route('events.accommodation.plan.confirm', $this->event))->assertSessionHas('success');
+    expect($named->assignments()->sole()->allocation_reason)->toBe('Room plan: room named on the list.');
 });
