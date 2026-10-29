@@ -8,6 +8,7 @@ use App\Models\EventRegistration;
 use App\Models\RoomAssignment;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\RoomAssigned;
+use App\Support\RoomRange;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -164,34 +165,73 @@ class RoomAllocationService
      * where rooms have more beds; the spare beds stay free for later. People are grouped by
      * gender, accessibility need and room group, and each group of up to $perRoom goes into an
      * empty room where one is free, else the compatible room with the most space. A room never
-     * mixes genders. $siteId / $blockId limit the rooms used. People who already have a room
-     * are left where they are.
+     * mixes genders. $where limits the rooms used (site_id, block_id, floor_id, room_ids); rooms
+     * on a chosen floor or picked one by one fill lowest room number first. $requested names a
+     * room per registration id (the list's Room column): they go there instead, wherever it is,
+     * if it has a bed and suits them. People who already have a room are left where they are.
      *
      * @param  Collection<int, EventRegistration>  $registrations
-     * @return array{proposals: Collection, unallocated: Collection, alreadyRoomed: Collection}
+     * @param  array{site_id?: ?int, block_id?: ?int, floor_id?: ?int, room_ids?: ?list<int>}  $where
+     * @param  array<int, string>  $requested
+     * @return array{proposals: Collection, unallocated: Collection, alreadyRoomed: Collection, freeBeds: int, toPlace: int}
      */
-    public function planBatch(Event $event, Collection $registrations, int $perRoom, ?int $siteId = null, ?int $blockId = null): array
+    public function planBatch(Event $event, Collection $registrations, int $perRoom, array $where = [], array $requested = []): array
     {
         $registrations->loadMissing(['participant', 'roomAssignment.room.floor.block.site']);
         $alreadyRoomed = $registrations->filter(fn (EventRegistration $registration) => $registration->roomAssignment)->values();
 
-        $rooms = $this->eligibleRooms($event)
-            ->filter(fn (AccommodationRoom $room) => (! $siteId || $room->floor->block->accommodation_site_id === $siteId)
-                && (! $blockId || $room->floor->accommodation_block_id === $blockId))
+        $allRooms = $this->eligibleRooms($event);
+        $rooms = $allRooms
+            ->filter(fn (AccommodationRoom $room) => (empty($where['site_id']) || $room->floor->block->accommodation_site_id === $where['site_id'])
+                && (empty($where['block_id']) || $room->floor->accommodation_block_id === $where['block_id'])
+                && (empty($where['floor_id']) || $room->accommodation_floor_id === $where['floor_id'])
+                && (empty($where['room_ids']) || in_array($room->id, $where['room_ids'], true)))
             ->values();
-        $occupancy = $rooms->mapWithKeys(fn ($room) => [$room->id => (int) $room->active_assignments_count])->all();
-        $roomGender = $rooms->mapWithKeys(fn ($room) => [$room->id => $this->roomGender($room)])->all();
+        if (! empty($where['floor_id']) || ! empty($where['room_ids'])) {
+            // Rooms the manager pointed at fill along the corridor rather than by setup priority.
+            $rooms = $rooms->sort(fn ($a, $b) => strnatcasecmp($a->name, $b->name))->values();
+        }
+        $occupancy = $allRooms->mapWithKeys(fn ($room) => [$room->id => (int) $room->active_assignments_count])->all();
+        $roomGender = $allRooms->mapWithKeys(fn ($room) => [$room->id => $this->roomGender($room)])->all();
 
-        $queue = $registrations->reject(fn (EventRegistration $registration) => $registration->roomAssignment)
+        $proposals = collect();
+        $unallocated = collect();
+        $waiting = $registrations->reject(fn (EventRegistration $registration) => $registration->roomAssignment);
+
+        // People the list names a room for go there first, outside the chosen place if need be.
+        [$named, $waiting] = $waiting->partition(fn (EventRegistration $registration) => filled($requested[$registration->id] ?? null));
+        foreach ($named as $registration) {
+            $wanted = trim($requested[$registration->id]);
+            $found = RoomRange::find($allRooms, $wanted);
+            $room = $found->count() === 1 ? $found->first() : null;
+            $gender = $this->normalizeGender($registration->participant->gender);
+            $problem = match (true) {
+                $found->isEmpty() => "Room {$wanted} on the list was not found, or is closed.",
+                $found->count() > 1 => "More than one room matches {$wanted}: write it as on the room list.",
+                $occupancy[$room->id] >= $room->capacity => "Room {$wanted} on the list is full.",
+                ! $this->matches($registration, $room) || ($roomGender[$room->id] && $gender && $roomGender[$room->id] !== $gender) => "Room {$wanted} on the list does not suit them (gender, category or access).",
+                default => null,
+            };
+            if ($problem) {
+                $unallocated->push(['registration' => $registration, 'reason' => $problem]);
+
+                continue;
+            }
+            $proposals->push(['registration' => $registration, 'room' => $room, 'reason' => 'Room plan: room named on the list.']);
+            $occupancy[$room->id]++;
+            $roomGender[$room->id] ??= $gender;
+        }
+
+        $queue = $waiting
             ->sortBy([
                 fn ($a, $b) => (int) $b->accessibility_required <=> (int) $a->accessibility_required,
                 fn ($a, $b) => (string) $this->normalizeGender($a->participant->gender) <=> (string) $this->normalizeGender($b->participant->gender),
                 fn ($a, $b) => (string) $this->normalizeText($a->participant->room_group) <=> (string) $this->normalizeText($b->participant->room_group),
                 fn ($a, $b) => strcasecmp((string) $a->participant->name, (string) $b->participant->name),
             ])->values();
+        $toPlace = $queue->count();
+        $freeBeds = $rooms->sum(fn ($room) => max(0, $room->capacity - $occupancy[$room->id]));
 
-        $proposals = collect();
-        $unallocated = collect();
         $groups = $queue->groupBy(fn ($registration) => $this->normalizeGender($registration->participant->gender).'|'.(int) $registration->accessibility_required)
             ->flatMap(fn (Collection $bucket) => $bucket->chunk($perRoom)->map->values());
 
@@ -208,8 +248,8 @@ class RoomAllocationService
                     ?? $candidates->sortByDesc(fn ($room) => $room->capacity - $occupancy[$room->id])->first();
 
                 if (! $room) {
-                    $where = $blockId || $siteId ? ' in the chosen location' : '';
-                    $pending->each(fn ($registration) => $unallocated->push(['registration' => $registration, 'reason' => "No free compatible room{$where}."]));
+                    $place = array_filter($where) ? ' in the chosen location' : '';
+                    $pending->each(fn ($registration) => $unallocated->push(['registration' => $registration, 'reason' => "No free compatible room{$place}."]));
 
                     break;
                 }
@@ -225,7 +265,7 @@ class RoomAllocationService
             }
         }
 
-        return compact('proposals', 'unallocated', 'alreadyRoomed');
+        return compact('proposals', 'unallocated', 'alreadyRoomed', 'freeBeds', 'toPlace');
     }
 
     /**

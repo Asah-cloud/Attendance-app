@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Imports\UsersImport;
+use App\Models\AccommodationBlock;
+use App\Models\AccommodationFloor;
+use App\Models\AccommodationRoom;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Services\ParticipantListImporter;
 use App\Services\RoomAllocationService;
+use App\Support\RoomRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -33,12 +37,18 @@ class RoomPlanController extends Controller
         $this->authorize('update', $event);
         abort_unless($event->accommodation_enabled, 404);
 
+        $siteIds = $event->accommodationSites()->pluck('id');
         $options = $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:10240'],
             'per_room' => ['required', 'integer', 'min:1', 'max:20'],
             'site_id' => ['nullable', 'integer', Rule::exists('accommodation_sites', 'id')->where('event_id', $event->id)],
-            'block_id' => ['nullable', 'integer', Rule::exists('accommodation_blocks', 'id')->whereIn('accommodation_site_id', $event->accommodationSites()->pluck('id'))],
+            'block_id' => ['nullable', 'integer', Rule::exists('accommodation_blocks', 'id')->whereIn('accommodation_site_id', $siteIds)],
+            'floor_id' => ['nullable', 'integer', Rule::exists('accommodation_floors', 'id')->whereIn('accommodation_block_id', AccommodationBlock::whereIn('accommodation_site_id', $siteIds)->pluck('id'))],
+            'rooms' => ['nullable', 'string', 'max:1000'],
+            'room_ids' => ['nullable', 'array'],
+            'room_ids.*' => ['integer'],
         ]);
+        $roomIds = $this->chosenRooms($event, $options);
         $file = $request->file('file');
         $path = $file->storeAs('room-plans', Str::uuid().'.'.strtolower($file->getClientOriginalExtension()), 'local');
 
@@ -48,6 +58,8 @@ class RoomPlanController extends Controller
             'per_room' => (int) $options['per_room'],
             'site_id' => isset($options['site_id']) ? (int) $options['site_id'] : null,
             'block_id' => isset($options['block_id']) ? (int) $options['block_id'] : null,
+            'floor_id' => isset($options['floor_id']) ? (int) $options['floor_id'] : null,
+            'room_ids' => $roomIds,
         ];
 
         try {
@@ -149,20 +161,62 @@ class RoomPlanController extends Controller
                         ])->values()->all(),
                     'unallocated' => $plan['unallocated']->map(fn ($item) => $person($item['registration']) + ['reason' => $item['reason']])->all(),
                     'already' => $plan['alreadyRoomed']->map(fn ($registration) => $person($registration) + ['room' => $registration->roomAssignment->room->label()])->all(),
+                    'free_beds' => $plan['freeBeds'],
+                    'to_place' => $plan['toPlace'],
                 ];
             });
 
         return ['rows' => $import->rowResults(), 'review_rows' => $import->reviewRows(), 'preview' => $preview];
     }
 
-    /** Everyone the list put on this event needs a room; place them per the plan's settings. */
+    /** Everyone the list put on this event needs a room; place them per the plan's settings and the list's Room column. */
     private function plan(Event $event, UsersImport $import, array $review): array
     {
-        $ids = collect($import->rowResults())->pluck('registration_id')->filter()->unique();
+        $rows = collect($import->rowResults())->filter(fn ($row) => $row['registration_id']);
+        $ids = $rows->pluck('registration_id')->unique();
         EventRegistration::whereIn('id', $ids)->update(['accommodation_required' => true]);
         $registrations = EventRegistration::whereIn('id', $ids)->get();
+        $requested = $rows->filter(fn ($row) => filled($row['room'] ?? null))->mapWithKeys(fn ($row) => [$row['registration_id'] => $row['room']])->all();
 
-        return $this->rooms->planBatch($event, $registrations, $review['per_room'], $review['site_id'], $review['block_id']);
+        return $this->rooms->planBatch($event, $registrations, $review['per_room'], [
+            'site_id' => $review['site_id'],
+            'block_id' => $review['block_id'],
+            'floor_id' => $review['floor_id'] ?? null,
+            'room_ids' => $review['room_ids'] ?? null,
+        ], $requested);
+    }
+
+    /**
+     * The rooms ticked or typed ("101-110, 115"), within the chosen site, building or floor;
+     * null when none were picked, meaning every room there.
+     *
+     * @return list<int>|null
+     */
+    private function chosenRooms(Event $event, array $options): ?array
+    {
+        $typed = trim((string) ($options['rooms'] ?? ''));
+        $ticked = array_map('intval', $options['room_ids'] ?? []);
+        if ($typed === '' && ! $ticked) {
+            return null;
+        }
+
+        $rooms = AccommodationRoom::query()->with('floor.block')
+            ->whereHas('floor.block', fn ($query) => $query->whereIn('accommodation_site_id', $event->accommodationSites()->pluck('id')))
+            ->get()
+            ->filter(fn (AccommodationRoom $room) => (empty($options['site_id']) || $room->floor->block->accommodation_site_id === (int) $options['site_id'])
+                && (empty($options['block_id']) || $room->floor->accommodation_block_id === (int) $options['block_id'])
+                && (empty($options['floor_id']) || $room->accommodation_floor_id === (int) $options['floor_id']));
+
+        ['ids' => $ids, 'unmatched' => $unmatched] = RoomRange::parse($rooms, $typed);
+        if ($unmatched) {
+            throw ValidationException::withMessages(['rooms' => 'No room in the chosen place matches: '.implode(', ', $unmatched).'.']);
+        }
+        $ids = array_values(array_unique([...$ids, ...array_intersect($ticked, $rooms->modelKeys())]));
+        if (! $ids) {
+            throw ValidationException::withMessages(['rooms' => 'None of the chosen rooms are in the chosen place.']);
+        }
+
+        return $ids;
     }
 
     private function decisions(Request $request): array
@@ -172,6 +226,16 @@ class RoomPlanController extends Controller
 
     private function locationLabel(Event $event, array $review): string
     {
+        if ($review['room_ids'] ?? null) {
+            $names = AccommodationRoom::whereIn('id', $review['room_ids'])->pluck('name')->sort(fn ($a, $b) => strnatcasecmp($a, $b))->values();
+
+            return count($names).' chosen '.Str::plural('room', count($names)).' ('.($names->count() > 6 ? $names->first().' … '.$names->last() : $names->join(', ')).')';
+        }
+        if ($review['floor_id'] ?? null) {
+            $floor = AccommodationFloor::with('block.site')->find($review['floor_id']);
+
+            return $floor ? $floor->block->name.' · '.$floor->name.' ('.$floor->block->site->name.')' : 'All rooms';
+        }
         if ($review['block_id']) {
             $block = $event->accommodationSites()->with('blocks')->get()->flatMap->blocks->firstWhere('id', $review['block_id']);
 

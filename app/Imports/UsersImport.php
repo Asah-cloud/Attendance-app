@@ -43,15 +43,15 @@ class UsersImport implements OnEachRow
      */
     private ?array $columns = null;
 
-    /** Fields in the fixed column order, then those only read from a heading (Country). */
-    private const FIELDS = ['id', 'name', 'gender', 'area', 'category', 'phone', 'email', 'country'];
+    /** Fields in the fixed column order, then those only read from a heading (Country, and Room for a room plan). */
+    private const FIELDS = ['id', 'name', 'gender', 'area', 'category', 'phone', 'email', 'country', 'room'];
 
     /**
      * What happened to each row: new_person (created), newly_registered (already in the system,
      * now added to this event), reconfirmed (was pending or cancelled here), already_registered,
      * or skipped.
      *
-     * @var list<array{row: int, name: string, status: string, registration_id: ?int}>
+     * @var list<array{row: int, name: string, status: string, registration_id: ?int, room?: ?string}>
      */
     private array $rowResults = [];
 
@@ -87,7 +87,7 @@ class UsersImport implements OnEachRow
         return ['registrations' => array_values(array_unique($this->newRegistrationIds)), 'participants' => array_values(array_unique($this->newParticipantIds))];
     }
 
-    /** @return list<array{row: int, name: string, status: string, registration_id: ?int}> */
+    /** @return list<array{row: int, name: string, status: string, registration_id: ?int, room?: ?string}> */
     public function rowResults(): array
     {
         return $this->rowResults;
@@ -134,9 +134,9 @@ class UsersImport implements OnEachRow
         // whatever order the columns are in. Without one, the fixed order applies.
         if ($rowIndex === 1 && ($columns = self::headingColumns($data))) {
             // Name in column B is the fixed layout: keep reading it that way (column A stays the
-            // row's ID, so re-importing an older list still finds the same people), plus Country.
+            // row's ID, so re-importing an older list still finds the same people), plus Country and Room.
             $this->columns = $columns['name'] === 1
-                ? array_slice(array_flip(self::FIELDS), 0, 7) + array_intersect_key($columns, ['country' => true])
+                ? array_slice(array_flip(self::FIELDS), 0, 7) + array_intersect_key($columns, ['country' => true, 'room' => true])
                 : $columns;
 
             return;
@@ -221,12 +221,14 @@ class UsersImport implements OnEachRow
         if ($participant->wasRecentlyCreated) {
             $this->newParticipantIds[] = $participant->id;
         }
-        $this->rowResults[] = ['row' => $rowIndex, 'name' => $participant->name, 'registration_id' => $registration->id, 'status' => match (true) {
-            $participant->wasRecentlyCreated => 'new_person',
-            $registration->wasRecentlyCreated => 'newly_registered',
-            $registration->wasChanged('status') => 'reconfirmed',
-            default => 'already_registered',
-        }];
+        $this->rowResults[] = ['row' => $rowIndex, 'name' => $participant->name, 'registration_id' => $registration->id,
+            // Only from a Room heading: in a list without headings, column I could be anything.
+            'room' => $this->columns !== null ? $value(8) : null, 'status' => match (true) {
+                $participant->wasRecentlyCreated => 'new_person',
+                $registration->wasRecentlyCreated => 'newly_registered',
+                $registration->wasChanged('status') => 'reconfirmed',
+                default => 'already_registered',
+            }];
 
         if ($registration->wasRecentlyCreated) {
             $this->newRegistrationIds[] = $registration->id;
@@ -260,6 +262,7 @@ class UsersImport implements OnEachRow
                 str_contains($heading, 'phone') || str_contains($heading, 'mobile') || str_contains($heading, 'contact') || str_contains($heading, 'tel') => 'phone',
                 str_contains($heading, 'email') => 'email',
                 in_array($heading, ['country', 'nationality'], true) => 'country',
+                in_array($heading, ['room', 'rooms', 'roomno', 'roomnumber', 'roomname'], true) => 'room',
                 default => null,
             };
             if ($field !== null && ! isset($columns[$field])) {

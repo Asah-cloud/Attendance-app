@@ -29,6 +29,12 @@
             <div class="rounded-2xl border {{ count($preview['unallocated']) ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white' }} p-4"><p class="text-xs font-black uppercase {{ count($preview['unallocated']) ? 'text-rose-700' : 'text-slate-400' }}">Can't be placed</p><p class="mt-1 text-2xl font-black">{{ count($preview['unallocated']) }}</p></div>
         </div>
 
+        @if(($preview['to_place'] ?? 0) > ($preview['free_beds'] ?? PHP_INT_MAX))
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" data-short-of-beds>
+                <strong>Not enough beds:</strong> the chosen rooms have {{ $preview['free_beds'] }} free {{ Str::plural('bed', $preview['free_beds']) }}, but {{ $preview['to_place'] }} people on the list need a room. Go back and choose more rooms, or confirm and place the rest later.
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('events.accommodation.plan.confirm', $event) }}" class="space-y-6">
             @csrf
 

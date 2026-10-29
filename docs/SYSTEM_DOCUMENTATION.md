@@ -228,7 +228,7 @@ or `manual`. Each registration's `room_group` (its "area", per event) keeps peop
 |---|---|---|
 | "Assign rooms now", optionally for one category and/or gender | `preview` / `commit` | "Preview selection" shows the proposals and assigns nobody |
 | Confirming a registration | `allocateOne` | Places one person inline |
-| Room plan import (a listed group, N to a room) | `planBatch` / `commitPlan` | Spare beds stay free |
+| Room plan import (a listed group, N to a room) | `planBatch` / `commitPlan` | Spare beds stay free. Can be limited to a site, building, floor, or rooms typed (`RoomRange`: "101-110, NB-115", numbers match the last number in a room's name) or ticked; chosen rooms fill lowest number first. A **Room** heading in the list sends that person to the named room wherever it is, if it has a bed and suits them. The preview warns when the chosen rooms have fewer free beds than people to place |
 | Attendee room picker, while self-selection is open | `selectableRooms` / `claim` | Open until `accommodation_self_select_closes_at` |
 | Room board (drag and drop) or the guests list | `assignManually` | A manager override for category and step-free settings, but never for gender: a room with someone of the other gender refuses, and an empty room kept for the other gender switches its own setting to this person's (`manualGenderCheck`) |
 
