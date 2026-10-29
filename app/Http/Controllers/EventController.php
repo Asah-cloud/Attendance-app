@@ -137,6 +137,17 @@ class EventController extends Controller
         return back()->with('success', 'Import cancelled. Nothing was changed.');
     }
 
+    /** Every participant list imported into this event, newest first, each undoable once. */
+    public function imports(Event $event)
+    {
+        $this->authorize('manageWhenOpen', $event);
+
+        return view('events.imports', [
+            'event' => $event,
+            'imports' => $event->participantImports()->with('user:id,name')->latest('id')->get(),
+        ]);
+    }
+
     /**
      * Take back an import: remove the people it added to this event, and the people it created
      * who are now on no event at all. Anyone already checked in stays, as with "Clear all
