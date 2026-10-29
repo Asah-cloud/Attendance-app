@@ -78,31 +78,31 @@ class EventRegistrationFormController extends Controller
      * Attendees who share a name but, unlike a phone/email match, were never automatically
      * merged into one participant record — grouped so a manager can review and cancel the
      * extra entry by hand instead of the system guessing wrong and merging unrelated people.
+     * Names match in any word order and without titles ("Kwame Asante" = "Pastor Asante Kwame").
      */
     private function possibleDuplicateRegistrations(Event $event)
     {
-        $duplicateNames = $event->registrations()
+        $people = app(ParticipantRegistrationService::class);
+        $names = $event->registrations()
             ->join('participants', 'participants.id', '=', 'event_registrations.participant_id')
             ->where('event_registrations.status', '!=', EventRegistration::STATUS_CANCELLED)
             ->where('participants.is_support_staff', false)
-            ->selectRaw('LOWER(TRIM(participants.name)) as normalized_name')
-            ->groupBy('normalized_name')
-            ->havingRaw('COUNT(DISTINCT participants.id) > 1')
-            ->pluck('normalized_name');
+            ->pluck('participants.name', 'event_registrations.id')
+            ->map(fn ($name) => $people->nameKey($name))
+            ->filter();
+        $sharedIds = $names->groupBy(fn ($key) => $key, true)->filter(fn ($ids) => $ids->count() > 1)->flatMap(fn ($ids) => $ids->keys());
 
-        if ($duplicateNames->isEmpty()) {
+        if ($sharedIds->isEmpty()) {
             return collect();
         }
 
         return $event->registrations()
             ->with('participant')
-            ->where('status', '!=', EventRegistration::STATUS_CANCELLED)
-            ->whereHas('participant', function ($query) use ($duplicateNames): void {
-                $query->where('is_support_staff', false)
-                    ->whereIn(DB::raw('LOWER(TRIM(name))'), $duplicateNames->all());
-            })
+            ->whereIn('id', $sharedIds->all())
             ->get()
-            ->groupBy(fn ($registration) => Str::of($registration->participant->name)->lower()->squish()->toString())
+            ->groupBy(fn ($registration) => $names[$registration->id])
+            // Two registrations of one participant are not two people.
+            ->filter(fn ($group) => $group->pluck('participant_id')->unique()->count() > 1)
             // A group the manager marked as different people stays hidden until someone new joins it.
             ->filter(fn ($group) => $group->contains(fn ($registration) => $registration->duplicate_dismissed_at === null));
     }

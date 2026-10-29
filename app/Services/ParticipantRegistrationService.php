@@ -144,6 +144,23 @@ class ParticipantRegistrationService
         return $normalize($a) !== '' && $normalize($a) === $normalize($b);
     }
 
+    /** Titles left out when looking for possible duplicates, so "Pastor Kofi Mensah" is checked as "Kofi Mensah". */
+    private const NAME_TITLES = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof', 'rev', 'revd', 'reverend', 'pastor', 'ps', 'pst', 'pr',
+        'apostle', 'apst', 'prophet', 'prophetess', 'bishop', 'evangelist', 'evang', 'elder', 'deacon', 'deaconess', 'overseer', 'sister', 'brother', 'sis', 'bro'];
+
+    /**
+     * A name reduced for spotting possible duplicates: same words in any order, ignoring case,
+     * punctuation and titles ("Asante Kwame" and "Pastor Kwame Asante" both give "asante kwame").
+     */
+    public function nameKey(?string $name): string
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower((string) $name), -1, PREG_SPLIT_NO_EMPTY);
+        $words = array_diff($words, self::NAME_TITLES) ?: $words;
+        sort($words);
+
+        return implode(' ', $words);
+    }
+
     public function normalizePhone(?string $phone): ?string
     {
         $phone = preg_replace('/[^0-9]/', '', $phone ?? '') ?? '';

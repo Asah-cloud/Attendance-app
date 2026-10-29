@@ -314,6 +314,28 @@ it('flags attendees sharing a name but no phone or email as possible duplicates'
         ->and(substr_count($content, 'Cancelled Twin'))->toBe(4);
 });
 
+it('flags names written in a different order or with a title as possible duplicates', function () {
+    $event = publicRegistrationEvent();
+    $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    foreach (['Kwame Asante', 'Asante Kwame', 'Rev. Kofi Boateng', 'Pastor Boateng Kofi', 'Kofi Boateng Mensah', 'Pastor'] as $name) {
+        $person = Participant::create(['company_id' => $event->company_id, 'name' => $name, 'category' => 'Guest']);
+        $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']);
+    }
+
+    $content = $this->actingAs($manager)->get(route('events.registrations.index', $event))
+        ->assertOk()
+        ->assertSee('2 names shared by 4 entries')
+        // Each entry shows its own name, since they're written differently.
+        ->assertSee('<strong class="text-slate-900">Asante Kwame</strong>', false)
+        ->assertSee('<strong class="text-slate-900">Pastor Boateng Kofi</strong>', false)
+        ->getContent();
+
+    // A third name with an extra word is someone else, and a title alone is never a match.
+    expect(substr_count($content, 'Cancel this one'))->toBe(4)
+        ->and($content)->not->toContain('<strong class="text-slate-900">Kofi Boateng Mensah</strong>');
+});
+
 it('does not flag a single attendee with a unique name as a possible duplicate', function () {
     $event = publicRegistrationEvent();
     $manager = User::factory()->create(['company_id' => $event->company_id, 'role' => 'manager']);
