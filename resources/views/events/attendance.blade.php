@@ -34,7 +34,7 @@
                         @endif
                         <div class="min-w-0">
                             <p class="truncate text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600">{{ $event->company?->name ?? 'Event workspace' }}</p>
-                            <h2 class="mt-2 truncate text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{{ $event->title }}</h2>
+                            <h2 class="mt-2 line-clamp-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{{ $event->title }}</h2>
                             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500">
                                 <span>{{ $event->event_date->format('M j, Y') }}</span>
                                 @if($event->end_date)<span class="text-slate-300">—</span><span>{{ $event->end_date->format('M j, Y') }}</span>@endif
@@ -51,9 +51,20 @@
                             @endunless
                         @endcan
                         @can('manageWhenOpen', $event)
+                            @php
+                                $recentImports = $event->participantImports()->with('user:id,name')->latest('id')->limit(5)->get();
+                                $undoableImports = $event->participantImports()->whereNull('undone_at')->count();
+                            @endphp
                             <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-700">
                                 <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12" /></svg>Import
                             </button>
+                            @if($recentImports->isNotEmpty())
+                                {{-- Past imports, with a count while any can still be undone. --}}
+                                <a href="{{ route('events.imports', $event) }}" data-imports-link class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100">
+                                    Imports
+                                    @if($undoableImports > 0)<span class="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">{{ $undoableImports }} can be undone</span>@endif
+                                </a>
+                            @endif
                         @endcan
                         @can('update', $event)
                             <a href="{{ route('events.sessions.index', $event) }}" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100">Manage sessions</a>
@@ -68,23 +79,6 @@
                     </div>
                 </div>
             </section>
-
-            @can('manageWhenOpen', $event)
-                @php
-                    $recentImports = $event->participantImports()->with('user:id,name')->latest('id')->limit(5)->get();
-                    $lastImport = $recentImports->first();
-                @endphp
-                @if($lastImport && ! $lastImport->undone_at && $lastImport->created_at->gt(now()->subDay()))
-                    {{-- The latest import stays undoable from here for a day; older ones from the Import window. --}}
-                    <div class="mb-8 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between" data-last-import>
-                        <p class="text-sm text-amber-900">
-                            <strong>Last import:</strong> {{ $lastImport->file_name }}, {{ $lastImport->created_at->diffForHumans() }}, added {{ $lastImport->addedToEventCount() }} {{ Str::plural('person', $lastImport->addedToEventCount()) }}.
-                            Imported the wrong list? You can undo it.
-                        </p>
-                        @include('events.partials.undo-import', ['import' => $lastImport])
-                    </div>
-                @endif
-            @endcan
 
             @php $status = $event->status; @endphp
 
@@ -208,7 +202,10 @@
                     @if($recentImports->isNotEmpty())
                         {{-- Recent imports, newest first, each undoable once. --}}
                         <div class="border-t border-gray-100 px-8 pb-8 pt-6">
-                            <h4 class="mb-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Recent imports</h4>
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <h4 class="text-[10px] font-black uppercase tracking-widest text-gray-400">Recent imports</h4>
+                                <a href="{{ route('events.imports', $event) }}" class="text-xs font-bold text-blue-700 hover:text-blue-900">See all imports</a>
+                            </div>
                             <ul class="space-y-3">
                                 @foreach($recentImports as $recent)
                                     <li class="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">

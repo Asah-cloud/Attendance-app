@@ -55,12 +55,33 @@ it('records an import and offers to undo it on the attendance page', function ()
         ->and($import->addedToEventCount())->toBe(3)
         ->and($import->participant_ids)->toHaveCount(2);
 
+    // The attendance page links to the imports instead of showing a box about the last one.
     $this->get(route('events.attendance', $this->event))->assertOk()
-        ->assertSee('data-last-import', false)
+        ->assertSee('data-imports-link', false)
+        ->assertSee('1 can be undone')
+        ->assertSee(route('events.imports', $this->event))
+        ->assertSee('Recent imports')
+        ->assertSee('See all imports');
+
+    $this->get(route('events.imports', $this->event))->assertOk()
         ->assertSee('wrong-list.csv')
         ->assertSee('added 3 people')
-        ->assertSee('Recent imports')
+        ->assertSee($this->manager->name)
         ->assertSee('Undo import');
+});
+
+it('lists every import on the imports page, not only the last five', function () {
+    foreach (range(1, 7) as $n) {
+        ParticipantImport::create(['event_id' => $this->event->id, 'user_id' => $this->manager->id, 'file_name' => "list-{$n}.csv", 'added_count' => 1, 'updated_count' => 0, 'registration_ids' => [], 'participant_ids' => []]);
+    }
+
+    $content = $this->actingAs($this->manager)->get(route('events.imports', $this->event))->assertOk()
+        ->assertSee('list-1.csv')->assertSee('list-7.csv')->getContent();
+    expect(substr_count($content, 'data-import>'))->toBe(7);
+
+    $stranger = User::factory()->create(['company_id' => Company::create(['name' => 'Other Co'])->id, 'role' => 'manager']);
+    $stranger->assignRole('manager');
+    $this->actingAs($stranger)->get(route('events.imports', $this->event))->assertForbidden();
 });
 
 it('removes only the people an import added, keeping anyone who has checked in', function () {
@@ -80,8 +101,11 @@ it('removes only the people an import added, keeping anyone who has checked in',
         ->and($import->fresh()->undone_by)->toBe($this->manager->id);
 
     $this->get(route('events.attendance', $this->event))->assertOk()
-        ->assertDontSee('data-last-import', false)
-        ->assertSee('Undone');
+        ->assertSee('data-imports-link', false)
+        ->assertDontSee('can be undone');
+    $this->get(route('events.imports', $this->event))->assertOk()
+        ->assertSee('Undone')
+        ->assertDontSee('Undo import</button>', false);
 });
 
 it('says so when an import that updated people already on the list is undone', function () {

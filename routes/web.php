@@ -369,6 +369,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/import', [EventController::class, 'import'])->name('events.import.store');
         Route::post('/events/{event}/import/confirm', [EventController::class, 'confirmImport'])->name('events.import.confirm');
         Route::post('/events/{event}/import/cancel', [EventController::class, 'cancelImport'])->name('events.import.cancel');
+        Route::get('/events/{event}/imports', [EventController::class, 'imports'])->name('events.imports');
         Route::delete('/events/{event}/imports/{import}', [EventController::class, 'undoImport'])->name('events.import.undo');
 
         // Hard-copy attendees: import a contact list, customize the welcome
