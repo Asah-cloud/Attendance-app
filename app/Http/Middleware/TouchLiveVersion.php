@@ -19,7 +19,7 @@ class TouchLiveVersion
     /** Route names (prefixes) whose saves change what the people pages show. */
     private const ROUTES = [
         'events.registrations.', 'events.import.', 'events.accommodation.', 'events.registration-fields.',
-        'events.update', 'events.badges.printed.', 'events.staff-badges.printed.', 'events.confirmations.import',
+        'events.update', 'events.attendance.reset', 'events.badges.printed.', 'events.staff-badges.printed.', 'events.confirmations.import',
         'participants.', 'support-staff.import', 'support-staff.clear-all',
     ];
 

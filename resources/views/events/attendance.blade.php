@@ -24,7 +24,8 @@
 
     <div class="py-10 bg-[#f8fafc] overflow-x-hidden">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <section class="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            {{-- No hover lift: a lifted (transformed) card would carry the Reset attendance window with it. --}}
+            <section class="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-no-lift>
                 <div class="flex flex-col justify-between gap-6 p-6 lg:flex-row lg:items-center lg:p-8">
                     <div class="flex min-w-0 items-center gap-5">
                         @if($event->company?->logo_path)
@@ -64,6 +65,68 @@
                                     Imports
                                     @if($undoableImports > 0)<span class="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">{{ $undoableImports }} can be undone</span>@endif
                                 </a>
+                            @endif
+                            @php
+                                $checkInsByDay = \App\Models\Attendance::where('event_id', $event->id)->selectRaw('day, count(*) as total')->groupBy('day')->orderBy('day')->pluck('total', 'day');
+                                $recentResets = $event->attendanceResets()->with('user:id,name')->latest('id')->limit(5)->get();
+                            @endphp
+                            @if($checkInsByDay->isNotEmpty() || $recentResets->isNotEmpty())
+                                <div x-data="{ open: {{ $errors->hasAny(['confirm_title', 'password', 'day']) ? 'true' : 'false' }}, title: @js((string) old('confirm_title', '')) }" class="inline-flex" data-attendance-reset>
+                                    <button type="button" @click="open = true" class="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-extrabold text-red-700 hover:bg-red-100">Reset attendance</button>
+                                    <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="open = false">
+                                        <div role="dialog" aria-modal="true" class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 text-left shadow-xl" @click.outside="open = false">
+                                            <h3 class="text-lg font-black text-slate-900">Reset attendance?</h3>
+                                            @if($checkInsByDay->isNotEmpty())
+                                                <p class="mt-2 text-sm text-slate-600">This removes the check-ins taken for <strong>{{ $event->title }}</strong>, as if nobody had been marked present. Registrations, rooms and meals are not touched. The company's managers are emailed, and you can undo it below.</p>
+                                                <form method="POST" action="{{ route('events.attendance.reset', $event) }}" class="mt-4 space-y-3">
+                                                    @csrf
+                                                    <div>
+                                                        <label for="reset-day" class="text-xs font-bold text-slate-500">Which check-ins</label>
+                                                        <select id="reset-day" name="day" class="mt-1 w-full rounded-xl border-slate-300 text-sm">
+                                                            <option value="all">All days ({{ $checkInsByDay->sum() }} check-ins)</option>
+                                                            @foreach($checkInsByDay as $resetDay => $total)
+                                                                <option value="{{ $resetDay }}" @selected(old('day') === (string) $resetDay)>{{ (int) $resetDay === 0 ? 'Arrival' : 'Day '.$resetDay }} only ({{ $total }})</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label for="reset-title" class="text-xs font-bold text-slate-500">Type the event title to confirm</label>
+                                                        <input id="reset-title" name="confirm_title" x-model="title" autocomplete="off" placeholder="{{ $event->title }}" class="mt-1 w-full rounded-xl border-slate-300 text-sm">
+                                                        <x-input-error :messages="$errors->get('confirm_title')" class="mt-1" />
+                                                    </div>
+                                                    <div>
+                                                        <label for="reset-password" class="text-xs font-bold text-slate-500">Your password</label>
+                                                        <input id="reset-password" name="password" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-xl border-slate-300 text-sm">
+                                                        <x-input-error :messages="$errors->get('password')" class="mt-1" />
+                                                    </div>
+                                                    <div class="flex justify-end gap-2 pt-1">
+                                                        <button type="button" @click="open = false" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600">Cancel</button>
+                                                        <button type="submit" x-bind:disabled="title.trim() !== @js($event->title)" class="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white disabled:opacity-40">Reset attendance</button>
+                                                    </div>
+                                                </form>
+                                            @else
+                                                <p class="mt-2 text-sm text-slate-600">No check-ins have been taken.</p>
+                                            @endif
+                                            @if($recentResets->isNotEmpty())
+                                                <div class="mt-6 border-t border-slate-100 pt-4">
+                                                    <p class="text-xs font-black uppercase tracking-wider text-slate-400">Recent resets</p>
+                                                    <ul class="mt-2 divide-y divide-slate-100">
+                                                        @foreach($recentResets as $reset)
+                                                            <li class="flex items-center justify-between gap-3 py-2 text-xs" data-attendance-reset-row>
+                                                                <span class="text-slate-600"><strong class="text-slate-800">{{ $reset->label() }}</strong> · {{ $reset->removed_count }} removed by {{ $reset->user?->name ?? 'someone' }}, {{ $reset->created_at->diffForHumans() }}</span>
+                                                                @if($reset->undone_at)
+                                                                    <span class="shrink-0 font-bold text-slate-400">Undone</span>
+                                                                @else
+                                                                    <form method="POST" action="{{ route('events.attendance.reset.undo', [$event, $reset]) }}" onsubmit="return confirm('Put these {{ $reset->removed_count }} check-ins back?')">@csrf<button class="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 font-black text-slate-700 hover:bg-slate-50">Undo</button></form>
+                                                                @endif
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             @endif
                         @endcan
                         @can('update', $event)
