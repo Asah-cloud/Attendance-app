@@ -251,6 +251,10 @@ or `manual`. Each registration's `room_group` (its "area", per event) keeps peop
 `{building}`, `{floor}`, `{location}` and `{room_link}` (`MergeFields`). Reports, CSV and PDF rooming
 lists come from `AccommodationController::report/exportCsv/exportPdf`.
 
+### 6.13a Reset attendance
+
+Managers (and admins) can remove an event's check-ins from **Attendance → Reset attendance**: every day, or one day. It needs the exact event title and the person's own password, is limited to 5 tries a minute, and only works while the event is open (closing reconciles the attendee bill from the check-ins, so a closed event's check-ins can't be wiped). Each reset is stored in `attendance_resets` with the removed rows, who did it and from where; **Undo** in the same window puts them back (people deleted since are skipped, check-ins taken again since are kept). Every reset and undo emails the company's managers (`AttendanceWasReset`). Registrations, rooms and meals are not touched. The attendance header card has `data-no-lift`: the global hover lift (a transform) would otherwise move the fixed window with the card.
+
 ### 6.14 Live updates (no reload)
 
 Open pages show edits made anywhere (another tab, another person, a background job) within about

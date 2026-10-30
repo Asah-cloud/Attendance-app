@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AttendanceConfirmationController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceResetController;
 use App\Http\Controllers\AuditAccessController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
@@ -387,6 +388,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         // Manual Attendance Overrides
         Route::post('events/{event}/attendance', [AttendanceController::class, 'store'])->name('events.attendance.store');
         Route::delete('/events/{event}/attendance/{participant_id}', [AttendanceController::class, 'destroy'])->name('events.attendance.destroy');
+        Route::post('/events/{event}/attendance-reset', [AttendanceResetController::class, 'store'])->middleware('throttle:5,1')->name('events.attendance.reset');
+        Route::post('/events/{event}/attendance-reset/{reset}/undo', [AttendanceResetController::class, 'undo'])->middleware('throttle:5,1')->name('events.attendance.reset.undo');
     });
 
     // --- MANAGER ONLY: participant data cleanup (not event-scoped) ---
