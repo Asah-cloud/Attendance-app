@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\CodeSignInController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -20,6 +21,10 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::get('login/code', [CodeSignInController::class, 'create'])->name('login.code');
+    Route::post('login/code/send', [CodeSignInController::class, 'send'])->middleware('throttle:10,1')->name('login.code.send');
+    Route::post('login/code', [CodeSignInController::class, 'store'])->middleware('throttle:20,1')->name('login.code.store');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

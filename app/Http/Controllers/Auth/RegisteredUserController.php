@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\NewAccountCredentials;
+use App\Services\SignInCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -45,13 +46,14 @@ class RegisteredUserController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, SignInCode $codes): RedirectResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'company_id' => ['nullable', 'exists:companies,id'],
             'role' => ['required', 'exists:roles,name'],
+            'sign_in' => ['nullable', 'in:code,password'],
         ]);
 
         $currentUser = Auth::user();
@@ -63,6 +65,14 @@ class RegisteredUserController extends Controller
         abort_unless($isAdmin || in_array($role, ['usher', 'audit_head', 'audit_staff'], true), 403);
         $companyId = $isAdmin ? $request->input('company_id') : $currentUser->company_id;
 
+        // Staff roles can be added to sign in with an emailed code instead of a password;
+        // managers and admins always get a password.
+        $withCode = $request->input('sign_in') === 'code' && in_array($role, ['usher', 'audit_head', 'audit_staff'], true);
+        if ($request->input('sign_in') === 'code' && ! $withCode) {
+            throw ValidationException::withMessages(['sign_in' => 'Managers and admins sign in with a password.']);
+        }
+
+        // A code user never learns this password; it only fills the column.
         $temporaryPassword = Str::password(16);
 
         $user = User::create([
@@ -73,7 +83,8 @@ class RegisteredUserController extends Controller
             'role' => $role,
             'company_id' => $companyId,
             'email_verified_at' => now(),
-            'must_change_password' => true,
+            'must_change_password' => ! $withCode,
+            'signs_in_with_code' => $withCode,
         ]);
 
         $user->assignRole(Role::findOrCreate($role));
@@ -84,6 +95,13 @@ class RegisteredUserController extends Controller
         // an explicit assignment via Edit Member.
         if (in_array($role, ['usher', 'audit_head', 'audit_staff'], true) && $companyId) {
             $user->events()->sync(Event::where('company_id', $companyId)->pluck('id'));
+        }
+
+        if ($withCode) {
+            $codes->send($user, invite: true);
+
+            return redirect()->route('admin.users.index')
+                ->with('success', "{$user->name} has been added. We've emailed {$user->email} a sign-in code; it lasts 7 days.");
         }
 
         $user->notify(new NewAccountCredentials($temporaryPassword));

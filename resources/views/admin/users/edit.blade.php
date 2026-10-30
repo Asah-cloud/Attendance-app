@@ -88,6 +88,13 @@
                 </form>
 
                 @if(! auth()->user()->is($user) && ! $user->hasRole('admin'))
+                    @if($user->signs_in_with_code)
+                        <div class="mt-8 border-t border-gray-100 pt-7" data-sign-in-code-section>
+                            <h3 class="text-sm font-black text-gray-900">Signs in with an emailed code</h3>
+                            <p class="mt-1 text-xs leading-5 text-gray-500">{{ $user->name }} has no password. They ask for a code on the sign-in page each time, or you can email them one that lasts 7 days.</p>
+                            <form method="POST" action="{{ route('admin.users.sign-in-code', $user) }}" class="mt-4">@csrf<button class="rounded-xl bg-blue-600 px-5 py-3 text-xs font-black text-white hover:bg-blue-700">Email a new code</button></form>
+                        </div>
+                    @endif
                     <div class="mt-8 border-t border-gray-100 pt-7">
                         <h3 class="text-sm font-black text-gray-900">Password recovery</h3>
                         <p class="mt-1 text-xs leading-5 text-gray-500">Email a secure reset link, or generate a one-time temporary password when email is unavailable.</p>

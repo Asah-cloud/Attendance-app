@@ -42,6 +42,9 @@
                             <td class="px-6 py-4">
                                 <div class="text-sm font-bold text-gray-900">{{ $user->name }}</div>
                                 <div class="text-[10px] text-gray-400 uppercase font-medium">Joined {{ $user->created_at->format('M d, Y') }}</div>
+                                @if($user->signs_in_with_code)
+                                    <span class="mt-1 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">Signs in with code</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600">
                                 <div class="flex flex-col">

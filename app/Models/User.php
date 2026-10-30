@@ -13,8 +13,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'email_verified_at', 'password', 'phone', 'member_id', 'category', 'role', 'company_id', 'must_change_password', 'password_changed_at', 'onboarding_tours_seen'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'email_verified_at', 'password', 'phone', 'member_id', 'category', 'role', 'company_id', 'must_change_password', 'password_changed_at', 'onboarding_tours_seen', 'signs_in_with_code'])]
+#[Hidden(['password', 'remember_token', 'sign_in_code'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, HasRoles, Notifiable;
@@ -34,6 +34,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'must_change_password' => 'boolean',
             'password_changed_at' => 'datetime',
             'onboarding_tours_seen' => 'array',
+            'signs_in_with_code' => 'boolean',
+            'sign_in_code_expires_at' => 'datetime',
         ];
     }
 
