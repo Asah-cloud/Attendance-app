@@ -44,11 +44,41 @@
                 </div>
             </div>
             <p class="text-xs leading-5 text-slate-500">New staff are automatically assigned on every event currently in the selected company. You can fine-tune which events they can access afterwards from Edit Member.</p>
-            <p class="text-xs leading-5 text-slate-500">A temporary password will be emailed to them. They'll be required to set their own password the first time they sign in.</p>
+            <fieldset data-sign-in-choice>
+                <legend class="text-sm font-bold text-slate-700">How they sign in</legend>
+                <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                    <label class="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="sign_in" value="code" class="mt-1 text-blue-600 focus:ring-blue-500" {{ old('sign_in', 'code') === 'code' ? 'checked' : '' }}>
+                        <span><span class="block text-sm font-extrabold text-slate-800">Send a sign-in code</span>
+                            <span class="mt-1 block text-xs leading-5 text-slate-500">No password. We email a 6-digit code (lasts 7 days); they type it on the sign-in page. Later they ask for a new code each time. For ushers and audit staff.</span></span>
+                    </label>
+                    <label class="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="sign_in" value="password" class="mt-1 text-blue-600 focus:ring-blue-500" {{ old('sign_in') === 'password' ? 'checked' : '' }}>
+                        <span><span class="block text-sm font-extrabold text-slate-800">Temporary password</span>
+                            <span class="mt-1 block text-xs leading-5 text-slate-500">We email a temporary password; they choose their own the first time they sign in. Managers and admins always use this.</span></span>
+                    </label>
+                </div>
+                <x-input-error :messages="$errors->get('sign_in')" class="mt-1" />
+            </fieldset>
             <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
                 <a href="{{ route('admin.users.index') }}" class="rounded-xl border border-slate-200 px-5 py-3 text-center text-sm font-extrabold text-slate-600 hover:bg-slate-50">Cancel</a>
                 <button class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-200 hover:bg-blue-700">Create account</button>
             </div>
         </form>
     </div>
+
+    <script>
+        // Managers and admins always sign in with a password.
+        (() => {
+            const role = document.getElementById('role');
+            const choice = (value) => document.querySelector(`[data-sign-in-choice] input[value="${value}"]`);
+            const sync = () => {
+                const staff = ['usher', 'audit_head', 'audit_staff'].includes(role.value);
+                choice('code').disabled = !staff;
+                if (!staff) choice('password').checked = true;
+            };
+            role.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
 </x-app-layout>

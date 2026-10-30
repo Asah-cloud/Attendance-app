@@ -124,6 +124,10 @@ Roles are managed by Spatie Laravel Permission and mirrored onto the legacy `use
 | `manager` | Own company only | Full control over their company's events, users, participants, registration forms, billing, branding, and de-duplication tooling. Cannot see other companies' data. |
 | `usher` | Assigned events only | Can view and scan attendance only for events they are explicitly assigned to via the `event_staff` pivot. |
 
+### 5.1a Sign-in with an emailed code
+
+Staff roles (usher, audit head, audit staff) can be added on **Team → Add team member** with **Send a sign-in code** instead of a temporary password (`users.signs_in_with_code`). They have no password they know: `SignInCode` emails a 6-digit code (hashed in `users.sign_in_code`, one at a time). The code from the invite lasts 7 days; codes asked for on `login/code` last 15 minutes. A code works once and stops after 5 wrong tries. Requests are limited to 3 codes per email every 10 minutes, and the page never says whether an email has an account. "Keep me signed in" lasts 30 days. Code sign-ins and failures go to the sign-in log like password ones. A manager can email a new 7-day code from the member's edit page (`admin.users.sign-in-code`, audited as `sign_in_code`). Their role and events are changed on the edit page as for anyone; managers and admins can't be added this way. Assigned ushers can open their events' reports as before.
+
 ### 5.2 Signed and token-based public access
 
 Public-facing flows do not require authentication and instead rely on unguessable tokens/signed routes rather than login:

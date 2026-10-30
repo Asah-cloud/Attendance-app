@@ -246,6 +246,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::delete('/admin/users/{user}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
         Route::post('/admin/users/{user}/password-reset-link', [AdminPasswordResetController::class, 'sendLink'])->name('admin.users.password.link');
         Route::post('/admin/users/{user}/temporary-password', [AdminPasswordResetController::class, 'temporaryPassword'])->name('admin.users.password.temporary');
+        Route::post('/admin/users/{user}/sign-in-code', [AdminPasswordResetController::class, 'sendCode'])->middleware('throttle:10,1')->name('admin.users.sign-in-code');
 
         // Event resource routes for Managers and Admins
         Route::patch('/events/{event}/cancel', [EventController::class, 'cancel'])->name('events.cancel');

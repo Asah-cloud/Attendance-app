@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PasswordResetAudit;
 use App\Models\User;
+use App\Services\SignInCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,18 @@ class AdminPasswordResetController extends Controller
             ->with('success', 'Temporary password generated. It will be shown only once.')
             ->with('temporary_password', $temporaryPassword)
             ->with('temporary_password_user', $user->name);
+    }
+
+    /** A new sign-in code for someone who signs in with codes, lasting as long as the first one. */
+    public function sendCode(Request $request, User $user, SignInCode $codes): RedirectResponse
+    {
+        $this->authorizeReset($request, $user);
+        abort_unless($user->signs_in_with_code, 404);
+
+        $codes->send($user, invite: true);
+        $this->audit($request, $user, 'sign_in_code');
+
+        return back()->with('success', "A new sign-in code was emailed to {$user->email}. It lasts 7 days.");
     }
 
     private function authorizeReset(Request $request, User $user): void
