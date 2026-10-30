@@ -37,6 +37,13 @@
         .is-placing [data-room-card]:not(.is-full), .is-placing aside[data-drop-zone] { cursor: pointer; box-shadow: 0 0 0 2px rgb(52 211 153 / .45); }
         .is-placing [data-room-card]:not(.is-full):hover { box-shadow: 0 0 0 3px rgb(52 211 153 / .95); }
         .board-chip.is-selected { outline: 3px solid rgb(252 211 77); outline-offset: 2px; }
+        /* Searching: only matching people wait, and when a match is in a room, only those rooms show, in any
+           building or room filter. A search matching only waiting people leaves the rooms, to place them. */
+        [data-searching] aside [data-registration-id]:not(.is-hit), [data-searching-rooms] [data-room-card]:not(.is-match) { display: none !important; }
+        [data-searching-rooms] [data-room-card].is-match { display: block !important; }
+        [data-searching-rooms] [data-block-section].has-match { display: block !important; }
+        [data-searching-rooms] [data-block-section]:not(.has-match) { display: none !important; }
+        .board-chip.is-hit { box-shadow: 0 0 0 3px rgb(252 211 77); }
         .is-dragging, .is-dragging * { cursor: grabbing !important; }
     </style>
 </head>
@@ -68,8 +75,9 @@
             <div class="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-5 pb-4 lg:px-8">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
-                    <input type="search" data-board-search placeholder="Find a person, area or phone" class="w-72 rounded-xl border-white/10 bg-white/10 py-2 pl-9 text-sm text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-indigo-400">
+                    <input type="search" data-board-search placeholder="Find a person, room, area or phone" class="w-72 rounded-xl border-white/10 bg-white/10 py-2 pl-9 text-sm text-white placeholder-slate-400 focus:border-indigo-400 focus:ring-indigo-400">
                 </div>
+                <p data-search-summary hidden aria-live="polite" class="text-xs font-bold text-amber-200"></p>
                 <div class="flex flex-wrap gap-1.5 text-xs font-bold">
                     <button type="button" @click="building = 'all'" :class="building === 'all' ? 'bg-white text-slate-900' : 'bg-white/10 text-slate-200 hover:bg-white/20'" class="rounded-full px-3 py-1.5 transition">All buildings</button>
                     @foreach($buildings as $building)
@@ -109,7 +117,7 @@
             <main class="space-y-8">
                 @forelse($sites as $site)
                     @foreach($site->blocks as $block)
-                        <section x-show="building === 'all' || building === '{{ $block->id }}'" class="space-y-4">
+                        <section data-block-section x-show="building === 'all' || building === '{{ $block->id }}'" class="space-y-4">
                             <div class="flex flex-wrap items-baseline gap-3">
                                 <h2 class="text-lg font-black">{{ $block->name }}</h2>
                                 <span class="text-xs font-bold text-slate-400">{{ $site->name }}</span>

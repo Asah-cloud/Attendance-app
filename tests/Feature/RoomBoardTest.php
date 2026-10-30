@@ -45,6 +45,10 @@ it('shows rooms with their occupants and the people who still need a room', func
 
     $this->actingAs($this->manager)->get(route('events.accommodation.board', $this->event))->assertOk()
         ->assertSee('data-room-board', false)
+        // The search filters by these: each person's words, each building's section, and a result line.
+        ->assertSee('data-search="ama serwaa', false)
+        ->assertSee('data-block-section', false)
+        ->assertSee('data-search-summary', false)
         ->assertSeeInOrder(['Needs a room', 'Ama Serwaa', 'A01', '1 / 2 beds', 'Kofi Mensah', 'A02', '0 / 2 beds']);
     $this->get(route('events.accommodation.index', $this->event))->assertSee(route('events.accommodation.board', $this->event), false);
 });
