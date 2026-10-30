@@ -16,6 +16,7 @@ use App\Http\Controllers\EventFormController;
 use App\Http\Controllers\EventRegistrationFormController;
 use App\Http\Controllers\EventSessionController;
 use App\Http\Controllers\FormViewerController;
+use App\Http\Controllers\LiveVersionController;
 use App\Http\Controllers\MealDistributionController;
 use App\Http\Controllers\MessageTemplateController;
 use App\Http\Controllers\OnboardingController;
@@ -112,6 +113,8 @@ Route::get('/dashboard', DashboardController::class)
     ->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Open pages ask this every few seconds and redraw when it changes.
+    Route::get('/live-version', LiveVersionController::class)->middleware('throttle:600,1')->name('live.version');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

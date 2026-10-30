@@ -247,6 +247,24 @@ or `manual`. Each registration's `room_group` (its "area", per event) keeps peop
 `{building}`, `{floor}`, `{location}` and `{room_link}` (`MergeFields`). Reports, CSV and PDF rooming
 lists come from `AccommodationController::report/exportCsv/exportPdf`.
 
+### 6.14 Live updates (no reload)
+
+Open pages show edits made anywhere (another tab, another person, a background job) within about
+five seconds, without reloading. `LiveVersion` keeps a marker per event and per company in the
+cache; model events in `AppServiceProvider` move it when a participant, registration, room
+assignment, room inventory, badge print or the event changes, and the `TouchLiveVersion`
+middleware moves it after successful saves on people and room routes, which covers bulk query
+updates. Check-ins, scans, meals and messages don't move it (their pages poll on their own). Writes
+are throttled to one every two seconds per marker, with a final write when the request or job
+ends. Pages carry `<x-live-version />` (the marker's URL, `live.version`, and the version they were
+drawn at); `resources/js/live-updates.js` asks every 5 s while the tab is visible and, when it has
+moved, fetches the page again and morphs each `[data-live-root]` in place (the layout's content,
+the room board's rooms) and refreshes Livewire components. A focused field, a form with unsaved
+changes, an open modal or `[data-live-busy]` (a drag or tap-to-place on the room board) holds the
+redraw; open `<details>` and rows shown by script stay open. The room board restores drag and drop,
+its view, opened rooms, counts and search on `live:updated`; Badge Studio reloads its people list
+and preview data itself, keeping ticks.
+
 ## 7. Notifications architecture
 
 | Notification | Trigger |

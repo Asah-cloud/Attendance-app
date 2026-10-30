@@ -13,3 +13,6 @@ if (document.querySelector('[data-room-board]')) {
 }
 
 Livewire.start();
+
+// Open pages redraw themselves when people or rooms change (needs Alpine and Livewire above).
+import('./live-updates');

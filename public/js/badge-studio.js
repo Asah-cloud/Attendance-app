@@ -804,6 +804,51 @@
         };
         img.src = artwork;
     }
+    // Someone's details changed elsewhere (a name, gender, a new registration): every few seconds
+    // the studio checks the live marker (as resources/js/live-updates.js does on other pages) and
+    // reloads its list and preview data, keeping ticks, filters and the design untouched.
+    const live = document.querySelector('meta[name="live-version"]');
+    async function reloadPeople() {
+        const response = await fetch(location.href, { headers: { Accept: "text/html" }, credentials: "same-origin" }).catch(() => null);
+        if (!response?.ok || response.redirected) return false;
+        const page = new DOMParser().parseFromString(await response.text(), "text/html");
+        const data = page.getElementById("badge-attendees"),
+            list = page.getElementById("attendee-list"),
+            preview = page.getElementById("preview-attendee");
+        if (!data || !list || !preview) return false;
+        c.attendees = JSON.parse(data.textContent);
+        const ticked = new Map([...document.querySelectorAll("#attendee-list input")].map((x) => [x.value, x.checked]));
+        $("attendee-list").replaceChildren(...[...list.children].map((row) => document.importNode(row, true)));
+        document.querySelectorAll("#attendee-list input").forEach((x) => {
+            if (ticked.has(x.value)) x.checked = ticked.get(x.value);
+        });
+        previewOptions.splice(0, previewOptions.length, ...[...preview.options].map((o) => document.importNode(o, true)));
+        const select = $("preview-attendee"),
+            current = select.value;
+        if ($("preview-search")) filterPreview();
+        else select.replaceChildren(...previewOptions);
+        if (previewOptions.some((o) => o.value === current)) select.value = current;
+        filter();
+        render();
+        return true;
+    }
+    if (live) {
+        let seen = live.dataset.version,
+            checking = false;
+        setInterval(async () => {
+            if (document.hidden || checking) return;
+            checking = true;
+            try {
+                const response = await fetch(live.content, { headers: { Accept: "application/json" }, credentials: "same-origin" });
+                const version = response.ok ? (await response.json()).version : null;
+                if (version && version !== seen && (await reloadPeople())) seen = version;
+            } catch {
+                // Offline for a moment: try again next time.
+            } finally {
+                checking = false;
+            }
+        }, 5000);
+    }
     render();
     filter();
     if (dirty) markDirty();

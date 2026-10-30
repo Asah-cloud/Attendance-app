@@ -15,6 +15,7 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800&display=swap" rel="stylesheet" />
         @livewireStyles
+        <x-live-version />
         <x-compiled-assets />
         <style>[x-cloak] { display: none !important; }</style>
     </head>
@@ -66,7 +67,10 @@
                 <main class="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                     <div class="mx-auto max-w-7xl">
                         @include('layouts.context-navigation')
-                        {{ $slot }}
+                        {{-- Redrawn in place when the event's people or rooms change (live-updates.js). --}}
+                        <div data-live-root>
+                            {{ $slot }}
+                        </div>
                     </div>
                 </main>
             </div>
