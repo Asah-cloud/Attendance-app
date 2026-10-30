@@ -85,6 +85,8 @@ function refreshCounts() {
     const freeTotal = board.querySelector('[data-total-free]');
     if (placedTotal) placedTotal.textContent = placed;
     if (freeTotal) freeTotal.textContent = Math.max(0, beds - placed);
+    // A move can bring someone into or out of a searched room.
+    if (board.hasAttribute('data-searching')) return runSearch();
     applyFilter();
 }
 
@@ -156,6 +158,58 @@ function select(chip) {
         banner.style.display = selected ? '' : 'none';
         if (selected) banner.querySelector('[data-placing-name]').textContent = selected.dataset.name;
     }
+}
+
+/** Words compared loosely: case ignored, and a phone number's leading zeros dropped. */
+const searchWords = (text) => text.toLowerCase().split(/\s+/).filter(Boolean).map((word) => (/^\d+$/.test(word) ? word.replace(/^0+/, '') : word)).filter(Boolean);
+const roomKey = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Filter the board to a search, like the live search: only the people who match stay in
+ * "Needs a room", and only rooms holding a match (or named like the search) stay on the board,
+ * opened so names show, across every building and whatever the room filter. When the only
+ * matches are waiting, the rooms stay so they can be placed. Clearing restores the board.
+ */
+function runSearch() {
+    const input = board.querySelector('[data-board-search]');
+    const words = searchWords(input?.value ?? '');
+    const searching = words.length > 0;
+    board.toggleAttribute('data-searching', searching);
+    let people = 0;
+    let waiting = 0;
+    let rooms = 0;
+
+    board.querySelectorAll('[data-registration-id]').forEach((chip) => {
+        const hit = searching && words.every((word) => chip.dataset.search.includes(word));
+        chip.classList.toggle('is-hit', hit);
+        if (hit) {
+            people += 1;
+            if (chip.closest('[data-room-list]')?.dataset.roomId === '') waiting += 1;
+        }
+    });
+    board.querySelectorAll('[data-room-card]').forEach((card) => {
+        const name = roomKey(card.querySelector('[data-room-list]').dataset.roomName ?? '');
+        const match = searching && (Boolean(card.querySelector('.is-hit')) || (roomKey(input.value) !== '' && name.includes(roomKey(input.value))));
+        card.classList.toggle('is-match', match);
+        rooms += match ? 1 : 0;
+        // Open folded rooms that match, so the person's name shows; fold them again afterwards.
+        if (match && !card.classList.contains('is-open')) { setOpen(card, true); card.dataset.searchOpened = '1'; }
+        if (!match && card.dataset.searchOpened) { setOpen(card, false); delete card.dataset.searchOpened; }
+    });
+    board.querySelectorAll('[data-block-section]').forEach((section) => section.classList.toggle('has-match', Boolean(section.querySelector('[data-room-card].is-match'))));
+    board.toggleAttribute('data-searching-rooms', rooms > 0);
+
+    const summary = board.querySelector('[data-search-summary]');
+    if (summary) {
+        summary.hidden = !searching;
+        const placedPeople = people - waiting;
+        summary.textContent = !people && !rooms ? 'No one matches.'
+            : [people ? `${people} ${people === 1 ? 'person' : 'people'} found` : `${rooms} ${rooms === 1 ? 'room' : 'rooms'} found`,
+                waiting ? `${waiting} waiting for a room` : '',
+                placedPeople ? `${placedPeople} in a room` : ''].filter(Boolean).join(' · ');
+    }
+    board.querySelectorAll('[data-floor]').forEach((floor) => floor.classList.remove('is-empty'));
+    applyFilter();
 }
 
 if (board) {
@@ -247,13 +301,9 @@ if (board) {
     setShow(recall('show', 'all'));
     refreshCounts();
 
-    board.querySelector('[data-board-search]')?.addEventListener('input', (event) => {
-        const term = event.target.value.trim().toLowerCase();
-        board.querySelectorAll('[data-registration-id]').forEach((chip) => {
-            const hit = term && chip.dataset.search.includes(term);
-            chip.classList.toggle('ring-2', hit);
-            chip.classList.toggle('ring-amber-400', hit);
-            chip.classList.toggle('opacity-30', Boolean(term) && !hit);
-        });
+    const search = board.querySelector('[data-board-search]');
+    search?.addEventListener('input', runSearch);
+    search?.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && search.value) { search.value = ''; runSearch(); }
     });
 }
