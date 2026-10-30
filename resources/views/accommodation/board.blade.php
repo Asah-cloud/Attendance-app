@@ -16,6 +16,7 @@
     <x-site-icons />
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800&display=swap" rel="stylesheet">
+    <x-live-version />
     <x-compiled-assets />
     <style>
         [x-cloak] { display: none !important; }
@@ -103,7 +104,7 @@
             <button type="button" data-placing-cancel class="rounded-lg bg-slate-900/10 px-3 py-1 text-xs font-black hover:bg-slate-900/20">Cancel</button>
         </div>
 
-        <div class="mx-auto grid max-w-[1600px] items-start gap-6 px-5 py-6 lg:grid-cols-[20rem_1fr] lg:px-8">
+        <div data-live-root class="mx-auto grid max-w-[1600px] items-start gap-6 px-5 py-6 lg:grid-cols-[20rem_1fr] lg:px-8">
             <aside data-drop-zone class="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-4 backdrop-blur-xl lg:sticky lg:top-40">
                 <h2 class="font-black text-amber-200">Needs a room</h2>
                 <p class="mt-0.5 text-xs text-amber-100/70">Drag someone onto any part of a room, or tap them and then tap a room.</p>

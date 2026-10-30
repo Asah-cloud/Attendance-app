@@ -153,6 +153,8 @@ function select(chip) {
     selected = chip === selected ? null : chip;
     selected?.classList.add('is-selected');
     board.classList.toggle('is-placing', Boolean(selected));
+    // Hold live redraws (live-updates.js) while someone is being placed.
+    board.toggleAttribute('data-live-busy', Boolean(selected));
     const banner = board.querySelector('[data-placing-banner]');
     if (banner) {
         banner.style.display = selected ? '' : 'none';
@@ -223,7 +225,9 @@ if (board) {
     document.addEventListener('pointermove', (e) => track(e.clientX, e.clientY), { passive: true });
     document.addEventListener('touchmove', (e) => e.touches[0] && track(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
 
-    board.querySelectorAll('[data-room-list]').forEach((list) => Sortable.create(list, {
+    // Lists get drag and drop once; a live redraw can add rooms, which get it then.
+    const sortable = new WeakSet();
+    const makeSortable = (list) => sortable.has(list) || (sortable.add(list), Sortable.create(list, {
         group: {
             name: 'rooms',
             // A full room accepts nobody new; "Needs a room" always does.
@@ -251,6 +255,7 @@ if (board) {
             dragging = true;
             select(null);
             board.classList.add('is-dragging');
+            board.toggleAttribute('data-live-busy', true);
         },
         // Saving happens on drop, below, so a drop anywhere on a room card counts.
         onEnd: (evt) => {
@@ -258,6 +263,7 @@ if (board) {
             justDragged = true;
             setTimeout(() => { justDragged = false; }, 0);
             board.classList.remove('is-dragging');
+            board.toggleAttribute('data-live-busy', false);
             markZone(null);
             const pointed = lastPoint ? listOf(zoneAt(lastPoint.x, lastPoint.y)) : null;
             const target = pointed && pointed !== evt.to && hasSpace(pointed) ? pointed : evt.to;
@@ -268,6 +274,7 @@ if (board) {
             place(evt.item, evt.from, evt.oldIndex, target);
         },
     }));
+    board.querySelectorAll('[data-room-list]').forEach(makeSortable);
 
     board.addEventListener('click', (event) => {
         if (justDragged || event.target.closest('button, a, input')) return;
@@ -290,10 +297,28 @@ if (board) {
 
     board.querySelectorAll('[data-show-button]').forEach((button) => button.addEventListener('click', () => setShow(button.dataset.showButton)));
     board.querySelector('[data-density-toggle]')?.addEventListener('click', () => setDensity(board.dataset.density === 'compact' ? 'names' : 'compact'));
-    board.querySelectorAll('[data-room-toggle]').forEach((button) => button.addEventListener('click', () => {
+    board.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-room-toggle]');
+        if (!button) return;
         const card = button.closest('[data-room-card]');
         setOpen(card, !card.classList.contains('is-open'));
-    }));
+    });
+
+    // Someone changed people or rooms elsewhere: the board was redrawn (live-updates.js). Put
+    // back drag and drop, the view, rooms that were opened, counts and the search.
+    let opened = [];
+    board.addEventListener('live:before', () => {
+        opened = [...board.querySelectorAll('[data-room-card].is-open:not([data-search-opened]) [data-room-list]')].map((list) => list.dataset.roomId);
+    });
+    board.addEventListener('live:updated', () => {
+        board.querySelectorAll('[data-room-list]').forEach(makeSortable);
+        setDensity(board.dataset.density);
+        opened.forEach((id) => {
+            const card = board.querySelector(`[data-room-list][data-room-id="${id}"]`)?.closest('[data-room-card]');
+            if (card) setOpen(card, true);
+        });
+        refreshCounts();
+    });
     // The building pills (Alpine) change which sections show; re-check empty floors afterwards.
     window.addEventListener('room-board:filter', applyFilter);
 

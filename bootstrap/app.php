@@ -4,6 +4,7 @@ use App\Http\Middleware\ConfineFormViewers;
 use App\Http\Middleware\EnsureCompanyIsActive;
 use App\Http\Middleware\EnsureEventFeature;
 use App\Http\Middleware\RequirePasswordChange;
+use App\Http\Middleware\TouchLiveVersion;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->web(append: [RequirePasswordChange::class, ConfineFormViewers::class]);
+        $middleware->web(append: [RequirePasswordChange::class, ConfineFormViewers::class, TouchLiveVersion::class]);
         $middleware->validateCsrfTokens(except: ['webhooks/paystack']);
         $middleware->alias([
             'company.active' => EnsureCompanyIsActive::class,
