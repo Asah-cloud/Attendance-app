@@ -3,6 +3,7 @@
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\EventAttendeeCharge;
 use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\SubscriptionPayment;
@@ -147,6 +148,8 @@ return [
         Participant::class,
         EventRegistration::class,
         SubscriptionPayment::class,
+        // Recent payments on the admin dashboard.
+        EventAttendeeCharge::class,
         Attendance::class,
         // Report rows (AttendanceGrid) are plain objects.
         stdClass::class,
