@@ -2,6 +2,7 @@
 
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\EventAttendeeCharge;
 use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\User;
@@ -117,4 +118,22 @@ it('counts people on events separately from all directory records', function () 
     $admin->assignRole('admin');
     $this->actingAs($admin)->get(route('dashboard'))->assertOk()
         ->assertSeeInOrder(['People on events', '2', '5 records in the directory']);
+});
+
+it('serves the admin dashboard from the cache when it lists a payment', function () {
+    // The array store keeps objects as they are; the database store (used in production)
+    // serializes them, so only allowlisted classes come back.
+    config(['cache.default' => 'database']);
+    $admin = User::factory()->create(['role' => 'admin']);
+    $admin->assignRole('admin');
+    $company = Company::create(['name' => 'Paying Company', 'subscription_ends_at' => now()->addMonth()]);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Paid Event', 'event_date' => now()->addDay()]);
+    EventAttendeeCharge::create([
+        'event_id' => $event->id, 'company_id' => $company->id, 'status' => EventAttendeeCharge::STATUS_PAID,
+        'registered_count' => 4, 'tier_breakdown' => [], 'amount_minor' => 800, 'currency' => 'GHS',
+        'finalized_at' => now(), 'paid_at' => now(),
+    ]);
+
+    $this->actingAs($admin)->get(route('dashboard'))->assertOk()->assertSee('Paid Event');
+    $this->actingAs($admin)->get(route('dashboard'))->assertOk()->assertSee('Paid Event');
 });
