@@ -41,7 +41,7 @@ class MealDistributionController extends Controller
             ->where('status', EventRegistration::STATUS_CONFIRMED)
             ->count();
         $checkedInCount = $event->attendances()->distinct()->count('participant_id');
-        $auditStaff = $event->staff()->where('company_id', $event->company_id)->role('audit_staff')->get();
+        $stationStaff = $event->staff()->where('company_id', $event->company_id)->role(['audit_staff', 'usher'])->with('roles')->orderBy('name')->get();
         $stations->load('staff');
         if (request()->user()->isAuditStaff()) {
             $stations = $this->staffStations($event)->get();
@@ -53,7 +53,7 @@ class MealDistributionController extends Controller
             return view('audit.food', compact('event', 'meals', 'stations', 'confirmedCount', 'checkedInCount'));
         }
 
-        return view('meals.index', compact('event', 'meals', 'stations', 'confirmedCount', 'checkedInCount', 'auditStaff'));
+        return view('meals.index', compact('event', 'meals', 'stations', 'confirmedCount', 'checkedInCount', 'stationStaff'));
     }
 
     public function store(Request $request, Event $event): RedirectResponse
@@ -226,7 +226,7 @@ class MealDistributionController extends Controller
             'override' => ['nullable', 'boolean'],
             'override_reason' => ['nullable', 'string', 'max:500', 'required_if:override,1'],
             'approval_code' => ['nullable', 'string', 'max:100'],
-            'meal_station_id' => [request()->user()->isAuditStaff() ? 'required' : 'nullable', Rule::exists('meal_stations', 'id')->where('event_id', $event->id)],
+            'meal_station_id' => [$this->servesAtStations($event) ? 'required' : 'nullable', Rule::exists('meal_stations', 'id')->where('event_id', $event->id)],
             'scanned_at' => ['nullable', 'date'],
         ]);
 
@@ -238,7 +238,7 @@ class MealDistributionController extends Controller
         }
 
         $override = $request->boolean('override');
-        if ($request->user()->isAuditStaff()) {
+        if ($this->servesAtStations($event)) {
             abort_unless($this->staffStations($event)->whereKey($validated['meal_station_id'])->exists(), 403);
         }
         if ($override && ! $request->user()->can('manageMeals', $event)) {
@@ -501,7 +501,7 @@ class MealDistributionController extends Controller
         abort_unless($station->event_id === $event->id, 404);
         $data = $request->validate(['staff_ids' => ['nullable', 'array'], 'staff_ids.*' => ['integer', 'distinct']]);
         $ids = $data['staff_ids'] ?? [];
-        $allowed = $event->staff()->where('company_id', $event->company_id)->role('audit_staff')->whereIn('users.id', $ids)->pluck('users.id');
+        $allowed = $event->staff()->where('company_id', $event->company_id)->role(['audit_staff', 'usher'])->whereIn('users.id', $ids)->pluck('users.id');
         abort_unless($allowed->count() === count($ids), 403);
         $station->staff()->sync($allowed);
 
@@ -510,8 +510,23 @@ class MealDistributionController extends Controller
 
     private function staffStations(Event $event)
     {
-        return $event->mealStations()->when(request()->user()->isAuditStaff(),
+        return $event->mealStations()->when($this->servesAtStations($event),
             fn ($q) => $q->whereHas('staff', fn ($users) => $users->where('users.id', request()->user()->id)));
+    }
+
+    /**
+     * Whether the person may only serve at the sharing points they're on: always for audit staff,
+     * and for an usher once they've been put on a point at this event (until then, any point).
+     */
+    private function servesAtStations(Event $event): bool
+    {
+        $user = request()->user();
+        if ($user->isAuditStaff()) {
+            return true;
+        }
+
+        return $user->hasRole('usher') && ! $user->hasAnyRole(['admin', 'manager', 'audit_head'])
+            && $user->mealStations()->where('event_id', $event->id)->exists();
     }
 
     private function scopeMealTotals(MealDistribution $meal, Event $event): void

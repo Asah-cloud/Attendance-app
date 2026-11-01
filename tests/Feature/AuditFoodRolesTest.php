@@ -49,7 +49,7 @@ function auditCode($test, string $scope, ?User $approver = null): string
 }
 
 it('gives audit heads food management without general event management', function () {
-    $this->actingAs($this->head)->get(route('events.meals.index', $this->event))->assertOk()->assertSee('Assign Audit Staff');
+    $this->actingAs($this->head)->get(route('events.meals.index', $this->event))->assertOk()->assertSee('Assign ushers and audit staff');
     $this->post(route('events.meals.store', $this->event), ['name' => 'Dinner', 'total_portions' => 10, 'is_active' => 1])->assertRedirect();
     $this->get(route('events.meals.report', $this->event))->assertOk()->assertDontSee('private@example.com');
     $this->get(route('events.edit', $this->event))->assertForbidden();
@@ -185,4 +185,35 @@ it('scopes collection reports to sharing points and preserves assignments on pro
     expect($this->point->staff()->whereKey($this->staff->id)->exists())->toBeTrue();
     $this->put(route('admin.users.update', $this->staff), ['name' => 'Updated Auditor', 'email' => $this->staff->email, 'role' => 'audit_staff', 'company_id' => $this->company->id, 'event_ids' => []])->assertRedirect();
     expect($this->point->staff()->whereKey($this->staff->id)->exists())->toBeFalse();
+});
+
+it('lets managers put ushers on sharing points, who then serve only there', function () {
+    $usher = auditUser('usher', $this->company, $this->event);
+
+    $this->actingAs($this->manager)->get(route('events.meals.index', $this->event))->assertOk()->assertSee($usher->name)->assertSee('Usher');
+    $this->post(route('events.meals.stations.staff', [$this->event, $this->otherPoint]), ['staff_ids' => [$usher->id]])->assertRedirect();
+    expect($this->otherPoint->staff()->pluck('users.id')->all())->toBe([$usher->id]);
+
+    $this->actingAs($usher)->get(route('events.meals.scanner', [$this->event, $this->meal]))->assertOk()
+        ->assertSee('South private point')->assertDontSee('North sharing point');
+    $url = route('events.meals.issue', [$this->event, $this->meal]);
+    $payload = ['registration_code' => $this->registration->registration_code];
+    $this->postJson($url, $payload)->assertUnprocessable();
+    $this->postJson($url, $payload + ['meal_station_id' => $this->point->id])->assertForbidden();
+    $this->postJson($url, $payload + ['meal_station_id' => $this->otherPoint->id])->assertOk();
+});
+
+it('lets an usher on no sharing point serve at any point', function () {
+    $usher = auditUser('usher', $this->company, $this->event);
+
+    $this->actingAs($usher)->get(route('events.meals.scanner', [$this->event, $this->meal]))->assertOk()
+        ->assertSee('South private point')->assertSee('North sharing point');
+    $this->postJson(route('events.meals.issue', [$this->event, $this->meal]), ['registration_code' => $this->registration->registration_code])->assertOk();
+});
+
+it('does not put ushers from other events on a sharing point', function () {
+    $usher = User::factory()->create(['company_id' => $this->company->id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+
+    $this->actingAs($this->manager)->post(route('events.meals.stations.staff', [$this->event, $this->point]), ['staff_ids' => [$usher->id]])->assertForbidden();
 });
