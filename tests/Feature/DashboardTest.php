@@ -137,3 +137,15 @@ it('serves the admin dashboard from the cache when it lists a payment', function
     $this->actingAs($admin)->get(route('dashboard'))->assertOk()->assertSee('Paid Event');
     $this->actingAs($admin)->get(route('dashboard'))->assertOk()->assertSee('Paid Event');
 });
+
+it('hides closed events from an usher\'s dashboard', function () {
+    $company = Company::create(['name' => 'Usher Co', 'subscription_ends_at' => now()->addMonth()]);
+    $open = Event::create(['company_id' => $company->id, 'title' => 'Youth Camp', 'event_date' => now()->addDay()]);
+    $closed = Event::create(['company_id' => $company->id, 'title' => 'Old Convention', 'event_date' => now()->subDays(5), 'end_date' => now()->subDays(3)]);
+    $usher = User::factory()->create(['company_id' => $company->id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+    $usher->events()->attach([$open->id, $closed->id]);
+
+    $this->actingAs($usher)->get(route('dashboard'))->assertOk()->assertSee('Youth Camp')->assertDontSee('Old Convention');
+    $this->get(route('events.index'))->assertOk()->assertSee('Youth Camp')->assertDontSee('Old Convention');
+});
