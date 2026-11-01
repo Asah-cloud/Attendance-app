@@ -31,8 +31,10 @@ class DashboardController extends Controller
             return $this->managerDashboard($user->company_id);
         }
 
+        // Closed events drop off, as on the Events list; they stay under its "Show past events".
         $events = $user->events()->withCount(['confirmedParticipants', 'attendances'])
-            ->orderBy('event_date')->get();
+            ->orderBy('event_date')->get()
+            ->reject(fn ($event) => $event->status === 'closed')->values();
 
         return view('dashboard', [
             'dashboardType' => 'staff',
