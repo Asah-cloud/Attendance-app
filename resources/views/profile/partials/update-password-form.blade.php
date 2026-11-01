@@ -15,18 +15,44 @@
         </div>
     </header>
 
+    @if(auth()->user()->signs_in_with_code)
+        <form id="send-password-code" method="post" action="{{ route('password.code') }}" class="hidden">@csrf</form>
+    @endif
+
     <form method="post" action="{{ route('password.update') }}" class="space-y-6 max-w-xl">
         @csrf
         @method('put')
 
-        <div class="space-y-2">
-            <x-input-label for="update_password_current_password" :value="__('Current Password')" class="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1" />
-            <x-text-input id="update_password_current_password" name="current_password" type="password" 
-                class="block w-full px-4 py-3 bg-gray-50 border-gray-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none" 
-                autocomplete="current-password" 
-                placeholder="••••••••" />
-            <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2 text-xs font-bold" />
-        </div>
+        @if(auth()->user()->signs_in_with_code)
+            {{-- Code users never had a password: they confirm with a code emailed to them. --}}
+            <div class="space-y-2">
+                <x-input-label for="update_password_code" :value="__('Sign-in Code')" class="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1" />
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <x-text-input id="update_password_code" name="code" type="text" inputmode="numeric" maxlength="7"
+                        class="block w-full px-4 py-3 bg-gray-50 border-gray-100 rounded-xl tracking-[0.3em] focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                        autocomplete="one-time-code"
+                        placeholder="6-digit code" />
+                    <button type="submit" form="send-password-code" class="shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-700 hover:bg-blue-600 hover:text-white transition-all">
+                        {{ __('Email me a code') }}
+                    </button>
+                </div>
+                @if (session('status') === 'password-code-sent')
+                    <p class="text-xs font-bold text-green-600">{{ __('Code sent to :email. It lasts 15 minutes.', ['email' => auth()->user()->email]) }}</p>
+                @else
+                    <p class="text-xs text-gray-400">{{ __('We\'ll email you a code to use here instead of a current password.') }}</p>
+                @endif
+                <x-input-error :messages="$errors->updatePassword->get('code')" class="mt-2 text-xs font-bold" />
+            </div>
+        @else
+            <div class="space-y-2">
+                <x-input-label for="update_password_current_password" :value="__('Current Password')" class="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1" />
+                <x-text-input id="update_password_current_password" name="current_password" type="password" 
+                    class="block w-full px-4 py-3 bg-gray-50 border-gray-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none" 
+                    autocomplete="current-password" 
+                    placeholder="••••••••" />
+                <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2 text-xs font-bold" />
+            </div>
+        @endif
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-2">
