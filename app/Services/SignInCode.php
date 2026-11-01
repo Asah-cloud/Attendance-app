@@ -24,8 +24,21 @@ class SignInCode
     /** Make a new code for the user (replacing any earlier one) and email it. */
     public function send(User $user, bool $invite = false): void
     {
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $minutes = $invite ? self::INVITE_MINUTES : self::LOGIN_MINUTES;
+
+        // Sent straight away rather than queued: the person is waiting at the sign-in page.
+        $user->notifyNow(new SignInCodeNotification($this->issue($user, $minutes), $minutes, $invite));
+    }
+
+    /** A code for a signed-in user to set their own password with, in place of a current password. */
+    public function sendForPassword(User $user): void
+    {
+        $user->notifyNow(new SignInCodeNotification($this->issue($user, self::LOGIN_MINUTES), self::LOGIN_MINUTES, forPassword: true));
+    }
+
+    private function issue(User $user, int $minutes): string
+    {
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $user->forceFill([
             'sign_in_code' => Hash::make($code),
@@ -33,8 +46,7 @@ class SignInCode
             'sign_in_code_attempts' => 0,
         ])->save();
 
-        // Sent straight away rather than queued: the person is waiting at the sign-in page.
-        $user->notifyNow(new SignInCodeNotification($code, $minutes, $invite));
+        return $code;
     }
 
     /** Whether the code is right; a right code is used up, a wrong one counts as a try. */
