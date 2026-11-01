@@ -55,7 +55,7 @@
                     $setup = [
                         ['create', 'New food distribution', 'A lunch, dinner or snack pack, with how many portions there are.', $meals->count().' created · '.$openCount.' open now', $icons['bowl'], 'from-orange-400 to-rose-500', 'event-food-create'],
                         ['stations', 'Sharing points', 'The places food is handed out, like Gate A or the VIP tent.', $stations->count().' sharing point'.($stations->count() === 1 ? '' : 's'), $icons['pin'], 'from-emerald-400 to-teal-600', null],
-                        ['staff', 'Assign Audit Staff', 'Choose who serves at each sharing point.', $auditStaff->count().' audit staff available', $icons['staff'], 'from-sky-400 to-blue-600', null],
+                        ['staff', 'Assign staff', 'Choose which ushers and audit staff serve at each sharing point.', $stationStaff->count().' usher'.($stationStaff->count() === 1 ? '' : 's').' and audit staff available', $icons['staff'], 'from-sky-400 to-blue-600', null],
                     ];
                 @endphp
                 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -101,7 +101,10 @@
                 </div>
 
                 <div x-show="panel === 'staff'" x-cloak data-no-lift class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <h3 class="border-b border-slate-100 px-6 py-4 text-sm font-black text-slate-900">Assign Audit Staff to sharing points</h3>
+                    <div class="border-b border-slate-100 px-6 py-4">
+                        <h3 class="text-sm font-black text-slate-900">Assign ushers and audit staff to sharing points</h3>
+                        <p class="mt-1 text-xs text-slate-500">Someone on a sharing point only sees that point in the food scanner and serves from it. Ushers on no point can serve anywhere.</p>
+                    </div>
                     <div class="divide-y divide-slate-100">
                         @forelse($stations as $station)
                             <form method="POST" action="{{ route('events.meals.stations.staff', [$event, $station]) }}" class="p-6">
@@ -109,9 +112,10 @@
                                 <h4 class="flex items-center gap-2 font-black text-slate-800">
                                     <svg class="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['pin'] }}"/></svg>{{ $station->name }}</h4>
                                 <div class="my-3 flex flex-wrap gap-2">
-                                    @forelse($auditStaff as $member)
-                                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 has-[:checked]:border-sky-300 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-800"><input type="checkbox" name="staff_ids[]" value="{{ $member->id }}" class="rounded text-sky-600" @checked($station->staff->contains('id', $member->id))> {{ $member->name }}</label>
-                                    @empty<p class="text-sm text-slate-500">Ask your manager to create and assign Audit Staff to this event.</p>@endforelse
+                                    @forelse($stationStaff as $member)
+                                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 has-[:checked]:border-sky-300 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-800"><input type="checkbox" name="staff_ids[]" value="{{ $member->id }}" class="rounded text-sky-600" @checked($station->staff->contains('id', $member->id))> {{ $member->name }}
+                                            <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-black uppercase text-slate-500">{{ $member->hasRole('usher') ? 'Usher' : 'Audit staff' }}</span></label>
+                                    @empty<p class="text-sm text-slate-500">Assign ushers or audit staff to this event on the Team page first.</p>@endforelse
                                 </div>
                                 <button class="rounded-xl bg-sky-600 px-4 py-2 text-xs font-black text-white">Save staff assignment</button>
                             </form>
