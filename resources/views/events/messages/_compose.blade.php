@@ -99,7 +99,9 @@
                         </div>
 
                         {{-- Every selected id is posted, however many chips are drawn. --}}
-                        <template x-for="id in selectedIds" :key="id"><input type="hidden" name="participant_ids[]" :value="id"></template>
+                        {{-- One field for the whole selection: one field per person would pass PHP's max_input_vars
+                             (1000) on a big event and silently drop everything after it, mode and message included. --}}
+                        <input type="hidden" name="participant_ids_list" :value="selectedIds.join(',')">
 
                         {{-- The box and its dropdown share one outside-click boundary, so clicking the box never closes the list. --}}
                         <div @click.outside="pickerOpen = false">
