@@ -81,7 +81,7 @@
                     <div class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-600"></div>
                     @csrf
 
-                    @if($fields->isEmpty())
+                    @if($fields->isEmpty() && ! $form->collectsPayment())
                         <p class="text-sm text-slate-500">This form has no questions yet.</p>
                     @endif
 

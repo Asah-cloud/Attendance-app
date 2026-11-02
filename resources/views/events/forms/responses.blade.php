@@ -27,6 +27,14 @@
                 <div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs font-black uppercase text-slate-500">Paid</p><p class="mt-1 text-2xl font-black">{{ $paidCount }}</p></div>
                 <div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs font-black uppercase text-slate-500">Not paid yet</p><p class="mt-1 text-2xl font-black">{{ $form->responses()->where('payment_status', 'unpaid')->count() }}</p></div>
             </div>
+            @php($byChoice = $form->responses()->where('payment_status', 'paid')->whereNotNull('payment_option')->selectRaw('payment_option, count(*) as people, sum(amount_paid_minor) as total')->groupBy('payment_option')->orderBy('payment_option')->get())
+            @if($byChoice->isNotEmpty())
+                <div class="-mt-2 mb-5 flex flex-wrap gap-2">
+                    @foreach($byChoice as $choice)
+                        <span class="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">{{ $choice->payment_option }}: <span class="font-black">{{ $choice->people }}</span> paid · {{ App\Models\AttendeePayment::money((int) $choice->total) }}</span>
+                    @endforeach
+                </div>
+            @endif
         @endif
 
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -38,7 +46,7 @@
             <tbody class="divide-y divide-slate-100">@forelse($responses as $response)
                 <tr>
                     <td class="px-5 py-4 text-slate-500">{{ $response->created_at->format('M j, Y g:i A') }}</td>
-                    @if($showPayment)<td class="whitespace-nowrap px-5 py-4">@include('partials.payment-badge', ['status' => $response->payment_status, 'amount' => $response->amount_paid_minor])</td>@endif
+                    @if($showPayment)<td class="whitespace-nowrap px-5 py-4">@include('partials.payment-badge', ['status' => $response->payment_status, 'amount' => $response->amount_paid_minor, 'option' => $response->payment_option])</td>@endif
                     @foreach($fields as $field)<td class="px-5 py-4 text-slate-700">{{ $response->answers[$field->field_key] ?? '—' }}</td>@endforeach
                 </tr>
             @empty<tr><td colspan="{{ $fields->count() + ($showPayment ? 2 : 1) }}" class="px-5 py-12 text-center text-slate-500">No responses yet.</td></tr>@endforelse</tbody>

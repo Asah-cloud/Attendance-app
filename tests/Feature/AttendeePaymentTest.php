@@ -217,3 +217,49 @@ it('lets only admins switch the platform fee on and off', function () {
     expect(AttendeePaymentService::feeEnabled())->toBeFalse()->and(AttendeePaymentService::feeFor(10000))->toBe(0);
     $this->get(route('integrations.edit'))->assertOk()->assertSee('Platform fee on attendee payments');
 });
+
+it('lets people pick what they are paying for and charges that choice\'s price', function () {
+    fakePaystack($this);
+    $this->actingAs($this->manager)->patch(route('events.forms.payment', [$this->event, $this->form]), [
+        'payment_enabled' => 1, 'payment_label' => 'Camp ticket', 'payment_options' => "Adult: 200\nStudent - 100\nChild: GH₵ 50.50",
+    ])->assertSessionHasNoErrors();
+    expect($this->form->fresh()->paymentOptions())->toBe([
+        ['label' => 'Adult', 'amount_minor' => 20000], ['label' => 'Student', 'amount_minor' => 10000], ['label' => 'Child', 'amount_minor' => 5050],
+    ]);
+    auth()->logout();
+
+    $this->get(route('forms.show', ['youth-camp', $this->form->slug]))->assertOk()->assertSee('Choose what you\'re paying for', false)->assertSee('Student')->assertSee('GH₵ 100.00');
+    $this->post(route('forms.store', ['youth-camp', $this->form->slug]), ['payer_email' => 'kwame@example.com'])->assertSessionHasErrors('payment_option');
+    $this->post(route('forms.store', ['youth-camp', $this->form->slug]), ['payer_email' => 'kwame@example.com', 'payment_option' => 'VIP'])->assertSessionHasErrors('payment_option');
+    $this->post(route('forms.store', ['youth-camp', $this->form->slug]), ['payer_email' => 'kwame@example.com', 'payment_option' => 'Student'])->assertRedirect();
+
+    $payment = AttendeePayment::sole();
+    expect($payment->amount_minor)->toBe(10000)->and($payment->payment_option)->toBe('Student')
+        ->and(initializeRequest()['amount'])->toBe(10000)->and(FormResponse::sole()->payment_option)->toBe('Student');
+
+    $this->get(route('payments.return', $payment->reference));
+    $this->actingAs($this->manager)->get(route('events.forms.responses', [$this->event, $this->form]))
+        ->assertSee('Student: <span class="font-black">1</span> paid', false);
+    expect((new FormResponsesExport($this->form))->map(FormResponse::sole()))->toContain('Student', '100.00');
+});
+
+it('rejects choices that are not written as a name and a price', function () {
+    $this->actingAs($this->manager)->patch(route('events.forms.payment', [$this->event, $this->form]), ['payment_enabled' => 1, 'payment_options' => "Adult: 200\nStudent"])
+        ->assertSessionHasErrors('payment_options');
+    expect($this->form->fresh()->paymentOptions())->toBe([]);
+});
+
+it('charges a registration the price of the choice made, also when paying later', function () {
+    fakePaystack($this);
+    $this->event->update(['registration_payment_enabled' => true, 'registration_payment_options' => [['label' => 'Adult', 'amount_minor' => 20000], ['label' => 'Student', 'amount_minor' => 10000]]]);
+
+    $this->post(route('events.register.store', $this->event), [
+        'name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0201234567', 'gender' => 'Female', 'category' => 'Youth', 'consent' => 1, 'payment_option' => 'Student',
+    ])->assertRedirect();
+    $registration = EventRegistration::sole();
+    expect($registration->payment_option)->toBe('Student')->and(AttendeePayment::sole()->amount_minor)->toBe(10000);
+
+    AttendeePayment::query()->delete();
+    $this->post(route('registrations.pay', $registration->management_token))->assertRedirect();
+    expect(AttendeePayment::sole()->amount_minor)->toBe(10000)->and(AttendeePayment::sole()->payment_option)->toBe('Student');
+});

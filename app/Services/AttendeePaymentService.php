@@ -48,7 +48,7 @@ class AttendeePaymentService
     }
 
     /** Record a payment for a form response or registration and return Paystack's checkout link. */
-    public function start(EventRegistration|FormResponse $payable, Event $event, int $amountMinor, string $email): string
+    public function start(EventRegistration|FormResponse $payable, Event $event, int $amountMinor, string $email, ?string $option = null): string
     {
         $event->loadMissing('company');
         $payment = AttendeePayment::create([
@@ -61,8 +61,9 @@ class AttendeePaymentService
             'platform_fee_minor' => self::feeFor($amountMinor),
             'currency' => config('plans.currency'),
             'payer_email' => $email,
+            'payment_option' => $option,
         ]);
-        $payable->update(['payment_status' => 'unpaid']);
+        $payable->update(['payment_status' => 'unpaid', 'payment_option' => $option]);
 
         return $this->checkout($payment);
     }

@@ -137,6 +137,7 @@ class Event extends Model
         'registration_payment_amount_minor',
         'registration_payment_payer_sets_amount',
         'registration_payment_minimum_minor',
+        'registration_payment_options',
     ];
 
     protected $casts = [
@@ -158,6 +159,7 @@ class Event extends Model
         'registration_payment_amount_minor' => 'integer',
         'registration_payment_payer_sets_amount' => 'boolean',
         'registration_payment_minimum_minor' => 'integer',
+        'registration_payment_options' => 'array',
         'cancelled_at' => 'datetime',
         'badge_category_colors' => 'array',
         'badge_fields' => 'array',

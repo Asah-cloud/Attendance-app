@@ -14,6 +14,7 @@ class FormResponse extends Model
         'ip_address',
         'payment_status',
         'amount_paid_minor',
+        'payment_option',
     ];
 
     protected function casts(): array

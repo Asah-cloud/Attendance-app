@@ -34,7 +34,7 @@
             @if($registration->payment_status === 'paid')
                 <div class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
                     <p class="text-xs font-black uppercase tracking-widest text-emerald-700">Payment</p>
-                    <p class="mt-2 text-lg font-black text-emerald-950">Paid · {{ App\Models\AttendeePayment::money($registration->amount_paid_minor) }}</p>
+                    <p class="mt-2 text-lg font-black text-emerald-950">Paid · {{ App\Models\AttendeePayment::money($registration->amount_paid_minor) }}@if($registration->payment_option) · {{ $registration->payment_option }}@endif</p>
                 </div>
             @elseif($registration->payment_status === 'unpaid' && in_array($registration->status, [\App\Models\EventRegistration::STATUS_CONFIRMED, \App\Models\EventRegistration::STATUS_PENDING], true))
                 <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-5">
