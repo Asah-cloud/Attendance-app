@@ -369,6 +369,14 @@ class CustomMessageController extends Controller
         abort_unless(in_array($intent, ['send', 'schedule', 'draft'], true), 422);
         $isDraft = $intent === 'draft';
 
+        // The compose window sends its selection as one comma-separated field (see _compose).
+        if ($request->filled('participant_ids_list')) {
+            $request->merge(['participant_ids' => array_values(array_unique(array_merge(
+                (array) $request->input('participant_ids', []),
+                array_map('intval', array_filter(explode(',', (string) $request->input('participant_ids_list')), 'is_numeric')),
+            )))]);
+        }
+
         $validated = $request->validate([
             'subject' => ['nullable', 'string', 'max:255'],
             'email_body' => $isDraft ? ['nullable', 'string', 'max:5000'] : ['nullable', 'required_without:sms_body', 'string', 'max:5000'],

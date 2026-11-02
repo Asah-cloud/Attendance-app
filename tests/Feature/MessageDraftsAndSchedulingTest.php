@@ -472,3 +472,24 @@ it('requires a body to save a template and shares templates only within a compan
 
     $this->actingAs($manager)->get(route('events.messages.create', $event))->assertOk()->assertDontSee('Theirs');
 });
+
+it('sends to a big selection given as one field, so PHP\'s field limit never drops the message', function () {
+    Notification::fake();
+    [$company, $manager, $event, $ama, $john] = draftsSetup();
+    $others = collect(range(1, 1200))->map(fn ($i) => Participant::create(['company_id' => $company->id, 'name' => "Guest {$i}", 'email' => "guest{$i}@example.com"]));
+    $others->each(fn ($person) => $event->registrations()->create(['participant_id' => $person->id, 'status' => 'confirmed']));
+
+    $this->actingAs($manager)->post(route('events.messages.store', $event), [
+        'intent' => 'send', 'subject' => 'Camp news', 'email_body' => 'See you soon', 'sms_body' => 'See you soon', 'mode' => 'both',
+        'participant_ids_list' => $others->pluck('id')->push($ama->id, $john->id)->implode(','),
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    expect(CustomMessage::sole()->recipient_count)->toBe(1202);
+});
+
+it('renders the compose window with the selection as a single field', function () {
+    [, $manager, $event] = draftsSetup();
+
+    $this->actingAs($manager)->get(route('events.messages.create', $event))->assertOk()
+        ->assertSee('name="participant_ids_list"', false)->assertDontSee('name="participant_ids[]"', false);
+});
