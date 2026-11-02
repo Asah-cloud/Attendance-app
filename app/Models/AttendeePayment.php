@@ -17,7 +17,7 @@ class AttendeePayment extends Model
 
     protected $fillable = [
         'company_id', 'event_id', 'payable_type', 'payable_id', 'reference', 'amount_minor',
-        'platform_fee_minor', 'currency', 'status', 'payer_email', 'channel', 'paid_at',
+        'platform_fee_minor', 'currency', 'status', 'payer_email', 'channel', 'paid_at', 'payment_option',
     ];
 
     protected function casts(): array

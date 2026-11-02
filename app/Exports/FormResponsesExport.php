@@ -31,7 +31,7 @@ class FormResponsesExport implements FromCollection, WithHeadings, WithMapping
 
     public function headings(): array
     {
-        return array_merge(['Submitted At'], $this->showsPayment() ? ['Payment', 'Amount paid (GH₵)'] : [], $this->fields->pluck('label')->all());
+        return array_merge(['Submitted At'], $this->showsPayment() ? ['Payment', 'Paying for', 'Amount paid (GH₵)'] : [], $this->fields->pluck('label')->all());
     }
 
     private function showsPayment(): bool
@@ -49,6 +49,7 @@ class FormResponsesExport implements FromCollection, WithHeadings, WithMapping
                 'unpaid' => 'Not paid',
                 default => '',
             };
+            $row[] = $response->payment_option ?? '';
             $row[] = $response->amount_paid_minor !== null ? number_format($response->amount_paid_minor / 100, 2, '.', '') : '';
         }
 

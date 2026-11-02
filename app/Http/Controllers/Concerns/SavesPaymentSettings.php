@@ -13,10 +13,13 @@ trait SavesPaymentSettings
 {
     private function savePaymentSettings(Request $request, Event|Form $payable): RedirectResponse
     {
-        $validated = $request->validate($payable::paymentSettingRules(), [
-            'payment_amount.required_if_accepted' => 'Enter the amount people pay.',
-        ]);
+        $validated = $request->validate($payable::paymentSettingRules());
         $enabled = (bool) ($validated['payment_enabled'] ?? false);
+        $hasOptions = (bool) $payable::parsePaymentOptions($validated['payment_options'] ?? null);
+
+        if ($enabled && ! $hasOptions && ! filled($validated['payment_amount'] ?? null)) {
+            throw ValidationException::withMessages(['payment_amount' => 'Enter the amount people pay, or add choices with their prices.']);
+        }
 
         if ($enabled && ! filled($payable->paymentCompany()?->payout_subaccount_code)) {
             throw ValidationException::withMessages(['payment_enabled' => 'Add your payout account under Organization → Payouts before collecting payments.']);

@@ -9,7 +9,18 @@
         </span>
         <div class="min-w-0 flex-1">
             <p class="text-xs font-black uppercase tracking-wide text-emerald-700">{{ $payable->paymentLabel() }}</p>
-            @if($payable->payerSetsAmount())
+            @if($payable->paymentOptions())
+                <p class="mt-1 text-sm font-bold text-slate-700">Choose what you're paying for <span class="text-red-500">*</span></p>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    @foreach($payable->paymentOptions() as $option)
+                        <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 transition has-[:checked]:border-emerald-500 has-[:checked]:ring-4 has-[:checked]:ring-emerald-100">
+                            <span class="flex items-center gap-2.5"><input type="radio" name="payment_option" value="{{ $option['label'] }}" required class="text-emerald-600" @checked(old('payment_option') === $option['label'])><span class="text-sm font-bold text-slate-800">{{ $option['label'] }}</span></span>
+                            <span class="whitespace-nowrap text-sm font-black text-slate-950">GH₵ {{ number_format($option['amount_minor'] / 100, 2) }}</span>
+                        </label>
+                    @endforeach
+                </div>
+                <x-input-error :messages="$errors->get('payment_option')" class="mt-1.5" />
+            @elseif($payable->payerSetsAmount())
                 <label for="payment_amount" class="mt-2 block text-sm font-bold text-slate-700">Amount you'll pay (GH₵)</label>
                 <input id="payment_amount" name="payment_amount" type="number" step="0.01" min="{{ $cedis($payable->paymentMinimumMinor()) }}" required
                        value="{{ old('payment_amount', $payable->paymentAmountMinor() ? $cedis($payable->paymentAmountMinor()) : '') }}"

@@ -58,6 +58,7 @@ class Form extends Model
         'payment_amount_minor',
         'payment_payer_sets_amount',
         'payment_minimum_minor',
+        'payment_options',
     ];
 
     protected function casts(): array
@@ -71,6 +72,7 @@ class Form extends Model
             'payment_amount_minor' => 'integer',
             'payment_payer_sets_amount' => 'boolean',
             'payment_minimum_minor' => 'integer',
+            'payment_options' => 'array',
         ];
     }
 

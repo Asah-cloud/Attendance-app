@@ -46,7 +46,7 @@ class PublicFormController extends Controller
         // The answers are kept either way; the response shows as unpaid until Paystack confirms.
         if ($paid) {
             try {
-                return redirect()->away($payments->start($response, $form->event, $form->chargeFor($validated['payment_amount'] ?? null), $validated['payer_email']));
+                return redirect()->away($payments->start($response, $form->event, $form->chargeFor($validated), $validated['payer_email'], $validated['payment_option'] ?? null));
             } catch (RuntimeException) {
                 return redirect()->route('payments.return', $response->payments()->latest('id')->value('reference'));
             }

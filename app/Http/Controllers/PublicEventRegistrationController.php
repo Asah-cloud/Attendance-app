@@ -79,6 +79,7 @@ class PublicEventRegistrationController extends Controller
                 'accommodation_notes' => $event->accommodation_enabled ? ($validated['accommodation_notes'] ?? null) : null,
                 'food_required' => false,
                 'payment_status' => $paid ? 'unpaid' : null,
+                'payment_option' => $paid ? ($validated['payment_option'] ?? null) : null,
             ]);
         });
 
@@ -88,7 +89,7 @@ class PublicEventRegistrationController extends Controller
         // A paid registration is acknowledged once the payment goes through (AttendeePaymentService).
         if ($paid && $this->canPay($registration)) {
             try {
-                return redirect()->away($payments->start($registration, $registration->event, $event->chargeFor($validated['payment_amount'] ?? null), $validated['email']));
+                return redirect()->away($payments->start($registration, $registration->event, $event->chargeFor($validated), $validated['email'], $validated['payment_option'] ?? null));
             } catch (RuntimeException) {
                 return redirect()->route('registrations.confirmation', $registration->management_token)
                     ->with('error', 'We could not open the payment page. Use "Pay now" below to try again.');
@@ -110,10 +111,19 @@ class PublicEventRegistrationController extends Controller
         try {
             return redirect()->away($last
                 ? $payments->retry($last)
-                : $payments->start($registration, $registration->event, max($registration->event->paymentAmountMinor(), $registration->event->payerSetsAmount() ? $registration->event->paymentMinimumMinor() : 0), $registration->participant->email));
+                : $payments->start($registration, $registration->event, $this->amountDue($registration), $registration->participant->email, $registration->payment_option));
         } catch (RuntimeException) {
             return back()->with('error', 'We could not open the payment page. Please try again in a moment.');
         }
+    }
+
+    /** What a registration that was never sent to Paystack owes: its chosen option's price, else the set amount (or the minimum). */
+    private function amountDue(EventRegistration $registration): int
+    {
+        $event = $registration->event;
+
+        return $event->paymentOptionAmount($registration->payment_option)
+            ?? max($event->paymentAmountMinor(), $event->payerSetsAmount() ? $event->paymentMinimumMinor() : 0);
     }
 
     /** Unpaid, and in line for a place: someone on the waiting list pays once they're confirmed. */

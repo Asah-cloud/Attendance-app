@@ -47,6 +47,7 @@ class EventRegistration extends Model
         'duplicate_dismissed_at',
         'payment_status',
         'amount_paid_minor',
+        'payment_option',
     ];
 
     protected function casts(): array
