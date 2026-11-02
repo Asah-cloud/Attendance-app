@@ -392,3 +392,14 @@ These are observations from reading the current code, not commitments — flag b
 - **`MigrateParticipantRegistrations`** is a one-time backfill command left in the codebase; once confirmed fully obsolete in all environments it could be removed, but should not be removed while any environment might still have the legacy `users.event_id` column.
 - **Signed-URL/QR invalidation on `APP_KEY` rotation** is an operational trap noted in the README but not automated or alerted on — nothing currently detects or warns if this happens.
 - No API layer exists for third-party/headless integration; all functionality is delivered through server-rendered routes.
+
+
+## Attendee payments on forms
+
+Organisations take payments on custom forms and the registration form through Paystack, paid straight into their own account.
+
+- **Payout account:** a manager adds Mobile Money (network + number) or a bank account on **Organization → Payouts** (`OrganizationPayoutController`). This creates or updates a Paystack sub-account (`companies.payout_subaccount_code`, standing share 0%). Provider lists come from Paystack `/bank` (GHS, `mobile_money` or `ghipss`), cached a day.
+- **Per form:** the **Collect payment** card (`partials/payment-settings`) saves `payment_*` on `forms` or `registration_payment_*` on `events` (`CollectsPayment` trait, `SavesPaymentSettings`). It can't be switched on without a payout account. The amount can change at any time; with "let people change the amount" the payer types an amount of at least the minimum (GH₵ 1 if none).
+- **Paying:** the response or registration is saved first with `payment_status = unpaid`, then `AttendeePaymentService::start` records an `attendee_payments` row (reference `ATP-…`) and redirects to Paystack with `subaccount`, `bearer=subaccount`, channels Mobile Money and card, and `transaction_charge` when the platform fee is on. Paystack returns people to `payments.return`, which verifies (status, amount and currency must match) and marks the payment and its response/registration paid; the webhook does the same. Unfinished payments show "Pay now" (a new reference each try) and "Check again". Registrations: the "registration received" message is sent once paid; waitlisted people pay from their confirmation page once confirmed.
+- **Platform fee:** admin **Integrations → Platform fee on attendee payments**, on/off and a % (`attendee_payment_fee_enabled`, `attendee_payment_fee_percent` in `platform_settings`). Applied to new payments only.
+- **Managers see:** Paid / Not paid and totals on a form's responses page and Excel export; a payment badge on the registrations list.

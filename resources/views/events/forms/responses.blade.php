@@ -4,6 +4,10 @@
     $exportPdfUrl ??= route('events.forms.responses.pdf', [$event, $form]);
     $backUrl ??= route('events.forms.edit', [$event, $form]);
     $backLabel ??= 'Back to form';
+    // A payment column once the form has ever asked for payment.
+    $showPayment = $form->payment_enabled || $form->responses()->whereNotNull('payment_status')->exists();
+    $paidTotal = $showPayment ? (int) $form->responses()->where('payment_status', 'paid')->sum('amount_paid_minor') : 0;
+    $paidCount = $showPayment ? $form->responses()->where('payment_status', 'paid')->count() : 0;
 @endphp
 <x-app-layout>
     <x-slot name="header">{{ $form->title }} · Responses</x-slot>
@@ -17,17 +21,27 @@
             </div>
         </div>
 
+        @if($showPayment)
+            <div class="mb-5 grid gap-3 sm:grid-cols-3">
+                <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><p class="text-xs font-black uppercase text-emerald-700">Collected</p><p class="mt-1 text-2xl font-black text-emerald-950">{{ App\Models\AttendeePayment::money($paidTotal) }}</p></div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs font-black uppercase text-slate-500">Paid</p><p class="mt-1 text-2xl font-black">{{ $paidCount }}</p></div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-4"><p class="text-xs font-black uppercase text-slate-500">Not paid yet</p><p class="mt-1 text-2xl font-black">{{ $form->responses()->where('payment_status', 'unpaid')->count() }}</p></div>
+            </div>
+        @endif
+
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm">
             <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wider text-slate-500"><tr>
                 <th class="px-5 py-4">Submitted</th>
+                @if($showPayment)<th class="px-5 py-4">Payment</th>@endif
                 @foreach($fields as $field)<th class="px-5 py-4">{{ $field->label }}</th>@endforeach
             </tr></thead>
             <tbody class="divide-y divide-slate-100">@forelse($responses as $response)
                 <tr>
                     <td class="px-5 py-4 text-slate-500">{{ $response->created_at->format('M j, Y g:i A') }}</td>
+                    @if($showPayment)<td class="whitespace-nowrap px-5 py-4">@include('partials.payment-badge', ['status' => $response->payment_status, 'amount' => $response->amount_paid_minor])</td>@endif
                     @foreach($fields as $field)<td class="px-5 py-4 text-slate-700">{{ $response->answers[$field->field_key] ?? '—' }}</td>@endforeach
                 </tr>
-            @empty<tr><td colspan="{{ $fields->count() + 1 }}" class="px-5 py-12 text-center text-slate-500">No responses yet.</td></tr>@endforelse</tbody>
+            @empty<tr><td colspan="{{ $fields->count() + ($showPayment ? 2 : 1) }}" class="px-5 py-12 text-center text-slate-500">No responses yet.</td></tr>@endforelse</tbody>
         </table></div></div><div class="mt-5">{{ $responses->links() }}</div>
     </div>
 </x-app-layout>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\CollectsPayment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class Form extends Model
 {
+    use CollectsPayment;
+
     protected static function booted(): void
     {
         static::creating(function (Form $form): void {
@@ -50,6 +53,11 @@ class Form extends Model
         'is_open',
         'opens_at',
         'closes_at',
+        'payment_enabled',
+        'payment_label',
+        'payment_amount_minor',
+        'payment_payer_sets_amount',
+        'payment_minimum_minor',
     ];
 
     protected function casts(): array
@@ -59,6 +67,10 @@ class Form extends Model
             'flyer_paths' => 'array',
             'opens_at' => 'datetime',
             'closes_at' => 'datetime',
+            'payment_enabled' => 'boolean',
+            'payment_amount_minor' => 'integer',
+            'payment_payer_sets_amount' => 'boolean',
+            'payment_minimum_minor' => 'integer',
         ];
     }
 
@@ -81,6 +93,16 @@ class Form extends Model
     public function responses(): HasMany
     {
         return $this->hasMany(FormResponse::class);
+    }
+
+    protected function paymentPrefix(): string
+    {
+        return 'payment_';
+    }
+
+    public function paymentCompany(): ?Company
+    {
+        return $this->event?->company;
     }
 
     public function isOpen(): bool

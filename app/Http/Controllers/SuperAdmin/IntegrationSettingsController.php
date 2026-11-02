@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AttendeePayment;
 use App\Models\PlatformSetting;
+use App\Services\AttendeePaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,7 +24,12 @@ class IntegrationSettingsController extends Controller
             'public_key_preview' => $this->preview(PlatformSetting::get('paystack_public_key')),
         ];
 
-        return view('superadmin.integrations.edit', ['paystack' => $paystack]);
+        return view('superadmin.integrations.edit', [
+            'paystack' => $paystack,
+            'feeEnabled' => AttendeePaymentService::feeEnabled(),
+            'feePercent' => AttendeePaymentService::feePercent(),
+            'attendeePayments' => AttendeePayment::where('status', AttendeePayment::STATUS_PAID)->selectRaw('count(*) as count, coalesce(sum(amount_minor), 0) as amount, coalesce(sum(platform_fee_minor), 0) as fees')->first(),
+        ]);
     }
 
     public function update(Request $request): RedirectResponse
@@ -39,6 +46,22 @@ class IntegrationSettingsController extends Controller
         }
 
         return back()->with('success', 'Integration settings updated.');
+    }
+
+    /** The platform's share of attendee payments on forms: on or off, and how much. */
+    public function updateAttendeePaymentFee(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'fee_enabled' => ['required', 'boolean'],
+            'fee_percent' => ['nullable', 'numeric', 'min:0', 'max:20', 'required_if_accepted:fee_enabled'],
+        ]);
+
+        PlatformSetting::set(AttendeePaymentService::FEE_ENABLED, $validated['fee_enabled'] ? '1' : '0');
+        if (filled($validated['fee_percent'] ?? null)) {
+            PlatformSetting::set(AttendeePaymentService::FEE_PERCENT, (string) (float) $validated['fee_percent']);
+        }
+
+        return back()->with('success', $validated['fee_enabled'] ? 'Platform fee switched on.' : 'Platform fee switched off.');
     }
 
     private function preview(?string $value): ?string

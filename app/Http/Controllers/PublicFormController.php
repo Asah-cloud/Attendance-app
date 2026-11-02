@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Form;
 use App\Models\FormResponse;
+use App\Services\AttendeePaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use RuntimeException;
 
 class PublicFormController extends Controller
 {
@@ -26,19 +28,29 @@ class PublicFormController extends Controller
         ]);
     }
 
-    public function store(Request $request, string $eventSlug, string $formSlug): RedirectResponse
+    public function store(Request $request, string $eventSlug, string $formSlug, AttendeePaymentService $payments): RedirectResponse
     {
         $form = $this->findForm($eventSlug, $formSlug);
         abort_unless($form->isOpen(), 404);
 
         $fields = $form->fields()->where('is_active', true)->get();
-        $validated = $request->validate($this->rules($fields));
+        $paid = $form->collectsPayment();
+        $validated = $request->validate($this->rules($fields) + ($paid ? ['payer_email' => ['required', 'email', 'max:255']] + $form->paymentAmountRules() : []));
 
-        FormResponse::create([
+        $response = FormResponse::create([
             'form_id' => $form->id,
             'answers' => $validated['answers'] ?? [],
             'ip_address' => $request->ip(),
         ]);
+
+        // The answers are kept either way; the response shows as unpaid until Paystack confirms.
+        if ($paid) {
+            try {
+                return redirect()->away($payments->start($response, $form->event, $form->chargeFor($validated['payment_amount'] ?? null), $validated['payer_email']));
+            } catch (RuntimeException) {
+                return redirect()->route('payments.return', $response->payments()->latest('id')->value('reference'));
+            }
+        }
 
         return redirect()->route('forms.thank-you', [$form->event->slug, $form->slug]);
     }

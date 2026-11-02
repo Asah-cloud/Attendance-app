@@ -130,8 +130,12 @@
                         <x-input-error :messages="$errors->get('consent')" class="mt-1.5" />
                     </div>
 
+                    @if($event->collectsPayment())
+                        @include('forms.partials.payment-box', ['payable' => $event])
+                    @endif
+
                     <button class="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-300 active:translate-y-0">
-                        Submit registration
+                        {{ $event->collectsPayment() ? 'Register & pay' : 'Submit registration' }}
                     </button>
                 </form>
             @endif

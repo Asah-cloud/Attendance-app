@@ -89,6 +89,8 @@
             </form>
         </section>
 
+        @include('partials.payment-settings', ['payable' => $form, 'action' => route('events.forms.payment', [$event, $form])])
+
         <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <h3 class="text-lg font-black">Questions</h3>
             <div class="mt-5 space-y-3">@forelse($form->fields as $field)

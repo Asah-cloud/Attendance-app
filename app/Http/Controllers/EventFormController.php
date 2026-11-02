@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\FormResponsesExport;
+use App\Http\Controllers\Concerns\SavesPaymentSettings;
 use App\Models\Event;
 use App\Models\Form;
 use App\Models\FormField;
@@ -20,6 +21,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EventFormController extends Controller
 {
+    use SavesPaymentSettings;
+
     public function index(Event $event): View
     {
         $this->authorize('update', $event);
@@ -96,6 +99,14 @@ class EventFormController extends Controller
         $form->update($validated + ['flyer_paths' => $kept ?: null]);
 
         return back()->with('success', 'Form settings updated.');
+    }
+
+    public function updatePayment(Request $request, Event $event, Form $form): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $this->authorizeForm($event, $form);
+
+        return $this->savePaymentSettings($request, $form);
     }
 
     public function destroy(Event $event, Form $form): RedirectResponse
