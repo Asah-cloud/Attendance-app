@@ -29,6 +29,23 @@
 
             <div class="mt-6 rounded-2xl bg-slate-50 p-5"><p class="text-xs uppercase text-slate-500">Status</p><p class="mt-2 text-xl font-black capitalize">{{ $registration->status }}</p></div>
 
+            @if(session('payment_success'))<p class="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm font-black text-emerald-800">{{ session('payment_success') }}</p>@endif
+            @if(session('error'))<p class="mt-4 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ session('error') }}</p>@endif
+            @if($registration->payment_status === 'paid')
+                <div class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+                    <p class="text-xs font-black uppercase tracking-widest text-emerald-700">Payment</p>
+                    <p class="mt-2 text-lg font-black text-emerald-950">Paid · {{ App\Models\AttendeePayment::money($registration->amount_paid_minor) }}</p>
+                </div>
+            @elseif($registration->payment_status === 'unpaid' && in_array($registration->status, [\App\Models\EventRegistration::STATUS_CONFIRMED, \App\Models\EventRegistration::STATUS_PENDING], true))
+                <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-5">
+                    <p class="text-xs font-black uppercase tracking-widest text-amber-700">Payment needed</p>
+                    <p class="mt-2 text-sm font-bold text-amber-900">Your registration isn't paid for yet.</p>
+                    <form method="POST" action="{{ route('registrations.pay', $registration->management_token) }}" class="mt-3">@csrf
+                        <button class="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-black text-white">Pay now</button>
+                    </form>
+                </div>
+            @endif
+
             @if($registration->accommodation_required)
                 <div class="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
                     <p class="text-xs font-black uppercase tracking-widest text-indigo-700">Accommodation</p>

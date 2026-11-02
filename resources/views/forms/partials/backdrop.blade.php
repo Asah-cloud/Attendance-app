@@ -3,7 +3,7 @@
     form's first flyer, so the page takes on the event's own colours; soft colour glows
     when the form has no flyer. Sits behind the content of a "relative isolate" section.
 --}}
-@php($backdropFlyer = $form->flyers()[0] ?? null)
+@php($backdropFlyer = isset($form) ? ($form->flyers()[0] ?? null) : null)
 <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
     @if($backdropFlyer)
         <img src="{{ Storage::url($backdropFlyer) }}" alt="" class="absolute inset-0 h-full w-full scale-125 object-cover opacity-90 blur-3xl saturate-150">

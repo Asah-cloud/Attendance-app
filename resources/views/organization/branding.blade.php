@@ -2,6 +2,11 @@
     <x-slot name="header">Organization settings</x-slot>
 
     <div class="mx-auto max-w-3xl">
+        <a href="{{ route('organization.payouts.edit') }}" class="mb-6 flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-200">
+            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h2m4 0h4M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></span>
+            <span class="min-w-0 flex-1"><span class="block font-black text-slate-900">Payouts</span><span class="block text-sm text-slate-500">{{ $company->payout_subaccount_code ? 'Payments are paid into '.$company->payout_bank_name.' ••••'.substr((string) $company->payout_account_number, -4) : 'Add your Mobile Money or bank account to take payments on forms.' }}</span></span>
+            <span class="text-sm font-bold text-emerald-600">Open →</span>
+        </a>
         <div data-tour="organization-branding" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div class="flex flex-col gap-6 border-b border-slate-100 pb-7 sm:flex-row sm:items-center">
                 @if($company->logo_path)

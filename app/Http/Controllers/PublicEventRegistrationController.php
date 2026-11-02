@@ -7,6 +7,7 @@ use App\Models\EventRegistration;
 use App\Notifications\Concerns\NotifiesPerChannel;
 use App\Notifications\EventRegistrationSubmitted;
 use App\Notifications\RoomAssigned;
+use App\Services\AttendeePaymentService;
 use App\Services\ParticipantRegistrationService;
 use App\Services\RegistrationLifecycleService;
 use App\Services\RoomAllocationService;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use RuntimeException;
 
 class PublicEventRegistrationController extends Controller
 {
@@ -32,13 +34,14 @@ class PublicEventRegistrationController extends Controller
         ]);
     }
 
-    public function store(Request $request, Event $event, ParticipantRegistrationService $participants, RegistrationLifecycleService $lifecycle): RedirectResponse
+    public function store(Request $request, Event $event, ParticipantRegistrationService $participants, RegistrationLifecycleService $lifecycle, AttendeePaymentService $payments): RedirectResponse
     {
         $event->ensureSystemRegistrationFields();
         $fields = $event->registrationFields()->where('is_active', true)->get();
-        $validated = $request->validate($this->rules($fields));
+        $paid = $event->collectsPayment();
+        $validated = $request->validate($this->rules($fields) + ($paid ? $event->paymentAmountRules() : []));
 
-        $registration = DB::transaction(function () use ($event, $validated, $participants, $lifecycle): EventRegistration {
+        $registration = DB::transaction(function () use ($event, $validated, $participants, $lifecycle, $paid): EventRegistration {
             $event = Event::query()->lockForUpdate()->findOrFail($event->id);
 
             if (! $event->registrationIsOpen()) {
@@ -75,14 +78,51 @@ class PublicEventRegistrationController extends Controller
                 'accessibility_required' => $event->accommodation_enabled && ($validated['accommodation_required'] ?? false) && ($validated['accessibility_required'] ?? false),
                 'accommodation_notes' => $event->accommodation_enabled ? ($validated['accommodation_notes'] ?? null) : null,
                 'food_required' => false,
+                'payment_status' => $paid ? 'unpaid' : null,
             ]);
         });
 
         $registration->load(['event.company', 'participant']);
         $lifecycle->allocateAccommodation($registration);
+
+        // A paid registration is acknowledged once the payment goes through (AttendeePaymentService).
+        if ($paid && $this->canPay($registration)) {
+            try {
+                return redirect()->away($payments->start($registration, $registration->event, $event->chargeFor($validated['payment_amount'] ?? null), $validated['email']));
+            } catch (RuntimeException) {
+                return redirect()->route('registrations.confirmation', $registration->management_token)
+                    ->with('error', 'We could not open the payment page. Use "Pay now" below to try again.');
+            }
+        }
+
         NotifiesPerChannel::send($registration->participant, new EventRegistrationSubmitted($registration), $registration->event->attendeeNotificationChannels());
 
         return $this->afterRegistration($registration);
+    }
+
+    /** Pay for a registration that hasn't been paid for yet, from its confirmation page. */
+    public function pay(string $code, AttendeePaymentService $payments): RedirectResponse
+    {
+        $registration = EventRegistration::with(['event.company', 'participant'])->where('management_token', $code)->firstOrFail();
+        abort_unless($this->canPay($registration), 404);
+
+        $last = $registration->payments()->latest('id')->first();
+        try {
+            return redirect()->away($last
+                ? $payments->retry($last)
+                : $payments->start($registration, $registration->event, max($registration->event->paymentAmountMinor(), $registration->event->payerSetsAmount() ? $registration->event->paymentMinimumMinor() : 0), $registration->participant->email));
+        } catch (RuntimeException) {
+            return back()->with('error', 'We could not open the payment page. Please try again in a moment.');
+        }
+    }
+
+    /** Unpaid, and in line for a place: someone on the waiting list pays once they're confirmed. */
+    private function canPay(EventRegistration $registration): bool
+    {
+        return $registration->payment_status === 'unpaid'
+            && in_array($registration->status, [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_PENDING], true)
+            && filled($registration->event->company?->payout_subaccount_code)
+            && filled($registration->participant?->email);
     }
 
     public function confirmation(string $code): View

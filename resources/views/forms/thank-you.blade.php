@@ -6,6 +6,7 @@
                 <p class="text-xs font-black uppercase tracking-widest text-blue-600">{{ $event->title }}</p>
                 <h1 class="mt-3 text-2xl font-black text-slate-950">Thanks for your response!</h1>
                 <p class="mt-3 text-sm font-semibold text-slate-500">Your answers to "{{ $form->title }}" have been recorded.</p>
+                @if(session('payment_success'))<p class="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-black text-emerald-800">{{ session('payment_success') }}</p>@endif
             </div>
         </div>
     </section>

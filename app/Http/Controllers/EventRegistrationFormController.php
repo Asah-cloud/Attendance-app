@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\BadgePrintListExport;
+use App\Http\Controllers\Concerns\SavesPaymentSettings;
 use App\Jobs\FinalizeBadgeExport;
 use App\Jobs\GenerateBadgeExportBatch;
 use App\Models\BadgeExport;
@@ -42,6 +43,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EventRegistrationFormController extends Controller
 {
+    use SavesPaymentSettings;
+
     public function registrations(Request $request, Event $event): View
     {
         $this->authorize('manageWhenOpen', $event);
@@ -711,6 +714,13 @@ class EventRegistrationFormController extends Controller
         }
 
         return back()->with('success', 'Registration settings updated.');
+    }
+
+    public function updatePayment(Request $request, Event $event): RedirectResponse
+    {
+        $this->authorize('manageWhenOpen', $event);
+
+        return $this->savePaymentSettings($request, $event);
     }
 
     public function updateSystemField(Request $request, Event $event, EventRegistrationField $field): RedirectResponse

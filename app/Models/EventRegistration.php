@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 
 class EventRegistration extends Model
@@ -44,6 +45,8 @@ class EventRegistration extends Model
         'accommodation_notes',
         'food_required',
         'duplicate_dismissed_at',
+        'payment_status',
+        'amount_paid_minor',
     ];
 
     protected function casts(): array
@@ -55,6 +58,7 @@ class EventRegistration extends Model
             'duplicate_dismissed_at' => 'datetime',
             'consented_at' => 'datetime',
             'custom_answers' => 'array',
+            'amount_paid_minor' => 'integer',
             'reminder_sent_at' => 'datetime',
             'confirmation_sent_at' => 'datetime',
             'confirmation_reminder_sent_at' => 'datetime',
@@ -95,6 +99,11 @@ class EventRegistration extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    public function payments(): MorphMany
+    {
+        return $this->morphMany(AttendeePayment::class, 'payable');
     }
 
     public function participant(): BelongsTo

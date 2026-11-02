@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AttendanceConfirmationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceResetController;
+use App\Http\Controllers\AttendeePaymentController;
 use App\Http\Controllers\AuditAccessController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\MessageTemplateController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OnboardingTourController;
 use App\Http\Controllers\OrganizationBrandingController;
+use App\Http\Controllers\OrganizationPayoutController;
 use App\Http\Controllers\ParticipantMergeController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
@@ -103,6 +105,10 @@ Route::get('/forms/{eventSlug}/{formSlug}', [PublicFormController::class, 'show'
 Route::post('/forms/{eventSlug}/{formSlug}', [PublicFormController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('forms.store');
+// Attendee payments: Paystack sends people back here, and they can try again from here.
+Route::get('/payments/{reference}', [AttendeePaymentController::class, 'show'])->middleware('throttle:60,1')->name('payments.return');
+Route::post('/payments/{reference}/retry', [AttendeePaymentController::class, 'retry'])->middleware('throttle:10,1')->name('payments.retry');
+Route::post('/registrations/{code}/pay', [PublicEventRegistrationController::class, 'pay'])->middleware('throttle:10,1')->name('registrations.pay');
 Route::get('/forms/{eventSlug}/{formSlug}/thank-you', [PublicFormController::class, 'thankYou'])->name('forms.thank-you');
 
 Route::post('/webhooks/paystack', [PaystackWebhookController::class, 'handle'])
@@ -132,6 +138,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/branding', [OrganizationBrandingController::class, 'update'])->name('branding.update');
         Route::patch('/messaging', [OrganizationBrandingController::class, 'updateMessaging'])->name('messaging.update');
         Route::post('/messaging/email-domain/check', [OrganizationBrandingController::class, 'checkEmailDomain'])->name('messaging.email-domain.check');
+        Route::get('/payouts', [OrganizationPayoutController::class, 'edit'])->name('payouts.edit');
+        Route::put('/payouts', [OrganizationPayoutController::class, 'update'])->middleware('throttle:10,1')->name('payouts.update');
     });
 });
 
@@ -287,6 +295,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/badge-exports/{badgeExport}', [EventRegistrationFormController::class, 'badgeExportStatus'])->name('badge-exports.show');
         Route::get('/badge-exports/{badgeExport}/download', [EventRegistrationFormController::class, 'downloadBadgeExport'])->name('badge-exports.download');
         Route::patch('/events/{event}/registration-form', [EventRegistrationFormController::class, 'updateSettings'])->name('events.registration-form.update');
+        Route::patch('/events/{event}/registration-form/payment', [EventRegistrationFormController::class, 'updatePayment'])->name('events.registration-form.payment');
         Route::get('/events/{event}/registration-form/print-qr', [EventRegistrationFormController::class, 'printQr'])->name('events.registration-form.print-qr');
         Route::get('/events/{event}/registration-form/download-qr', [EventRegistrationFormController::class, 'downloadQr'])->name('events.registration-form.download-qr');
         Route::post('/events/{event}/registration-fields', [EventRegistrationFormController::class, 'storeField'])->name('events.registration-fields.store');
@@ -342,6 +351,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/forms', [EventFormController::class, 'store'])->name('events.forms.store');
         Route::get('/events/{event}/forms/{form}/edit', [EventFormController::class, 'edit'])->name('events.forms.edit');
         Route::patch('/events/{event}/forms/{form}', [EventFormController::class, 'update'])->name('events.forms.update');
+        Route::patch('/events/{event}/forms/{form}/payment', [EventFormController::class, 'updatePayment'])->name('events.forms.payment');
         Route::delete('/events/{event}/forms/{form}', [EventFormController::class, 'destroy'])->name('events.forms.destroy');
         Route::post('/events/{event}/forms/{form}/fields', [EventFormController::class, 'storeField'])->name('events.forms.fields.store');
         Route::patch('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'updateField'])->name('events.forms.fields.update');
@@ -445,6 +455,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         // from the admin UI instead of the server .env.
         Route::get('/integrations', [IntegrationSettingsController::class, 'edit'])->name('integrations.edit');
         Route::put('/integrations', [IntegrationSettingsController::class, 'update'])->name('integrations.update');
+        Route::put('/integrations/attendee-payment-fee', [IntegrationSettingsController::class, 'updateAttendeePaymentFee'])->name('integrations.attendee-fee');
 
         // Attendee pricing: platform default + per-plan tier tables (per-company
         // overrides live on the company edit screen instead).

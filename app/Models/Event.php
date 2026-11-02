@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\CollectsPayment;
 use App\Notifications\Channels\ArkeselChannel;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,8 @@ use Illuminate\Support\Str;
 
 class Event extends Model
 {
+    use CollectsPayment;
+
     protected $attributes = [
         'registration_enabled' => false,
         'registration_requires_approval' => false,
@@ -129,6 +132,11 @@ class Event extends Model
         'staff_badge_settings',
         'automatic_attendee_email',
         'automatic_attendee_sms',
+        'registration_payment_enabled',
+        'registration_payment_label',
+        'registration_payment_amount_minor',
+        'registration_payment_payer_sets_amount',
+        'registration_payment_minimum_minor',
     ];
 
     protected $casts = [
@@ -146,6 +154,10 @@ class Event extends Model
         'registration_closes_at' => 'datetime',
         'registration_capacity' => 'integer',
         'registration_requires_approval' => 'boolean',
+        'registration_payment_enabled' => 'boolean',
+        'registration_payment_amount_minor' => 'integer',
+        'registration_payment_payer_sets_amount' => 'boolean',
+        'registration_payment_minimum_minor' => 'integer',
         'cancelled_at' => 'datetime',
         'badge_category_colors' => 'array',
         'badge_fields' => 'array',
@@ -266,6 +278,16 @@ class Event extends Model
     public function checkedInParticipantCount(): int
     {
         return $this->attendances()->distinct('participant_id')->count('participant_id');
+    }
+
+    protected function paymentPrefix(): string
+    {
+        return 'registration_payment_';
+    }
+
+    public function paymentCompany(): ?Company
+    {
+        return $this->company;
     }
 
     public function registrationFields(): HasMany

@@ -42,6 +42,8 @@
             </form>
         </section>
 
+        @include('partials.payment-settings', ['payable' => $event, 'action' => route('events.registration-form.payment', $event)])
+
         <section class="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <h3 class="text-lg font-black">Protected system fields</h3><p class="mt-1 text-sm text-gray-500">You may rename these labels, but they cannot be disabled, reordered, or removed.</p>
             <div class="mt-5 space-y-3">
