@@ -357,6 +357,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'updateField'])->name('events.forms.fields.update');
         Route::delete('/events/{event}/forms/{form}/fields/{field}', [EventFormController::class, 'destroyField'])->name('events.forms.fields.destroy');
         Route::get('/events/{event}/forms/{form}/responses', [EventFormController::class, 'responses'])->name('events.forms.responses');
+        Route::delete('/events/{event}/forms/{form}/responses', [EventFormController::class, 'destroyResponses'])->name('events.forms.responses.destroy');
         Route::post('/events/{event}/forms/{form}/viewers', [FormViewerController::class, 'store'])->middleware('throttle:20,1')->name('events.forms.viewers.store');
         Route::delete('/events/{event}/forms/{form}/viewers/{viewer}', [FormViewerController::class, 'destroy'])->name('events.forms.viewers.destroy');
         Route::get('/events/{event}/forms/{form}/responses/export', [EventFormController::class, 'exportExcel'])->name('events.forms.responses.export');

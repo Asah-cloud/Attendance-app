@@ -34,6 +34,7 @@ class SharedFormController extends Controller
             'exportPdfUrl' => route('shared-forms.pdf', $form),
             'backUrl' => route('shared-forms.index'),
             'backLabel' => 'All shared forms',
+            'canDelete' => false,
         ]);
     }
 
