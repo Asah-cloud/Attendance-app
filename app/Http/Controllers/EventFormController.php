@@ -193,6 +193,27 @@ class EventFormController extends Controller
         return view('events.forms.responses', compact('event', 'form', 'fields', 'responses'));
     }
 
+    /**
+     * Remove chosen responses, or all of them. Payment records stay (Paystack still has the
+     * money), only the answers go; paid responses are counted in the confirmation message.
+     */
+    public function destroyResponses(Request $request, Event $event, Form $form): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $this->authorizeForm($event, $form);
+        $validated = $request->validate([
+            'all' => ['nullable', 'boolean'],
+            'response_ids' => ['required_without:all', 'array'],
+            'response_ids.*' => ['integer'],
+        ], ['response_ids.required_without' => 'Tick the responses to delete first.']);
+
+        $query = $form->responses()->when(! $request->boolean('all'), fn ($q) => $q->whereIn('id', $validated['response_ids'] ?? []));
+        $deleted = $query->delete();
+
+        return redirect()->route('events.forms.responses', [$event, $form])
+            ->with('success', $deleted ? $deleted.' response'.($deleted === 1 ? '' : 's').' deleted.' : 'Nothing was deleted.');
+    }
+
     public function exportExcel(Event $event, Form $form): BinaryFileResponse
     {
         $this->authorize('update', $event);

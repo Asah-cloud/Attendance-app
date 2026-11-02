@@ -3,6 +3,7 @@
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\Form;
+use App\Models\FormResponse;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 
@@ -169,4 +170,32 @@ it('prevents a manager from managing another company event forms', function () {
     $event = Event::create(['company_id' => $otherCompany->id, 'title' => 'Private Event', 'event_date' => now()]);
 
     $this->actingAs($manager)->get(route('events.forms.index', $event))->assertForbidden();
+});
+
+it('lets a manager delete chosen responses or clear them all, but not people it was shared with', function () {
+    $company = Company::create(['name' => 'Clear Co']);
+    $manager = User::factory()->create(['company_id' => $company->id, 'role' => 'manager']);
+    $manager->assignRole('manager');
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Youth Camp', 'event_date' => now()->addWeek()]);
+    $form = Form::create(['event_id' => $event->id, 'title' => 'Feedback', 'is_open' => true]);
+    $other = Form::create(['event_id' => $event->id, 'title' => 'Other', 'is_open' => true]);
+    [$first, $second, $third] = collect(range(1, 3))->map(fn () => FormResponse::create(['form_id' => $form->id, 'answers' => []]))->all();
+    $elsewhere = FormResponse::create(['form_id' => $other->id, 'answers' => []]);
+
+    $this->actingAs($manager)->get(route('events.forms.responses', [$event, $form]))->assertOk()->assertSee('Clear all responses')->assertSee('Delete selected');
+    $this->delete(route('events.forms.responses.destroy', [$event, $form]), ['response_ids' => [$first->id, $elsewhere->id]])->assertSessionHas('success', '1 response deleted.');
+    expect($form->responses()->count())->toBe(2)->and(FormResponse::find($elsewhere->id))->not->toBeNull();
+
+    $this->delete(route('events.forms.responses.destroy', [$event, $form]), [])->assertSessionHasErrors('response_ids');
+    $this->delete(route('events.forms.responses.destroy', [$event, $form]), ['all' => 1])->assertSessionHas('success', '2 responses deleted.');
+    expect($form->responses()->count())->toBe(0)->and($other->responses()->count())->toBe(1);
+
+    $usher = User::factory()->create(['company_id' => $company->id, 'role' => 'usher']);
+    $usher->assignRole('usher');
+    FormResponse::create(['form_id' => $form->id, 'answers' => []]);
+    $this->actingAs($usher)->delete(route('events.forms.responses.destroy', [$event, $form]), ['all' => 1])->assertForbidden();
+    expect($form->responses()->count())->toBe(1);
+
+    $form->viewers()->attach($usher, ['invited_by' => $manager->id]);
+    $this->get(route('shared-forms.show', $form))->assertOk()->assertDontSee('Clear all responses');
 });
