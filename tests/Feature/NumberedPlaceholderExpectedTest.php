@@ -95,3 +95,19 @@ it('shows the unused badge note on the simple report', function () {
         ->assertOk()
         ->assertSee('1 unused numbered badge');
 });
+
+it('leaves people cancelled after arriving out of the arrival counters', function () {
+    $stays = ($this->register)('Kwame Asante');
+    $cancelled = ($this->register)('Ama Mensah');
+    ($this->register)('Kofi Boateng');
+    foreach ([$stays, $cancelled] as $person) {
+        Attendance::create(['event_id' => $this->event->id, 'participant_id' => $person->id, 'day' => 0, 'session' => 1]);
+    }
+    EventRegistration::where('participant_id', $cancelled->id)->update(['status' => EventRegistration::STATUS_CANCELLED]);
+
+    $this->actingAs($this->manager);
+
+    Livewire::test(ArrivalStats::class, ['event' => $this->event])
+        ->assertViewHas('confirmed', 2)
+        ->assertViewHas('arrived', 1);
+});
