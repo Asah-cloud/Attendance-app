@@ -78,6 +78,12 @@ class Participant extends Model
             && preg_match('/^participant\s+\d+$/i', trim($this->name)) === 1;
     }
 
+    /** A spare badge printed as "Participant 12" rather than for a named person. */
+    public static function isNumberedPlaceholderName(?string $name): bool
+    {
+        return preg_match('/^participant\s*#?\s*\d+$/i', trim((string) $name)) === 1;
+    }
+
     /** Whether any notification channel could actually reach this person right now. */
     public function hasReachableContact(): bool
     {

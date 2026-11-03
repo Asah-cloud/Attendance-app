@@ -354,6 +354,27 @@ class Event extends Model
             ->where('is_support_staff', false);
     }
 
+    /**
+     * The confirmed attendees reports and counters expect: everyone except spare "Participant 12"
+     * badges nobody has used yet. A numbered badge joins the expected total once it is scanned.
+     */
+    public function expectedParticipants(): BelongsToMany
+    {
+        return $this->confirmedParticipants()->whereNotIn('participants.id', $this->unusedPlaceholderIds());
+    }
+
+    /** @return Collection<int, int> confirmed "Participant <number>" attendees with no check-in at this event */
+    public function unusedPlaceholderIds(): Collection
+    {
+        return $this->confirmedParticipants()
+            ->whereRaw('LOWER(TRIM(participants.name)) LIKE ?', ['participant%'])
+            ->whereDoesntHave('attendances', fn ($query) => $query->where('event_id', $this->id))
+            ->get(['participants.id', 'participants.name'])
+            ->filter(fn (Participant $participant) => Participant::isNumberedPlaceholderName($participant->name))
+            ->pluck('id')
+            ->values();
+    }
+
     public function confirmedStaff(): BelongsToMany
     {
         return $this->registeredParticipants()

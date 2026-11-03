@@ -5,7 +5,7 @@
     $came = $grid['rows']->count();
     $notCounted = $registrationCounts->except('confirmed')->filter();
     $cards = [
-        ['Expected', $expected, 'Confirmed attendees. Support staff are counted in the staff report.', 'text-slate-900'],
+        ['Expected', $expected, 'Confirmed attendees. Support staff are counted in the staff report.'.($grid['unusedPlaceholders'] ? ' '.number_format($grid['unusedPlaceholders']).' unused numbered '.\Illuminate\Support\Str::plural('badge', $grid['unusedPlaceholders']).' ("Participant 12"…) not counted until scanned.' : ''), 'text-slate-900'],
         [$grid['presentLabel'], $came, $all ? 'Checked in on at least one day.' : 'Checked in during '.$grid['periodLabel'].'.', 'text-emerald-600'],
         [$grid['absentLabel'], $grid['absent']->count(), 'Expected, but no check-in'.($all ? ' on any day.' : '.'), 'text-rose-600'],
         [$all ? 'Average daily turnout' : 'Turnout', $grid['turnout'].'%', $all ? 'The average of each day\'s present ÷ expected.' : 'Present ÷ expected.', 'text-blue-600'],

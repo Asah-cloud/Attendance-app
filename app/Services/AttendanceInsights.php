@@ -103,7 +103,7 @@ class AttendanceInsights
      */
     public function dataQuality(Event $event): Collection
     {
-        $people = $event->confirmedParticipants()->orderBy('name')->get();
+        $people = $event->expectedParticipants()->orderBy('name')->get();
         $digits = fn (?string $phone) => substr(preg_replace('/\D+/', '', (string) $phone), -9);
         $phoneCounts = $people->map(fn ($person) => $digits($person->phone))->filter()->countBy();
 
