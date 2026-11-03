@@ -239,7 +239,9 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::patch('/events/{event}/meals/{meal}', [MealDistributionController::class, 'update'])->name('events.meals.update');
         Route::post('/events/{event}/meals/{meal}/waste', [MealDistributionController::class, 'logWaste'])->name('events.meals.waste');
         Route::delete('/events/{event}/meals/{meal}', [MealDistributionController::class, 'destroy'])->name('events.meals.destroy');
-        Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->middleware('throttle:5,1')->name('events.meals.collections.reverse');
+        Route::delete('/events/{event}/meals/{meal}/collections/{collection}', [MealDistributionController::class, 'reverse'])->middleware('throttle:5,1')->name('events.meals.collections.reverse')
+            // A double tap sends the reversal twice; the second finds the portion already gone.
+            ->missing(fn () => back()->with('success', 'That portion has already been reversed.'));
 
         Route::post('/events/{event}/meals/stations/{station}/staff', [MealDistributionController::class, 'assignStaff'])->name('events.meals.stations.staff');
     });
