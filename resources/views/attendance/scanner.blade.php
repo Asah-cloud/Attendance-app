@@ -33,11 +33,11 @@
             const input = document.getElementById('registration-code');
             let busy = false;
 
-            const showResult = (message, successful) => {
+            const showResult = (message, successful, warning = false) => {
                 result.textContent = message;
-                result.className = `mt-5 rounded-2xl p-5 font-bold ${successful ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`;
+                result.className = `mt-5 rounded-2xl p-5 font-bold ${warning ? 'bg-amber-50 text-amber-900' : (successful ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800')}`;
                 window.dispatchEvent(new CustomEvent('notify', {
-                    detail: { message, type: successful ? 'success' : 'error' },
+                    detail: { message, type: warning ? 'warning' : (successful ? 'success' : 'error') },
                 }));
             };
 
@@ -51,7 +51,7 @@
                         body: JSON.stringify({registration_code: value.trim()}),
                     });
                     const data = await response.json();
-                    showResult(data.message || 'We could not process that QR code. Please try again.', response.ok);
+                    showResult(data.message || 'We could not process that QR code. Please try again.', response.ok, Boolean(data.possible_duplicate));
                     if (response.ok) input.value = '';
                 } catch (error) {
                     showResult('We could not connect right now. Please check your internet connection and try again.', false);

@@ -28,10 +28,10 @@
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-2"
             class="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl px-5 py-4 text-sm font-bold text-white shadow-2xl"
-            :class="toast.type === 'error' ? 'bg-red-600 shadow-red-950/30' : 'bg-emerald-600 shadow-emerald-950/30'"
+            :class="toast.type === 'error' ? 'bg-red-600 shadow-red-950/30' : (toast.type === 'warning' ? 'bg-amber-600 shadow-amber-950/30' : 'bg-emerald-600 shadow-emerald-950/30')"
         >
-            <svg x-show="toast.type !== 'error'" class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-            <svg x-show="toast.type === 'error'" class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 2.11 18a2 2 0 0 0 1.71 3h16.36a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /></svg>
+            <svg x-show="toast.type === 'success'" class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            <svg x-show="toast.type !== 'success'" class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 2.11 18a2 2 0 0 0 1.71 3h16.36a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /></svg>
             <span x-text="toast.message"></span>
         </div>
     </template>

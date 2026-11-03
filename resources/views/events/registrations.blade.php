@@ -30,9 +30,21 @@
         <x-event-closed-banner :event="$event" />
         <livewire:registration-stats :event="$event" />
         @if($errors->any())<div class="mb-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</div>@endif
-        <details data-tour="event-attendees-manual" class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','country','category'])) open @endif>
+        <details data-tour="event-attendees-manual" class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" @if($errors->hasAny(['name','email','phone','country','category']) || session('similar_people')) open @endif>
             <summary class="cursor-pointer font-black text-slate-900">Manually register an attendee</summary>
             <form method="POST" action="{{ route('events.registrations.store', $event) }}" class="mt-5 grid gap-4 md:grid-cols-2">@csrf
+                @if(session('similar_people'))
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 md:col-span-2">
+                        <p class="font-black">Already registered under a similar name. Is this the same person?</p>
+                        <ul class="mt-2 space-y-1">
+                            @foreach(session('similar_people') as $person)
+                                <li><strong>{{ $person['name'] }}</strong> · {{ $person['phone'] ?: 'no phone' }} · {{ ucfirst($person['status']) }}@if($person['arrived']) · <span class="font-bold text-emerald-700">arrived</span>@endif</li>
+                            @endforeach
+                        </ul>
+                        <p class="mt-2 text-xs">If it's the same person, don't add them again. If it's someone different, press <strong>Register a different person</strong> below.</p>
+                        <input type="hidden" name="confirm_new" value="1">
+                    </div>
+                @endif
                 <input name="name" value="{{ old('name') }}" required placeholder="Full name" class="rounded-xl border-slate-200">
                 <input type="email" name="email" value="{{ old('email') }}" placeholder="Email" class="rounded-xl border-slate-200">
                 <input name="phone" value="{{ old('phone') }}" placeholder="Phone (optional)" class="rounded-xl border-slate-200">
@@ -52,7 +64,7 @@
                 @else
                     <input name="category" value="{{ old('category', 'Member') }}" required placeholder="Attendee type" class="rounded-xl border-slate-200 md:col-span-2">
                 @endif
-                <button class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white md:col-span-2">Register attendee</button>
+                <button class="rounded-xl bg-blue-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white md:col-span-2">{{ session('similar_people') ? 'Register a different person' : 'Register attendee' }}</button>
             </form>
         </details>
         <form id="attendee-filter" data-tour="event-attendees-filter" method="GET" action="{{ route('events.registrations.index', $event) }}" class="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
@@ -81,7 +93,7 @@
                     <svg class="h-5 w-5 shrink-0 text-amber-700 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                 </summary>
                 <div class="px-5 pb-5">
-                <p class="text-xs text-amber-700">These attendees share a name (in any word order, ignoring titles like Pastor or Rev) but not a phone number or email, so they weren't automatically combined into one record. If they are different people, choose <strong>keep both</strong> and they won't be flagged again. If it's the same person, merge the records or cancel the extra entry.</p>
+                <p class="text-xs text-amber-700">These attendees have the same or a very similar name (in any word order, ignoring titles like Pastor or Rev, and allowing small spelling differences such as Ebenezer / Ebenzer) but not a phone number or email, so they weren't automatically combined into one record. If they are different people, choose <strong>keep both</strong> and they won't be flagged again. If it's the same person, merge the records or cancel the extra entry.</p>
                 <div class="mt-4 space-y-4">
                     @foreach($possibleDuplicates as $group)
                         <div class="rounded-xl bg-white p-4 shadow-sm">
