@@ -15,7 +15,8 @@ class ArrivalStats extends Component
     {
         Gate::authorize('view', $this->event);
         $confirmed = $this->event->expectedParticipants()->count();
-        $arrived = Attendance::query()->where('event_id', $this->event->id)->where('day', 0)->count();
+        // Same rule as the reports: someone cancelled after arriving no longer counts.
+        $arrived = Attendance::query()->countedFor($this->event)->where('day', 0)->distinct('participant_id')->count('participant_id');
         $unusedPlaceholders = $this->event->unusedPlaceholderIds()->count();
 
         return view('livewire.arrival-stats', compact('confirmed', 'arrived', 'unusedPlaceholders'));
