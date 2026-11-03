@@ -141,10 +141,8 @@ class AttendanceController extends Controller
 
     public function personalCheckIn(string $code)
     {
-        $registration = EventRegistration::query()
-            ->with(['event', 'participant', 'roomAssignment.room.floor.block.site'])
-            ->where('registration_code', $code)
-            ->firstOrFail();
+        $registration = EventRegistration::findByCode($code) ?? abort(404);
+        $registration->load(['event', 'participant', 'roomAssignment.room.floor.block.site']);
 
         $event = $registration->event;
         $participant = $registration->participant;

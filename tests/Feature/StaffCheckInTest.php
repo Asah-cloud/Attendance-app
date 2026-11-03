@@ -140,7 +140,7 @@ it('notifies through the shared toast bubble instead of a silent session flash',
     $event->update(['cancelled_at' => null]);
     Livewire::test(AttendanceSearch::class, ['event' => $event, 'mode' => 'staff'])
         ->call('deleteUser', $staff->id)
-        ->assertDispatched('notify', message: 'Member removed successfully.', type: 'success');
+        ->assertDispatched('notify', message: 'Removed from the event. You can restore them from the Attendees page.', type: 'success');
 });
 
 it('checks a staff member in via their staff QR and keeps it separate from daily attendance', function () {

@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\BadgePrint;
 use App\Models\EventRegistration;
+use App\Models\MealCollectionAudit;
 use App\Models\Participant;
 use App\Models\ParticipantAuditLog;
 use App\Models\User;
@@ -38,8 +40,9 @@ class ParticipantMergeService
             $primary->save();
 
             $duplicate->registrations()->get()->each(function (EventRegistration $registration) use ($primary): void {
-                if ($primary->registrations()->where('event_id', $registration->event_id)->exists()) {
-                    $registration->delete();
+                $kept = $primary->registrations()->where('event_id', $registration->event_id)->first();
+                if ($kept) {
+                    $this->foldInto($registration, $kept);
                 } else {
                     $registration->update(['participant_id' => $primary->id]);
                 }
@@ -74,5 +77,38 @@ class ParticipantMergeService
 
             $duplicate->delete();
         });
+    }
+
+    /**
+     * Two registrations for one event: keep $kept and move what hangs off $gone onto it
+     * before $gone is deleted. Its printed QR code becomes an alias of $kept, so that
+     * badge keeps scanning, and its food collections, badge prints and room carry over.
+     */
+    private function foldInto(EventRegistration $gone, EventRegistration $kept): void
+    {
+        $codes = DB::table('registration_code_aliases')->where('event_registration_id', $gone->id)->pluck('code')
+            ->push($gone->registration_code)->filter()->unique();
+        DB::table('registration_code_aliases')->where('event_registration_id', $gone->id)->delete();
+        foreach ($codes as $code) {
+            DB::table('registration_code_aliases')->insert(['event_id' => $kept->event_id, 'event_registration_id' => $kept->id,
+                'code' => $code, 'created_at' => now(), 'updated_at' => now()]);
+        }
+
+        foreach ($gone->mealCollections()->get() as $collection) {
+            $existing = $kept->mealCollections()->where('meal_distribution_id', $collection->meal_distribution_id)->first();
+            if ($existing) {
+                $existing->increment('quantity', $collection->quantity);
+                $collection->delete();
+            } else {
+                $collection->update(['event_registration_id' => $kept->id, 'participant_id' => $kept->participant_id]);
+            }
+        }
+        MealCollectionAudit::where('event_registration_id', $gone->id)->update(['event_registration_id' => $kept->id, 'participant_id' => $kept->participant_id]);
+        BadgePrint::where('event_registration_id', $gone->id)->update(['event_registration_id' => $kept->id]);
+        if (! $kept->roomAssignment()->exists()) {
+            $gone->roomAssignment()->update(['event_registration_id' => $kept->id]);
+        }
+
+        $gone->delete();
     }
 }

@@ -44,6 +44,6 @@ class EventRegistrationResolver
             }
         }
 
-        return $event->registrations()->where('registration_code', $value)->first();
+        return EventRegistration::findByCode($value, $event->id);
     }
 }
