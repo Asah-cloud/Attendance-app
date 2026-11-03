@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Attendance;
 use App\Models\Event;
+use App\Models\EventRegistration;
 use App\Services\ApplicationCache;
 use App\Services\StaffCheckInService;
 use App\Support\Search;
@@ -170,10 +171,16 @@ class AttendanceSearch extends Component
     {
         Gate::authorize('update', $this->event);
         $this->participantsQuery()->findOrFail($participantId);
-        $this->event->registrations()->where('participant_id', $participantId)->delete();
+        // Cancelled, not deleted: the printed QR code is kept, and Attendees → Restore brings them back.
+        // No message goes to the person; this tidies the list rather than telling them anything.
+        $this->event->registrations()->where('participant_id', $participantId)->update([
+            'status' => EventRegistration::STATUS_CANCELLED,
+            'approved_at' => null,
+            'cancelled_at' => now(),
+        ]);
         app(ApplicationCache::class)->invalidateEvent($this->event->id, $this->event->company_id);
         $this->dispatch('attendanceStatsChanged');
-        $this->dispatch('notify', message: 'Member removed successfully.', type: 'success');
+        $this->dispatch('notify', message: 'Removed from the event. You can restore them from the Attendees page.', type: 'success');
     }
 
     public function startEditingStaff(int $participantId): void

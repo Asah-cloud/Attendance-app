@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class EventRegistration extends Model
@@ -135,5 +136,23 @@ class EventRegistration extends Model
     public function roomAssignment(): HasOne
     {
         return $this->hasOne(RoomAssignment::class);
+    }
+
+    /**
+     * The registration a printed code belongs to: its own code, or the code of a registration
+     * that was merged into it (that badge keeps working). Limited to one event when given.
+     */
+    public static function findByCode(string $code, ?int $eventId = null): ?self
+    {
+        $own = self::query()->where('registration_code', $code)
+            ->when($eventId, fn ($query) => $query->where('event_id', $eventId))->first();
+        if ($own) {
+            return $own;
+        }
+
+        $aliasOf = DB::table('registration_code_aliases')->where('code', $code)
+            ->when($eventId, fn ($query) => $query->where('event_id', $eventId))->value('event_registration_id');
+
+        return $aliasOf ? self::query()->find($aliasOf) : null;
     }
 }

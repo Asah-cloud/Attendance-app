@@ -79,8 +79,8 @@
                                         <button type="button" wire:click="startEditingStaff({{ $user->id }})" class="text-xs font-bold text-blue-600 hover:text-blue-800">Edit</button>
                                     @endif
                                     <button type="button" wire:click="deleteUser({{ $user->id }})"
-                                            wire:confirm="Are you sure you want to permanently remove this member from the event?"
-                                            class="text-xs font-bold text-red-500 hover:text-red-700">Delete</button>
+                                            wire:confirm="Remove this person from the event? Their badge stops working until you restore them from the Attendees page."
+                                            class="text-xs font-bold text-red-500 hover:text-red-700">Remove</button>
                                 </div>
                                 @endcan
                             </td>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditApproval;
 use App\Models\Event;
+use App\Models\EventRegistration;
 use App\Models\User;
 use App\Services\AuditApprovalService;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class AuditAccessController extends Controller
             $this->authorize('update', $event);
         } else {
             $meal = $event->mealDistributions()->findOrFail($data['meal_id']);
-            $registration = $event->registrations()->where('registration_code', $data['registration_code'])->firstOrFail();
+            $registration = EventRegistration::findByCode($data['registration_code'], $event->id) ?? abort(404);
             $mealId = $meal->id;
             $targetId = $registration->id;
             if ($data['scope'] === 'reverse') {
