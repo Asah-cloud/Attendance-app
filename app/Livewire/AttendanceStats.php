@@ -47,7 +47,9 @@ class AttendanceStats extends Component
             ->count('participant_id');
 
         return view('livewire.attendance-stats', [
-            'totalMembers' => $this->event->attendanceEligibleParticipants()->count(),
+            'totalMembers' => $this->event->has_arrival_session
+                ? $this->event->arrivedParticipants()->count()
+                : $this->event->expectedParticipants()->count(),
             'participantStaffCount' => $participantStaffCount,
             'presentCount' => $dailyAttendeeCount + $participantStaffCount,
             'totalPresentCount' => $this->day < 1 ? 0 : $cumulativeAttendeeCount + $participantStaffCount,

@@ -35,7 +35,7 @@ class AttendanceGrid
     {
         $session = $day === 'all' || (int) $day < 1 ? null : $session;
         $filters = array_filter(array_intersect_key($filters, array_flip(self::FILTERS)), fn ($value) => filled($value));
-        ['presentUsers' => $present, 'absentUsers' => $absent, 'totalExpected' => $expected] = $this->report->forPeriod($event, $day, $session);
+        ['presentUsers' => $present, 'absentUsers' => $absent, 'totalExpected' => $expected, 'unusedPlaceholders' => $unusedPlaceholders] = $this->report->forPeriod($event, $day, $session);
 
         if ($filters !== []) {
             $present = $present->filter(fn ($person) => self::matches($person, $filters))->values();
@@ -131,6 +131,7 @@ class AttendanceGrid
             'rows' => $rows,
             'absent' => $absent->values(),
             'totalExpected' => $expected,
+            'unusedPlaceholders' => $unusedPlaceholders,
             'turnout' => $turnout,
             'multiDay' => $day === 'all' && $heldDays->count() > 1,
             'totalDays' => $heldDays->count(),

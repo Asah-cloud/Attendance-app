@@ -14,9 +14,10 @@ class ArrivalStats extends Component
     public function render()
     {
         Gate::authorize('view', $this->event);
-        $confirmed = $this->event->confirmedParticipants()->count();
+        $confirmed = $this->event->expectedParticipants()->count();
         $arrived = Attendance::query()->where('event_id', $this->event->id)->where('day', 0)->count();
+        $unusedPlaceholders = $this->event->unusedPlaceholderIds()->count();
 
-        return view('livewire.arrival-stats', compact('confirmed', 'arrived'));
+        return view('livewire.arrival-stats', compact('confirmed', 'arrived', 'unusedPlaceholders'));
     }
 }

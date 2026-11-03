@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 
 class AttendanceReportData
 {
-    /** @return array{presentUsers: Collection, absentUsers: Collection, totalExpected: int} */
+    /** @return array{presentUsers: Collection, absentUsers: Collection, totalExpected: int, unusedPlaceholders: int} */
     public function forPeriod(Event $event, int|string $day, ?int $session = null): array
     {
         // A session filter only ever narrows a specific numbered program day (day >= 1);
@@ -19,8 +19,10 @@ class AttendanceReportData
 
         // "Expected" is always the confirmed attendees, on every day and on the all-days view.
         // On events with an arrival check-in, people who never arrived count as absent on each
-        // day rather than silently dropping out of the total.
-        $eligibleIds = $event->confirmedParticipants()->pluck('participants.id');
+        // day rather than silently dropping out of the total. Spare "Participant 12" badges
+        // only count once someone has been scanned with one.
+        $unusedPlaceholderIds = $event->unusedPlaceholderIds();
+        $eligibleIds = $event->confirmedParticipants()->pluck('participants.id')->diff($unusedPlaceholderIds)->values();
 
         $presentAttendeeIds = Attendance::query()
             ->where('event_id', $event->id)
@@ -71,6 +73,7 @@ class AttendanceReportData
             'presentUsers' => $presentUsers,
             'absentUsers' => $absentUsers,
             'totalExpected' => $eligibleIds->count() + $staffIds->count(),
+            'unusedPlaceholders' => $unusedPlaceholderIds->count(),
         ];
     }
 }

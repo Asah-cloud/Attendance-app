@@ -81,7 +81,7 @@ class AttendanceController extends Controller
         $this->authorize('view', $event);
         abort_unless($event->has_arrival_session, 404);
 
-        $confirmedCount = $event->confirmedParticipants()->count();
+        $confirmedCount = $event->expectedParticipants()->count();
         $arrivedCount = $event->arrivedParticipants()->count();
 
         return view('events.arrival', compact('event', 'confirmedCount', 'arrivedCount'));
