@@ -3,6 +3,7 @@
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\MealCollectionAudit;
 use App\Models\MealDistribution;
 use App\Models\Participant;
 use App\Models\User;
@@ -518,4 +519,25 @@ it('logs waste and reflects it in the food report totals', function () {
 
     $this->assertDatabaseHas('meal_waste_logs', ['meal_distribution_id' => $meal->id, 'quantity' => 3, 'reason' => 'Spoiled before service', 'logged_by' => $manager->id]);
     $this->actingAs($manager)->get(route('events.meals.report', $event))->assertOk()->assertSee('Spoiled before service');
+});
+
+it('answers a repeated reversal of the same portion without an error page', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
+    $registration = mealRegistration($event);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 5]);
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $registration->registration_code])->assertOk();
+    $collection = $meal->collections()->firstOrFail();
+    $url = route('events.meals.collections.reverse', [$event, $meal, $collection]);
+    $scanner = route('events.meals.scanner', [$event, $meal]);
+
+    $this->actingAs($manager)->from($scanner)->delete($url, ['reason' => 'Wrong person'])->assertRedirect($scanner);
+    $this->actingAs($manager)->from($scanner)->delete($url, ['reason' => 'Wrong person'])
+        ->assertRedirect($scanner)
+        ->assertSessionHas('success', 'That portion has already been reversed.');
+
+    expect($meal->collections()->count())->toBe(0)
+        ->and(MealCollectionAudit::where('meal_distribution_id', $meal->id)->where('action', 'reversed')->count())->toBe(1);
 });
