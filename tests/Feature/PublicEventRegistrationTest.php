@@ -325,15 +325,16 @@ it('flags names written in a different order or with a title as possible duplica
 
     $content = $this->actingAs($manager)->get(route('events.registrations.index', $event))
         ->assertOk()
-        ->assertSee('2 names shared by 4 entries')
+        ->assertSee('2 names shared by 5 entries')
         // Each entry shows its own name, since they're written differently.
         ->assertSee('<strong class="text-slate-900">Asante Kwame</strong>', false)
         ->assertSee('<strong class="text-slate-900">Pastor Boateng Kofi</strong>', false)
+        // An extra middle or last name is flagged too, as a variant for the manager to check.
+        ->assertSee('<strong class="text-slate-900">Kofi Boateng Mensah</strong>', false)
         ->getContent();
 
-    // A third name with an extra word is someone else, and a title alone is never a match.
-    expect(substr_count($content, 'Cancel this one'))->toBe(4)
-        ->and($content)->not->toContain('<strong class="text-slate-900">Kofi Boateng Mensah</strong>');
+    // A title alone is never a match.
+    expect(substr_count($content, 'Cancel this one'))->toBe(5);
 });
 
 it('does not flag a single attendee with a unique name as a possible duplicate', function () {

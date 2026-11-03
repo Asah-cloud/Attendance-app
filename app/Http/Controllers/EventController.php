@@ -6,6 +6,7 @@ use App\Imports\UsersImport;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventAttendeeCharge;
+use App\Models\EventRegistration;
 use App\Models\Participant;
 use App\Models\ParticipantImport;
 use App\Notifications\Channels\ArkeselChannel;
@@ -15,6 +16,7 @@ use App\Services\ParticipantListImporter;
 use App\Services\PdfParticipantListParser;
 // Added these for the import to work
 use App\Services\RegistrationLifecycleService;
+use App\Services\SimilarNames;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -224,8 +226,29 @@ class EventController extends Controller
         if ($options['needs_room']) {
             $message .= ' They were marked as needing a room.';
         }
+        // A list with no phone numbers can't be matched to people already registered under another spelling.
+        $lookalikes = $this->newLookalikes($event, $created['registrations']);
+        if ($lookalikes) {
+            $message .= " {$lookalikes} of the people added look like someone already registered under a similar name. Check Attendees → Possible duplicate attendees.";
+        }
 
         return back()->with('success', $message);
+    }
+
+    /** How many of these new registrations look like someone else already on the event. */
+    private function newLookalikes(Event $event, array $registrationIds): int
+    {
+        if ($registrationIds === []) {
+            return 0;
+        }
+        $registrations = $event->registrations()->with('participant')
+            ->where('status', '!=', EventRegistration::STATUS_CANCELLED)
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))->get();
+        $new = array_flip($registrationIds);
+
+        return app(SimilarNames::class)->groups($registrations)
+            ->filter(fn ($group) => $group->contains(fn ($registration) => ! isset($new[$registration->id])))
+            ->sum(fn ($group) => $group->filter(fn ($registration) => isset($new[$registration->id]))->count());
     }
 
     private function runImport(Event $event, PdfParticipantListParser $pdfParser, string $path, bool $needsRoom, array $decisions, bool $trial): UsersImport

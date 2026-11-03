@@ -6,6 +6,7 @@ use App\Exports\BadgePrintListExport;
 use App\Http\Controllers\Concerns\SavesPaymentSettings;
 use App\Jobs\FinalizeBadgeExport;
 use App\Jobs\GenerateBadgeExportBatch;
+use App\Models\Attendance;
 use App\Models\BadgeExport;
 use App\Models\BadgePrint;
 use App\Models\Event;
@@ -20,6 +21,7 @@ use App\Services\BadgePdfService;
 use App\Services\ParticipantRegistrationService;
 use App\Services\PhoneNumberService;
 use App\Services\RegistrationLifecycleService;
+use App\Services\SimilarNames;
 use App\Support\BadgeDesign;
 use App\Support\Pdf\PdfQrCode;
 use App\Support\Search;
@@ -81,29 +83,18 @@ class EventRegistrationFormController extends Controller
      * Attendees who share a name but, unlike a phone/email match, were never automatically
      * merged into one participant record — grouped so a manager can review and cancel the
      * extra entry by hand instead of the system guessing wrong and merging unrelated people.
-     * Names match in any word order and without titles ("Kwame Asante" = "Pastor Asante Kwame").
+     * Names match in any word order and without titles ("Kwame Asante" = "Pastor Asante Kwame"),
+     * and also spelling and middle-name variants ("Ebenzer Quao", "Charles Garvan Sayeweh").
      */
     private function possibleDuplicateRegistrations(Event $event)
     {
-        $people = app(ParticipantRegistrationService::class);
-        $names = $event->registrations()
-            ->join('participants', 'participants.id', '=', 'event_registrations.participant_id')
-            ->where('event_registrations.status', '!=', EventRegistration::STATUS_CANCELLED)
-            ->where('participants.is_support_staff', false)
-            ->pluck('participants.name', 'event_registrations.id')
-            ->map(fn ($name) => $people->nameKey($name))
-            ->filter();
-        $sharedIds = $names->groupBy(fn ($key) => $key, true)->filter(fn ($ids) => $ids->count() > 1)->flatMap(fn ($ids) => $ids->keys());
-
-        if ($sharedIds->isEmpty()) {
-            return collect();
-        }
-
-        return $event->registrations()
+        $registrations = $event->registrations()
             ->with('participant')
-            ->whereIn('id', $sharedIds->all())
-            ->get()
-            ->groupBy(fn ($registration) => $names[$registration->id])
+            ->where('status', '!=', EventRegistration::STATUS_CANCELLED)
+            ->whereHas('participant', fn ($query) => $query->where('is_support_staff', false))
+            ->get();
+
+        return app(SimilarNames::class)->groups($registrations)
             // Two registrations of one participant are not two people.
             ->filter(fn ($group) => $group->pluck('participant_id')->unique()->count() > 1)
             // A group the manager marked as different people stays hidden until someone new joins it.
@@ -135,6 +126,19 @@ class EventRegistrationFormController extends Controller
             'gender' => ['required', Rule::in($this->fieldOptions($event, 'gender', ['Male', 'Female']))],
             'category' => $this->categoryRule($event),
         ]);
+
+        // Someone already registered under a similar name: ask before adding a second record.
+        if (! $request->boolean('confirm_new')) {
+            $similar = app(SimilarNames::class)->matchesOnEvent($event, $validated['name'], $validated['phone'] ?? null, $validated['gender']);
+            if ($similar->isNotEmpty()) {
+                return back()->withInput()->with('similar_people', $similar->map(fn (EventRegistration $registration) => [
+                    'name' => $registration->participant->name,
+                    'phone' => $registration->participant->phone,
+                    'status' => $registration->status,
+                    'arrived' => Attendance::where('event_id', $event->id)->where('participant_id', $registration->participant_id)->exists(),
+                ])->all());
+            }
+        }
 
         $registration = DB::transaction(function () use ($event, $validated, $participants): EventRegistration {
             $event = Event::query()->lockForUpdate()->findOrFail($event->id);

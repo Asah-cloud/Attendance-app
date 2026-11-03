@@ -8,6 +8,7 @@ use App\Models\EventRegistration;
 use App\Services\ApplicationCache;
 use App\Services\EventRegistrationResolver;
 use App\Services\ParticipantRegistrationService;
+use App\Services\SimilarNames;
 use App\Services\StaffCheckInService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -358,8 +359,15 @@ class AttendanceController extends Controller
             $message .= ' Your room is '.$room->label().'.';
         }
 
+        // A second badge for someone already checked in under a similar name counts them twice.
+        $twin = $attendance->wasRecentlyCreated ? $this->similarAlreadyPresent($event, $registration, $day, $currentSession) : null;
+        if ($twin) {
+            $message .= " Possible duplicate: {$twin['name']} was already checked in at {$twin['at']}. Please check this is a different person.";
+        }
+
         return response()->json([
             'successful' => true,
+            'possible_duplicate' => $twin !== null,
             'already_present' => ! $attendance->wasRecentlyCreated,
             'name' => $registration->participant->name,
             'day' => $day,
@@ -367,6 +375,23 @@ class AttendanceController extends Controller
             'room' => $room?->label(),
             'message' => $message,
         ]);
+    }
+
+    /** @return array{name: string, at: string}|null someone else checked in for this session under a similar name */
+    private function similarAlreadyPresent(Event $event, EventRegistration $registration, int $day, int $session): ?array
+    {
+        $similar = app(SimilarNames::class)->matchesOnEvent($event, $registration->participant->name, $registration->participant->phone, $registration->participant->gender)
+            ->where('participant_id', '!=', $registration->participant_id)
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->where('duplicate_dismissed_at', null);
+        if ($similar->isEmpty()) {
+            return null;
+        }
+
+        $earlier = Attendance::query()->where('event_id', $event->id)->where('day', $day)->where('session', $session)
+            ->whereIn('participant_id', $similar->pluck('participant_id'))->with('participant:id,name')->oldest()->first();
+
+        return $earlier ? ['name' => $earlier->participant->name, 'at' => $earlier->created_at->format('D g:i A')] : null;
     }
 
     private function totalDays(Event $event): int
