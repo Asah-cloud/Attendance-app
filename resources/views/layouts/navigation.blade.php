@@ -21,6 +21,7 @@
         $items[] = ['label' => 'Integrations', 'route' => 'integrations.edit', 'active' => 'integrations.*', 'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z'];
     }
     if ($user->hasAnyRole(['admin', 'manager'])) {
+        $items[] = ['label' => 'Staff Messages', 'route' => 'staff-messages.index', 'active' => 'staff-messages.*', 'icon' => 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z'];
         $items[] = ['label' => 'Event Staff', 'route' => 'support-staff.index', 'active' => 'support-staff.*', 'icon' => 'M8 7a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-5 14a9 9 0 0 1 18 0M16 11l2 2 4-4', 'tour' => 'nav-staff-roster'];
     }
     if ($user->hasRole('manager')) {

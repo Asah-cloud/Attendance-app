@@ -54,6 +54,9 @@
                         @role('admin')
                             <x-sign-in-bell />
                         @endrole
+                        @if(auth()->user()->hasAnyRole(\App\Models\StaffMessage::STAFF_ROLES) && ! auth()->user()->hasAnyRole(['admin', 'manager']))
+                            <x-staff-message-bell />
+                        @endif
                         @if($tourKey && $tourUser?->hasRole('manager'))
                             <button type="button" data-tour-restart class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 text-sm font-extrabold text-slate-500 transition hover:border-blue-300 hover:text-blue-700" title="Replay this page's tour" aria-label="Replay this page's tour">?</button>
                         @endif
