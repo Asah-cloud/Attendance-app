@@ -37,6 +37,7 @@ use App\Http\Controllers\RoomPlanController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SharedFormController;
 use App\Http\Controllers\SignInActivityController;
+use App\Http\Controllers\StaffMessageController;
 use App\Http\Controllers\SuperAdmin\AttendeePricingController;
 use App\Http\Controllers\SuperAdmin\CompanyController;
 use App\Http\Controllers\SuperAdmin\CompanyHistoryController;
@@ -153,6 +154,10 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/{form}/export', [SharedFormController::class, 'exportExcel'])->name('export');
         Route::get('/{form}/pdf', [SharedFormController::class, 'exportPdf'])->name('pdf');
     });
+
+    // Messages from admins and managers to staff: the staff bell (polled) and marking them read.
+    Route::get('/staff-messages/feed', [StaffMessageController::class, 'feed'])->middleware('throttle:60,1')->name('staff-messages.feed');
+    Route::post('/staff-messages/read', [StaffMessageController::class, 'read'])->middleware('throttle:60,1')->name('staff-messages.read');
 
     // --- SHARED ROUTES (Admins, Managers & Markers) ---
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
@@ -411,6 +416,13 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::get('/compare', [ParticipantMergeController::class, 'compare'])->name('compare');
         Route::post('/merge', [ParticipantMergeController::class, 'merge'])->name('merge');
         Route::delete('/clear-all', [ParticipantMergeController::class, 'destroyAll'])->name('clear-all');
+    });
+
+    Route::middleware(['role:admin|manager'])->prefix('staff-messages')->name('staff-messages.')->group(function () {
+        Route::get('/', [StaffMessageController::class, 'index'])->name('index');
+        Route::post('/', [StaffMessageController::class, 'store'])->middleware('throttle:30,1')->name('store');
+        Route::get('/{message}', [StaffMessageController::class, 'show'])->whereNumber('message')->name('show');
+        Route::delete('/{message}', [StaffMessageController::class, 'destroy'])->whereNumber('message')->name('destroy');
     });
 
     Route::middleware(['role:admin|manager'])->prefix('support-staff')->name('support-staff.')->group(function () {

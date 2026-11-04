@@ -258,6 +258,10 @@ lists come from `AccommodationController::report/exportCsv/exportPdf`.
 
 Managers (and admins) can remove an event's check-ins from **Attendance → Reset attendance**: every day, or one day. It needs the exact event title and the person's own password, is limited to 5 tries a minute, and only works while the event is open (closing reconciles the attendee bill from the check-ins, so a closed event's check-ins can't be wiped). Each reset is stored in `attendance_resets` with the removed rows, who did it and from where; **Undo** in the same window puts them back (people deleted since are skipped, check-ins taken again since are kept). Every reset and undo emails the company's managers (`AttendanceWasReset`). Registrations, rooms and meals are not touched. The attendance header card has `data-no-lift`: the global hover lift (a transform) would otherwise move the fixed window with the card.
 
+### 6.13b Staff messages
+
+Admins and managers send read-only messages to staff accounts (roles `usher`, `audit_head`, `audit_staff`; `StaffMessage::STAFF_ROLES`) from **Staff Messages** (`staff-messages.*`, `role:admin|manager`). The audience is every staff account in the company, the staff linked to one event (`event_staff`), or one person; a platform admin picks the company first. Each recipient gets a `staff_message_recipients` row with `read_at`, so the sent list shows "Seen by N of M" and the message page lists who has not read it. Staff see a bell (`x-staff-message-bell`, in `layouts/app`) that polls `staff-messages.feed` every 20 seconds while the tab is visible; opening it marks everything read (`staff-messages.read`). An urgent message is shown across the top of the screen until "Got it", which marks just that one read. Deleting a message removes it for everyone. Messages are in-app only: no SMS or email is sent.
+
 ### 6.14 Live updates (no reload)
 
 Open pages show edits made anywhere (another tab, another person, a background job) within about
