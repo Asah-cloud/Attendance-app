@@ -29,35 +29,60 @@ class SimilarNames
 
     public function sameName(?string $a, ?string $b): bool
     {
-        [$short, $long] = collect([$this->words($a), $this->words($b)])->sortBy(fn ($words) => count($words))->values()->all();
-        if (count($short) < 2) {
+        return $this->sameWords($this->words($a), $this->words($b));
+    }
+
+    public function samePerson(Participant $a, Participant $b): bool
+    {
+        return $a->id !== $b->id && $this->sameProfile($this->profile($a), $this->profile($b));
+    }
+
+    /** @return array{words: array<int, string>, phone: ?string, gender: string, placeholder: bool} */
+    private function profile(Participant $participant): array
+    {
+        return [
+            'words' => $this->words($participant->name),
+            'phone' => $this->phoneDigits($participant->phone),
+            'gender' => strtolower(trim((string) $participant->gender)),
+            'placeholder' => Participant::isNumberedPlaceholderName($participant->name),
+        ];
+    }
+
+    private function sameProfile(array $a, array $b): bool
+    {
+        if ($a['placeholder'] || $b['placeholder']) {
+            return false;
+        }
+        if ($a['phone'] && $b['phone'] && $a['phone'] !== $b['phone']) {
+            return false;
+        }
+        if ($a['gender'] !== '' && $b['gender'] !== '' && $a['gender'] !== $b['gender']) {
             return false;
         }
 
+        return $this->sameWords($a['words'], $b['words']);
+    }
+
+    private function sameWords(array $a, array $b): bool
+    {
+        [$short, $long] = count($a) <= count($b) ? [$a, $b] : [$b, $a];
+        if (count($short) < 2) {
+            return false;
+        }
         foreach ($short as $word) {
-            if (! collect($long)->contains(fn ($other) => $this->sameWord($word, $other))) {
+            $found = false;
+            foreach ($long as $other) {
+                if ($this->sameWord($word, $other)) {
+                    $found = true;
+                    break;
+                }
+            }
+            if (! $found) {
                 return false;
             }
         }
 
         return true;
-    }
-
-    public function samePerson(Participant $a, Participant $b): bool
-    {
-        if ($a->id === $b->id || Participant::isNumberedPlaceholderName($a->name) || Participant::isNumberedPlaceholderName($b->name)) {
-            return false;
-        }
-        $phoneA = $this->phoneDigits($a->phone);
-        $phoneB = $this->phoneDigits($b->phone);
-        if ($phoneA && $phoneB && $phoneA !== $phoneB) {
-            return false;
-        }
-        if (filled($a->gender) && filled($b->gender) && strtolower($a->gender) !== strtolower($b->gender)) {
-            return false;
-        }
-
-        return $this->sameName($a->name, $b->name);
     }
 
     /**
@@ -74,13 +99,16 @@ class SimilarNames
             return $parent[$i] === $i ? $i : $parent[$i] = $find($parent[$i]);
         };
 
-        $nameKey = fn (EventRegistration $registration) => app(ParticipantRegistrationService::class)->nameKey($registration->participant->name);
-        foreach ($this->candidatePairs($registrations) as [$i, $j]) {
-            $a = $registrations[$i];
-            $b = $registrations[$j];
+        $people = app(ParticipantRegistrationService::class);
+        $profiles = $registrations->map(fn (EventRegistration $registration) => $this->profile($registration->participant))->all();
+        $keys = $registrations->map(fn (EventRegistration $registration) => $people->nameKey($registration->participant->name))->all();
+        foreach ($this->candidatePairs($profiles) as [$i, $j]) {
+            if ($registrations[$i]->participant_id === $registrations[$j]->participant_id) {
+                continue;
+            }
             // The exact same name is always worth a look, whatever the phone numbers say.
-            $sameExactName = $a->participant_id !== $b->participant_id && $nameKey($a) !== '' && $nameKey($a) === $nameKey($b);
-            if ($sameExactName || $this->samePerson($a->participant, $b->participant)) {
+            $sameExactName = $keys[$i] !== '' && $keys[$i] === $keys[$j];
+            if ($sameExactName || $this->sameProfile($profiles[$i], $profiles[$j])) {
                 $parent[$find($i)] = $find($j);
             }
         }
@@ -133,11 +161,11 @@ class SimilarNames
     }
 
     /** Index pairs sharing a word's first three letters: the only ones that can match. */
-    private function candidatePairs(Collection $registrations): array
+    private function candidatePairs(array $profiles): array
     {
         $buckets = [];
-        foreach ($registrations as $i => $registration) {
-            foreach ($this->words($registration->participant->name) as $word) {
+        foreach ($profiles as $i => $profile) {
+            foreach ($profile['words'] as $word) {
                 $buckets[substr($word, 0, 3)][$i] = true;
             }
         }
@@ -147,7 +175,7 @@ class SimilarNames
             $indexes = array_keys($indexes);
             foreach ($indexes as $x => $i) {
                 foreach (array_slice($indexes, $x + 1) as $j) {
-                    $pairs[$i < $j ? "$i-$j" : "$j-$i"] = [min($i, $j), max($i, $j)];
+                    $pairs[$i * 100000 + $j] = [$i, $j];
                 }
             }
         }
