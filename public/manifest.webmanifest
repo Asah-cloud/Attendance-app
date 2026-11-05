@@ -1,0 +1,13 @@
+{
+    "name": "Asah Apex Attendance",
+    "short_name": "Asah Apex",
+    "start_url": "/dashboard",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#071426",
+    "theme_color": "#071426",
+    "icons": [
+        { "src": "/images/asah-apex-logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+    ]
+}

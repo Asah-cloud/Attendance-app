@@ -5,7 +5,7 @@
         <section class="overflow-hidden rounded-3xl bg-[#071426] p-7 text-white shadow-xl">
             <p class="text-xs font-black uppercase tracking-[.24em] text-amber-300">Team</p>
             <h1 class="mt-2 text-3xl font-black">Staff messages</h1>
-            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Send instructions to your ushers, meal-station and audit staff. They see them on the bell at the top of every page, including the scanners, and can read but not reply. Urgent messages appear across their screen until they tap "Got it".</p>
+            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Send instructions to your ushers, meal-station and audit staff. They see them on the bell at the top of every page, including the scanners, and as a phone notification if they have turned notifications on, even when the app is closed. They can read but not reply. Urgent messages appear across their screen until they tap "Got it".</p>
         </section>
 
         @if(session('error'))<div class="rounded-2xl bg-rose-50 p-4 font-bold text-rose-800">{{ session('error') }}</div>@endif
@@ -21,7 +21,12 @@
         @endif
 
         <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200" x-data="{ audience: @js(old('audience', 'all')) }">
-            <h2 class="text-xl font-black text-slate-900">New message</h2>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-xl font-black text-slate-900">New message</h2>
+                @if($pushReady && $staff->isNotEmpty())
+                    <p class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800" title="Staff turn this on from the prompt on their phone after signing in. Messages pop up on those phones even when the app is closed.">Phone notifications on for {{ $notificationsOn }} of {{ $staff->count() }} staff</p>
+                @endif
+            </div>
             @if($staff->isEmpty())
                 <p class="mt-3 text-sm text-slate-500">{{ $company->name }} has no usher, meal-station or audit accounts yet. Add them from the Team page first.</p>
             @else
@@ -45,7 +50,7 @@
                     <div x-show="audience === 'user'" x-cloak>
                         <label for="user_id" class="text-sm font-bold text-slate-700">Staff member</label>
                         <select id="user_id" name="user_id" class="mt-2 block w-full rounded-xl border-slate-300" :disabled="audience !== 'user'">
-                            @foreach($staff as $person)<option value="{{ $person->id }}" @selected(old('user_id') == $person->id)>{{ $person->name }}</option>@endforeach
+                            @foreach($staff as $person)<option value="{{ $person->id }}" @selected(old('user_id') == $person->id)>{{ $person->name }}{{ $pushReady && $person->push_subscriptions_exists ? ' (phone notifications on)' : '' }}</option>@endforeach
                         </select>
                     </div>
                     <div>
