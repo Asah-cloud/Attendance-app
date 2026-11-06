@@ -24,6 +24,10 @@
         data-tour-key="{{ $tourKey }}"
         data-auto-start-tour="{{ $autoStartTour ? 'true' : 'false' }}">
         <x-toast />
+        {{-- Outside the header: its backdrop blur would pin a fixed element to the header instead of the screen. --}}
+        @if(auth()->user()->hasAnyRole(\App\Models\StaffMessage::STAFF_ROLES) && ! auth()->user()->hasAnyRole(['admin', 'manager']))
+            <x-push-prompt />
+        @endif
         <div data-ui="app" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false" class="min-h-screen bg-slate-50">
             @include('layouts.navigation')
 

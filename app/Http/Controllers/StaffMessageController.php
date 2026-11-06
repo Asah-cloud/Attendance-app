@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendStaffMessagePush;
 use App\Models\Company;
 use App\Models\Event;
+use App\Models\PushSubscription;
 use App\Models\StaffMessage;
 use App\Models\StaffMessageRecipient;
+use App\Services\WebPushSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,11 +31,15 @@ class StaffMessageController extends Controller
             ->withCount(['recipients', 'recipients as read_count' => fn ($query) => $query->whereNotNull('read_at')])
             ->latest('id')->paginate(20)->withQueryString();
 
+        $staff = StaffMessage::staffIn($company->id)->withExists('pushSubscriptions')->orderBy('name')->get(['id', 'name']);
+
         return view('staff-messages.index', [
             'company' => $company,
             'companies' => $companies,
             'messages' => $messages,
-            'staff' => StaffMessage::staffIn($company->id)->orderBy('name')->get(['id', 'name']),
+            'staff' => $staff,
+            'notificationsOn' => $staff->where('push_subscriptions_exists', true)->count(),
+            'pushReady' => app(WebPushSender::class)->configured(),
             'events' => Event::query()->where('company_id', $company->id)->whereNull('cancelled_at')
                 ->withCount(['staff' => fn ($query) => $query->whereHas('roles', fn ($query) => $query->whereIn('name', StaffMessage::STAFF_ROLES))])
                 ->orderByDesc('event_date')->limit(30)->get(['id', 'title', 'event_date']),
@@ -73,9 +80,13 @@ class StaffMessageController extends Controller
         StaffMessageRecipient::insert($recipientIds->map(fn ($id) => [
             'staff_message_id' => $message->id, 'user_id' => $id, 'created_at' => $now, 'updated_at' => $now,
         ])->all());
+        SendStaffMessagePush::dispatch($message->id);
+
+        $onPhones = PushSubscription::query()->whereIn('user_id', $recipientIds)->distinct('user_id')->count('user_id');
 
         return redirect()->route('staff-messages.index', $this->companyQuery($request, $company))
-            ->with('success', 'Message sent to '.$recipientIds->count().' staff '.str('member')->plural($recipientIds->count()).'.');
+            ->with('success', 'Message sent to '.$recipientIds->count().' staff '.str('member')->plural($recipientIds->count())
+                .($onPhones ? ', and pushed to the phones of '.$onPhones.' of them.' : '.'));
     }
 
     public function show(Request $request, StaffMessage $message): View

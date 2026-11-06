@@ -30,6 +30,7 @@ use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventRegistrationController;
 use App\Http\Controllers\PublicFormController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\RegistrationReportController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoomBoardController;
@@ -158,6 +159,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     // Messages from admins and managers to staff: the staff bell (polled) and marking them read.
     Route::get('/staff-messages/feed', [StaffMessageController::class, 'feed'])->middleware('throttle:60,1')->name('staff-messages.feed');
     Route::post('/staff-messages/read', [StaffMessageController::class, 'read'])->middleware('throttle:60,1')->name('staff-messages.read');
+    Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:20,1')->name('push-subscriptions.store');
+    Route::delete('/push-subscriptions', [PushSubscriptionController::class, 'destroy'])->middleware('throttle:20,1')->name('push-subscriptions.destroy');
 
     // --- SHARED ROUTES (Admins, Managers & Markers) ---
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
