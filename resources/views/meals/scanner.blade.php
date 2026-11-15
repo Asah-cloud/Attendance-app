@@ -13,7 +13,10 @@
                 <div class="mt-6"><label for="station-select" class="text-xs font-black uppercase text-slate-500">Sharing point</label><select id="station-select" class="mt-2 w-full rounded-xl border-slate-300"><option value="">Choose sharing point</option>@foreach($stations as $station)@php $stationRemaining = $meal->remainingPortionsAtStation($station->id); @endphp<option value="{{ $station->id }}">{{ $station->name }}{{ $stationRemaining !== null ? ' ('.$stationRemaining.' left)' : '' }}</option>@endforeach</select></div>
             @endif
 
-            <div id="qr-reader" class="mt-7 overflow-hidden rounded-2xl border border-slate-200"></div>
+            <div class="mt-6 flex justify-end">
+                <button type="button" id="sound-toggle" aria-pressed="true" class="rounded-full border border-slate-200 px-4 py-2 text-xs font-black text-slate-700">Sound and voice: On</button>
+            </div>
+            <div id="qr-reader" class="mt-3 overflow-hidden rounded-2xl border border-slate-200"></div>
             <div id="scan-result" class="mt-5 hidden rounded-2xl p-5 font-bold" role="status" aria-live="polite"></div>
             <div id="pending-badge" class="mt-3 hidden rounded-xl bg-slate-100 p-3 text-xs font-black text-slate-700">Pending sync: <span id="pending-count">0</span> <button type="button" id="sync-now" class="ml-2 underline">Sync now</button></div>
             <form id="manual-scan" class="mt-6 border-t border-slate-100 pt-6"><label for="registration-code" class="text-xs font-black uppercase text-slate-500">Registration code</label><div class="mt-3 flex flex-col gap-3 sm:flex-row"><input id="registration-code" class="min-w-0 flex-1 rounded-xl border-slate-300" placeholder="Scan or paste code" required><button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-extrabold text-white">Issue portion</button></div></form>
@@ -56,6 +59,16 @@
         <livewire:meal-recent-collections :event="$event" :meal="$meal" />
     </div>
 
+    {{-- Covers the whole screen after every scan, so the result can't be missed below the camera. --}}
+    <div id="scan-overlay" class="fixed inset-0 z-[70] hidden flex-col items-center justify-center p-6 text-center" role="alertdialog" aria-modal="true" aria-labelledby="scan-overlay-title" aria-describedby="scan-overlay-detail">
+        <div id="scan-overlay-icon" class="grid h-28 w-28 place-items-center rounded-full bg-white/25 text-7xl font-black leading-none" aria-hidden="true"></div>
+        <h2 id="scan-overlay-title" class="mt-6 break-words text-3xl font-black uppercase tracking-wide sm:text-6xl"></h2>
+        <p id="scan-overlay-name" class="mt-4 max-w-2xl break-words text-2xl font-extrabold sm:text-4xl"></p>
+        <p id="scan-overlay-detail" class="mt-3 max-w-xl text-base font-bold opacity-90 sm:text-lg"></p>
+        <button type="button" id="scan-overlay-close" class="mt-10 rounded-2xl bg-white px-10 py-4 text-lg font-black text-slate-900 shadow-lg">Next person</button>
+        <p id="scan-overlay-hint" class="mt-3 text-sm font-bold opacity-80"></p>
+    </div>
+
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
@@ -85,6 +98,107 @@
 
             const showResult = (message, successful) => { result.classList.remove('hidden'); result.textContent = message; result.className = `mt-5 rounded-2xl p-5 font-bold ${successful ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`; };
 
+            // ---- Full-screen result, sound, voice and vibration ----
+            const soundKey = 'meal-scanner-sound';
+            const soundToggle = document.getElementById('sound-toggle');
+            let soundOn = true;
+            try { soundOn = localStorage.getItem(soundKey) !== 'off'; } catch (e) { /* private mode */ }
+            const paintSoundToggle = () => { soundToggle.textContent = `Sound and voice: ${soundOn ? 'On' : 'Off'}`; soundToggle.setAttribute('aria-pressed', soundOn ? 'true' : 'false'); };
+            paintSoundToggle();
+            soundToggle.addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem(soundKey, soundOn ? 'on' : 'off'); } catch (e) { /* ignore */ } paintSoundToggle(); });
+
+            let audio = null;
+            // Phones only allow sound after the user has touched the page once, so unlock it on the first tap.
+            const unlockAudio = () => {
+                try {
+                    audio ??= new (window.AudioContext || window.webkitAudioContext)();
+                    if (audio.state === 'suspended') audio.resume();
+                    if (window.speechSynthesis) window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+                } catch (e) { /* no audio support */ }
+            };
+            document.addEventListener('pointerdown', unlockAudio, { once: true });
+
+            const tone = (frequency, start, length, type = 'sine', volume = 0.35) => {
+                const oscillator = audio.createOscillator();
+                const gain = audio.createGain();
+                oscillator.type = type;
+                oscillator.frequency.value = frequency;
+                gain.gain.setValueAtTime(volume, audio.currentTime + start);
+                gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + start + length);
+                oscillator.connect(gain).connect(audio.destination);
+                oscillator.start(audio.currentTime + start);
+                oscillator.stop(audio.currentTime + start + length);
+            };
+            const speak = text => {
+                if (!text || !window.speechSynthesis) return;
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.05;
+                window.speechSynthesis.speak(utterance);
+            };
+            const feedback = kind => {
+                if (navigator.vibrate) navigator.vibrate(kind === 'ok' ? 120 : [400, 120, 400, 120, 400]);
+                if (!soundOn) return;
+                try {
+                    audio ??= new (window.AudioContext || window.webkitAudioContext)();
+                    if (kind === 'ok') { tone(880, 0, 0.12); tone(1320, 0.13, 0.18); }
+                    else if (kind === 'warn') { tone(660, 0, 0.2, 'triangle'); tone(660, 0.25, 0.2, 'triangle'); }
+                    else { tone(220, 0, 0.25, 'square', 0.25); tone(220, 0.32, 0.25, 'square', 0.25); tone(165, 0.64, 0.45, 'square', 0.25); }
+                } catch (e) { /* no audio support */ }
+            };
+
+            const overlay = document.getElementById('scan-overlay');
+            const overlayClose = document.getElementById('scan-overlay-close');
+            const looks = {
+                ok: { bg: 'bg-emerald-700 text-white', icon: '✓' },
+                warn: { bg: 'bg-amber-400 text-slate-950', icon: '!' },
+                bad: { bg: 'bg-rose-700 text-white', icon: '✕' },
+            };
+            let overlayOpen = false;
+            let overlayTimer = null;
+            let lastCode = null;
+            let lastClosedAt = 0;
+            const hideOverlay = () => {
+                window.clearTimeout(overlayTimer);
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+                overlayOpen = false;
+                lastClosedAt = Date.now();
+            };
+            const showOverlay = ({ kind, title, name, detail, say }) => {
+                window.clearTimeout(overlayTimer);
+                overlay.className = `fixed inset-0 z-[70] flex flex-col items-center justify-center p-6 text-center ${looks[kind].bg}`;
+                document.getElementById('scan-overlay-icon').textContent = looks[kind].icon;
+                document.getElementById('scan-overlay-title').textContent = title;
+                document.getElementById('scan-overlay-name').textContent = name || '';
+                document.getElementById('scan-overlay-detail').textContent = detail || '';
+                // Green clears itself so a queue keeps moving; red and amber wait for a tap so nobody misses them.
+                document.getElementById('scan-overlay-hint').textContent = kind === 'ok' ? 'Closes by itself' : 'Tap to continue';
+                overlayOpen = true;
+                feedback(kind);
+                if (soundOn) speak(say);
+                overlayClose.focus({ preventScroll: true });
+                if (kind === 'ok') overlayTimer = window.setTimeout(hideOverlay, 1800);
+            };
+            overlayClose.addEventListener('click', hideOverlay);
+            overlay.addEventListener('click', event => { if (event.target === overlay) hideOverlay(); });
+            document.addEventListener('keydown', event => { if (overlayOpen && (event.key === 'Escape' || event.key === 'Enter')) { event.preventDefault(); hideOverlay(); } });
+
+            const describe = (data, ok) => {
+                const name = data.name || '';
+                switch (data.outcome) {
+                    case 'served': return { kind: 'ok', title: 'Served', name, detail: '1 portion issued' };
+                    case 'extra_portion': return { kind: 'ok', title: 'Extra portion', name, detail: 'Approved extra portion issued' };
+                    case 'already_collected': return { kind: 'bad', title: 'Already served', name, detail: `Collected at ${data.collected_at}. Do not serve again.`, say: `Already served at ${data.collected_at}` };
+                    case 'out_of_stock': return { kind: 'bad', title: 'No food left', name, detail: data.message, say: 'No food left here' };
+                    case 'not_open': return { kind: 'bad', title: 'Food not open', name, detail: data.message, say: 'Food is not open' };
+                    case 'invalid': return { kind: 'bad', title: 'Not valid', name, detail: data.message, say: 'Not valid' };
+                    default: return ok
+                        ? { kind: 'ok', title: 'Served', name, detail: data.message }
+                        : { kind: 'bad', title: 'Not served', name, detail: data.message || 'Unable to process this code.', say: 'Not served' };
+                }
+            };
+
             const getQueue = () => { try { return JSON.parse(localStorage.getItem(queueKey) || '[]'); } catch (e) { return []; } };
             const setQueue = items => { localStorage.setItem(queueKey, JSON.stringify(items)); pendingCount.textContent = items.length; pendingBadge.classList.toggle('hidden', items.length === 0); };
             const enqueue = item => setQueue([...getQueue(), item]);
@@ -110,6 +224,7 @@
                 let queue = getQueue();
                 if (queue.length === 0) return;
                 const remaining = [];
+                const failedBefore = failedSync.length;
                 for (const item of queue) {
                     try {
                         const { ok, status } = await submitScan(item);
@@ -122,16 +237,25 @@
                 }
                 setQueue(remaining);
                 showFailedSync();
+                const newlyFailed = failedSync.length - failedBefore;
+                if (newlyFailed > 0 && !overlayOpen) {
+                    showOverlay({ kind: 'bad', title: 'Check offline scans', name: `${newlyFailed} scan(s) not accepted`, detail: `Saved while offline, then refused when synced (for example, already served): ${failedSync.slice(failedBefore).map(f => f.registration_code).join(', ')}. Tell your supervisor.`, say: 'Some offline scans were refused' });
+                }
             };
 
-            const issue = async value => {
-                if (busy || !value) return;
+            const issue = async (value, fromCamera = false) => {
+                if (busy || overlayOpen || !value) return;
+                const code = value.trim();
+                // The badge is often still in front of the camera after the result closes; don't scan it again straight away.
+                if (fromCamera && code === lastCode && Date.now() - lastClosedAt < 3000) return;
                 busy = true;
-                const payload = { registration_code: value.trim(), scanned_at: new Date().toISOString() };
+                lastCode = code;
+                const payload = { registration_code: code, scanned_at: new Date().toISOString() };
                 if (stationSelect && stationSelect.value) payload.meal_station_id = stationSelect.value;
                 try {
                     const { ok, data } = await submitScan(payload);
                     showResult(data.message || 'Unable to process this code.', ok);
+                    showOverlay(describe(data, ok));
                     if (ok) {
                         input.value = '';
                         const count = document.getElementById('remaining-count');
@@ -139,7 +263,8 @@
                     }
                 } catch (e) {
                     enqueue(payload);
-                    showResult('Offline — scan queued and will sync automatically once you are back online.', true);
+                    showResult('Offline — scan saved and will be checked once you are back online. It could not be checked for an earlier collection.', false);
+                    showOverlay({ kind: 'warn', title: 'Saved offline', name: code, detail: 'No connection, so this badge could not be checked for an earlier collection. Check the badge or ask your supervisor before serving.', say: 'Offline. Could not check' });
                     input.value = '';
                 } finally {
                     window.setTimeout(() => busy = false, 1200);
@@ -163,7 +288,7 @@
             };
             setInterval(pollStatus, 10000);
 
-            if (window.loadHtml5Qrcode) { const Html5Qrcode = await window.loadHtml5Qrcode(); const scanner = new Html5Qrcode('qr-reader'); scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } }, issue).catch(() => showResult('Camera unavailable. Enter the registration code or search below.', false)); }
+            if (window.loadHtml5Qrcode) { const Html5Qrcode = await window.loadHtml5Qrcode(); const scanner = new Html5Qrcode('qr-reader'); scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } }, decoded => issue(decoded, true)).catch(() => showResult('Camera unavailable. Enter the registration code or search below.', false)); }
         });
     </script>
     @endpush

@@ -218,7 +218,7 @@ class MealDistributionController extends Controller
         $this->ensureMealBelongsToEvent($meal, $event);
 
         if (in_array($event->status, ['closed', 'cancelled'], true)) {
-            return $this->issueResponse($request, false, 'This event is closed — food can no longer be distributed.', 422);
+            return $this->issueResponse($request, false, 'This event is closed — food can no longer be distributed.', 422, 'not_open');
         }
 
         $validated = $request->validate([
@@ -257,13 +257,13 @@ class MealDistributionController extends Controller
                 ->first();
 
             if ($collection && $collection->quantity >= $entitlement && ! $override) {
-                return [false, "Entitlement reached ({$entitlement} portion(s)) — already collected at {$collection->collected_at->format('g:i A')}.", 409];
+                return [false, "Entitlement reached ({$entitlement} portion(s)) — already collected at {$collection->collected_at->format('g:i A')}.", 409, 'already_collected', $collection->collected_at->format('g:i A')];
             }
             if (! $lockedMeal->isOpen() && ! $override) {
-                return [false, 'This food distribution is not open right now.', 422];
+                return [false, 'This food distribution is not open right now.', 422, 'not_open'];
             }
             if ($lockedMeal->collections()->sum('quantity') >= $lockedMeal->total_portions && ! $override) {
-                return [false, 'No portions remain for this distribution.', 422];
+                return [false, 'No portions remain for this distribution.', 422, 'out_of_stock'];
             }
 
             $stationId = $validated['meal_station_id'] ?? null;
@@ -273,7 +273,7 @@ class MealDistributionController extends Controller
                     throw ValidationException::withMessages(['meal_station_id' => 'Ask your Audit Head to allocate stock to this sharing point first.']);
                 }
                 if ($allocated !== null && $lockedMeal->issuedPortionsAtStation((int) $stationId) >= $allocated && ! $override) {
-                    return [false, 'No portions remain allocated to this station.', 422];
+                    return [false, 'No portions remain allocated to this station.', 422, 'out_of_stock'];
                 }
             }
 
@@ -319,10 +319,10 @@ class MealDistributionController extends Controller
 
             $this->maybeAlertLowStock($lockedMeal->fresh());
 
-            return [true, "Approved — {$registration->participant->name} received 1 portion.", 200];
+            return [true, "Approved — {$registration->participant->name} received 1 portion.", 200, $override ? 'extra_portion' : 'served'];
         });
 
-        return $this->issueResponse($request, ...$result);
+        return $this->issueResponse($request, $result[0], $result[1], $result[2], $result[3], $registration->participant->name, $result[4] ?? null);
     }
 
     public function reverse(Event $event, MealDistribution $meal, MealCollection $collection): RedirectResponse
@@ -595,10 +595,19 @@ class MealDistributionController extends Controller
         abort_unless($meal->event_id === $event->id, 404);
     }
 
-    private function issueResponse(Request $request, bool $successful, string $message, int $status): JsonResponse|RedirectResponse
+    /**
+     * The scanner uses outcome, name and collected_at to show a full-screen result, play a sound and speak it.
+     */
+    private function issueResponse(Request $request, bool $successful, string $message, int $status, string $outcome = 'invalid', ?string $name = null, ?string $collectedAt = null): JsonResponse|RedirectResponse
     {
         if ($request->expectsJson()) {
-            return response()->json(['successful' => $successful, 'message' => $message], $status);
+            return response()->json([
+                'successful' => $successful,
+                'message' => $message,
+                'outcome' => $outcome,
+                'name' => $name,
+                'collected_at' => $collectedAt,
+            ], $status);
         }
 
         return back()->with($successful ? 'success' : 'error', $message);

@@ -541,3 +541,45 @@ it('answers a repeated reversal of the same portion without an error page', func
     expect($meal->collections()->count())->toBe(0)
         ->and(MealCollectionAudit::where('meal_distribution_id', $meal->id)->where('action', 'reversed')->count())->toBe(1);
 });
+
+it('tells the scanner who was scanned and whether they were already served', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $usher = mealUser('usher', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
+    $usher->events()->attach($event);
+    $registration = mealRegistration($event, 'Kwame Asante');
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 5]);
+
+    $this->actingAs($usher)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $registration->registration_code])
+        ->assertOk()
+        ->assertJsonPath('outcome', 'served')
+        ->assertJsonPath('name', 'Kwame Asante');
+
+    $collectedAt = $registration->mealCollections()->first()->collected_at->format('g:i A');
+
+    $this->actingAs($usher)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => $registration->registration_code])
+        ->assertStatus(409)
+        ->assertJsonPath('outcome', 'already_collected')
+        ->assertJsonPath('name', 'Kwame Asante')
+        ->assertJsonPath('collected_at', $collectedAt);
+
+    $this->actingAs($usher)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => 'NOT-A-REAL-CODE'])
+        ->assertStatus(422)
+        ->assertJsonPath('outcome', 'invalid')
+        ->assertJsonPath('name', null);
+});
+
+it('shows a full-screen result with sound controls on the food scanner', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 5]);
+
+    $this->actingAs($manager)->get(route('events.meals.scanner', [$event, $meal]))
+        ->assertOk()
+        ->assertSee('id="scan-overlay"', false)
+        ->assertSee('Sound and voice: On')
+        ->assertSee('Already served');
+});
