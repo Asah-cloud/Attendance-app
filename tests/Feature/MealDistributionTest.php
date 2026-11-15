@@ -583,3 +583,45 @@ it('shows a full-screen result with sound controls on the food scanner', functio
         ->assertSee('Sound and voice: On')
         ->assertSee('Already served');
 });
+
+it('shows the scanner how much was served at the chosen sharing point and by the person scanning', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $usher = mealUser('usher', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Summit', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
+    $usher->events()->attach($event);
+    $meal = MealDistribution::create(['event_id' => $event->id, 'name' => 'Lunch', 'total_portions' => 10]);
+    $this->actingAs($manager)->post(route('events.meals.stations.update', $event), ['stations' => "Gate A\nGate B"]);
+    $gateA = $event->mealStations()->where('name', 'Gate A')->firstOrFail();
+    $gateB = $event->mealStations()->where('name', 'Gate B')->firstOrFail();
+    $this->actingAs($manager)->put(route('events.meals.stations.allocations.update', [$event, $meal]), ['allocations' => [$gateA->id => 5, $gateB->id => '']]);
+    $this->actingAs($manager)->post(route('events.meals.stations.staff', [$event, $gateA]), ['staff_ids' => [$usher->id]]);
+
+    foreach (['Kwame Asante', 'Ama Mensah'] as $name) {
+        $this->actingAs($usher)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => mealRegistration($event, $name)->registration_code, 'meal_station_id' => $gateA->id])->assertOk();
+    }
+    // A manager serving at Gate A counts for the point, not for the usher.
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => mealRegistration($event, 'Kofi Boateng')->registration_code, 'meal_station_id' => $gateA->id])->assertOk();
+    $this->actingAs($manager)->postJson(route('events.meals.issue', [$event, $meal]), ['registration_code' => mealRegistration($event, 'Esi Owusu')->registration_code, 'meal_station_id' => $gateB->id])->assertOk();
+
+    $this->actingAs($usher)->getJson(route('events.meals.status', [$event, $meal, 'station' => $gateA->id]))
+        ->assertOk()
+        ->assertJsonPath('station.name', 'Gate A')
+        ->assertJsonPath('station.served', 3)
+        ->assertJsonPath('station.people', 3)
+        ->assertJsonPath('station.allocated', 5)
+        ->assertJsonPath('station.remaining', 2)
+        ->assertJsonPath('mine', 2);
+
+    // The usher isn't on Gate B, so its numbers aren't given out.
+    $this->actingAs($usher)->getJson(route('events.meals.status', [$event, $meal, 'station' => $gateB->id]))
+        ->assertOk()
+        ->assertJsonPath('station', null);
+
+    // A manager can look at any point; Gate B has no allocation, so nothing is "left".
+    $this->actingAs($manager)->getJson(route('events.meals.status', [$event, $meal, 'station' => $gateB->id]))
+        ->assertJsonPath('station.served', 1)
+        ->assertJsonPath('station.remaining', null)
+        ->assertJsonPath('mine', 2);
+});

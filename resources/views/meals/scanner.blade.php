@@ -7,11 +7,22 @@
 
     <div class="grid gap-6 xl:grid-cols-[1fr_360px]">
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p class="text-xs font-black uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h1 class="mt-2 text-3xl font-black">{{ $meal->name }}</h1><p class="mt-2 text-sm text-slate-500">Managers can scan an attendee or event staff badge QR code.</p></div><div class="rounded-2xl bg-blue-50 px-5 py-3 text-center"><strong class="block text-2xl text-blue-800" id="remaining-count">{{ $meal->remainingPortions() }}</strong><span class="text-[10px] font-black uppercase text-blue-600">Portions left</span></div></div>
+            <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p class="text-xs font-black uppercase tracking-wider text-blue-600">{{ $event->title }}</p><h1 class="mt-2 text-3xl font-black">{{ $meal->name }}</h1><p class="mt-2 text-sm text-slate-500">Managers can scan an attendee or event staff badge QR code.</p></div><div class="rounded-2xl bg-blue-50 px-5 py-3 text-center"><strong class="block text-2xl text-blue-800" id="remaining-count">{{ $meal->remainingPortions() }}</strong><span class="text-[10px] font-black uppercase text-blue-600">Left in total</span></div></div>
 
             @if($stations->isNotEmpty())
                 <div class="mt-6"><label for="station-select" class="text-xs font-black uppercase text-slate-500">Sharing point</label><select id="station-select" class="mt-2 w-full rounded-xl border-slate-300"><option value="">Choose sharing point</option>@foreach($stations as $station)@php $stationRemaining = $meal->remainingPortionsAtStation($station->id); @endphp<option value="{{ $station->id }}">{{ $station->name }}{{ $stationRemaining !== null ? ' ('.$stationRemaining.' left)' : '' }}</option>@endforeach</select></div>
             @endif
+
+            {{-- Counts for the chosen sharing point and for this person, refreshed after each scan and every 10 s. --}}
+            <div id="station-stats" class="mt-4">
+                <p id="station-stats-label" class="text-xs font-black uppercase text-slate-500">{{ $stations->isNotEmpty() ? 'Choose a sharing point to see its numbers' : 'Your numbers' }}</p>
+                <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div data-station-tile class="hidden rounded-2xl bg-emerald-50 px-4 py-3"><strong class="block text-2xl text-emerald-800" id="station-served">–</strong><span class="text-[10px] font-black uppercase text-emerald-700">Served here</span></div>
+                    <div data-station-tile class="hidden rounded-2xl bg-emerald-50 px-4 py-3"><strong class="block text-2xl text-emerald-800" id="station-people">–</strong><span class="text-[10px] font-black uppercase text-emerald-700">People here</span></div>
+                    <div data-station-tile id="station-left-tile" class="hidden rounded-2xl bg-amber-50 px-4 py-3"><strong class="block text-2xl text-amber-800" id="station-left">–</strong><span class="text-[10px] font-black uppercase text-amber-700">Left here</span></div>
+                    <div class="rounded-2xl bg-slate-100 px-4 py-3"><strong class="block text-2xl text-slate-800" id="my-served">–</strong><span class="text-[10px] font-black uppercase text-slate-600">Scanned by you</span></div>
+                </div>
+            </div>
 
             <div class="mt-6 flex justify-end">
                 <button type="button" id="sound-toggle" aria-pressed="true" class="rounded-full border border-slate-200 px-4 py-2 text-xs font-black text-slate-700">Sound and voice: On</button>
@@ -260,6 +271,7 @@
                         input.value = '';
                         const count = document.getElementById('remaining-count');
                         count.textContent = Math.max(0, Number(count.textContent) - 1);
+                        refreshStats().catch(() => {});
                     }
                 } catch (e) {
                     enqueue(payload);
@@ -276,17 +288,40 @@
             window.addEventListener('online', flushQueue);
             setQueue(getQueue());
 
+            const statusUrl = @js(route('events.meals.status', [$event, $meal]));
+            const statsLabel = document.getElementById('station-stats-label');
+            const paintStats = data => {
+                document.getElementById('my-served').textContent = data.mine ?? 0;
+                const station = data.station;
+                document.querySelectorAll('[data-station-tile]').forEach(tile => tile.classList.toggle('hidden', !station));
+                if (!station) {
+                    if (stationSelect) statsLabel.textContent = 'Choose a sharing point to see its numbers';
+                    return;
+                }
+                statsLabel.textContent = `At ${station.name}`;
+                document.getElementById('station-served').textContent = station.served;
+                document.getElementById('station-people').textContent = station.people;
+                // "Left here" only means something when stock was allocated to this point.
+                document.getElementById('station-left-tile').classList.toggle('hidden', station.remaining === null);
+                document.getElementById('station-left').textContent = station.remaining ?? '–';
+            };
+            const refreshStats = async () => {
+                const url = new URL(statusUrl, window.location.href);
+                if (stationSelect && stationSelect.value) url.searchParams.set('station', stationSelect.value);
+                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) return;
+                const data = await response.json();
+                document.getElementById('remaining-count').textContent = data.remaining;
+                lowStockBanner.classList.toggle('hidden', !data.low_stock);
+                paintStats(data);
+            };
             const pollStatus = async () => {
-                try {
-                    const response = await fetch(@js(route('events.meals.status', [$event, $meal])), { headers: { 'Accept': 'application/json' } });
-                    if (!response.ok) return;
-                    const data = await response.json();
-                    document.getElementById('remaining-count').textContent = data.remaining;
-                    lowStockBanner.classList.toggle('hidden', !data.low_stock);
-                } catch (e) { /* stay quiet, offline */ }
+                try { await refreshStats(); } catch (e) { /* stay quiet, offline */ }
                 flushQueue();
             };
             setInterval(pollStatus, 10000);
+            refreshStats().catch(() => {});
+            stationSelect?.addEventListener('change', () => refreshStats().catch(() => {}));
 
             if (window.loadHtml5Qrcode) { const Html5Qrcode = await window.loadHtml5Qrcode(); const scanner = new Html5Qrcode('qr-reader'); scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } }, decoded => issue(decoded, true)).catch(() => showResult('Camera unavailable. Enter the registration code or search below.', false)); }
         });

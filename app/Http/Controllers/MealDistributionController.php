@@ -195,7 +195,7 @@ class MealDistributionController extends Controller
         return view('meals.scanner', compact('event', 'meal', 'matches', 'recent', 'stations'));
     }
 
-    public function status(Event $event, MealDistribution $meal): JsonResponse
+    public function status(Request $request, Event $event, MealDistribution $meal): JsonResponse
     {
         $this->authorize('viewMeals', $event);
         $this->ensureMealBelongsToEvent($meal, $event);
@@ -203,12 +203,30 @@ class MealDistributionController extends Controller
 
         $this->scopeMealTotals($meal, $event);
 
+        // Only a sharing point this person may serve at; anything else is ignored rather than leaked.
+        $station = $request->filled('station')
+            ? $this->staffStations($event)->whereKey($request->integer('station'))->first()
+            : null;
+
         return response()->json([
             'remaining' => $meal->remainingPortions(),
             'issued' => $meal->issuedPortions(),
             'total' => $meal->total_portions,
             'low_stock' => $meal->isLowStock(),
             'is_open' => $meal->isOpen(),
+            'station' => $station ? [
+                'id' => $station->id,
+                'name' => $station->name,
+                'served' => $meal->issuedPortionsAtStation($station->id),
+                'people' => $meal->collections()->where('meal_station_id', $station->id)->distinct()->count('event_registration_id'),
+                'allocated' => $meal->allocatedPortionsFor($station->id),
+                'remaining' => $meal->remainingPortionsAtStation($station->id),
+            ] : null,
+            // Portions this person issued for this meal (from the audit trail, so a later scan by someone else doesn't take them away).
+            'mine' => MealCollectionAudit::where('meal_distribution_id', $meal->id)
+                ->where('performed_by', $request->user()->id)
+                ->whereIn('action', ['issued', 'override'])
+                ->sum('quantity_change'),
         ]);
     }
 
