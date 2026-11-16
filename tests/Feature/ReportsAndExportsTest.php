@@ -572,3 +572,31 @@ it('serves the detailed report from cache on a second visit', function () {
             ->assertSee('Both Days');
     }
 });
+
+it('keeps the Arrival day in the detailed report downloads and never mistakes an export for a report day', function () {
+    $company = Company::create(['name' => 'Acme Co']);
+    $manager = reportsManager($company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'World Conference', 'event_date' => now(), 'has_arrival_session' => true, 'arrival_date' => now()->subDay()]);
+    unlockAllEventFeatures($event);
+    $participant = Participant::create(['company_id' => $company->id, 'name' => 'Kwame Asante', 'phone' => '0241234567']);
+    $event->registrations()->create(['participant_id' => $participant->id, 'status' => 'confirmed']);
+    Attendance::create(['event_id' => $event->id, 'participant_id' => $participant->id, 'day' => 0, 'status' => 'present']);
+
+    // Day 0 (Arrival) used to be dropped from these links, sending them to "all days".
+    $this->actingAs($manager)
+        ->get(route('reports.event', ['event' => $event, 'day' => 0, 'view' => 'detailed']))
+        ->assertOk()
+        ->assertSee(route('reports.country-summary', ['event' => $event->id, 'day' => 0]), false)
+        ->assertSee(route('reports.country-detail', ['event' => $event->id, 'country' => 'Ghana', 'day' => 0]), false);
+
+    $arrival = $this->actingAs($manager)->get(route('reports.country-summary', ['event' => $event, 'day' => 0]));
+    $arrival->assertOk();
+    expect($arrival->headers->get('Content-Disposition'))->toContain('Country_Attendance_Arrival');
+
+    // Without a day, export URLs download all days instead of bouncing off the report page.
+    foreach (['country-summary', 'area-summary', 'excel', 'csv'] as $export) {
+        $this->actingAs($manager)->get("/reports/event/{$event->id}/{$export}")->assertOk()->assertHeader('Content-Disposition');
+    }
+    $this->actingAs($manager)->get("/reports/event/{$event->id}/all")->assertOk();
+    $this->actingAs($manager)->get("/reports/event/{$event->id}/0")->assertOk();
+});

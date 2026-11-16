@@ -38,7 +38,7 @@
         </select>
     @endforeach
     @if($filters !== [])
-        <a href="{{ route('reports.event', array_filter(['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession, 'view' => 'detailed'])) }}" class="text-xs font-bold text-slate-500 underline">Clear filters</a>
+        <a href="{{ route('reports.event', array_filter(['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession, 'view' => 'detailed'], fn ($value) => $value !== null && $value !== '')) }}" class="text-xs font-bold text-slate-500 underline">Clear filters</a>
     @endif
     <span class="ml-auto text-xs text-slate-500"><strong class="text-slate-900">{{ $grid['rows']->count() }}</strong> {{ strtolower($grid['presentLabel']) }} · <strong class="text-slate-900">{{ $grid['absent']->count() }}</strong> {{ strtolower($grid['absentLabel']) }} · of {{ $expected }} expected</span>
 </form>
@@ -70,7 +70,7 @@
             <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm {{ $download ? 'lg:col-span-2' : '' }}">
                 <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <h2 class="text-xs font-black uppercase tracking-widest text-slate-500">By {{ strtolower($heading) }}</h2>
-                    @if($download)<a href="{{ route($download[0], array_filter(['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession] + $filters)) }}" class="text-xs font-bold text-blue-600">Download {{ strtolower($heading) }} summary</a>@endif
+                    @if($download)<a href="{{ route($download[0], array_filter(['event' => $event->id, 'day' => $selectedDay, 'session' => $selectedSession] + $filters, fn ($value) => $value !== null && $value !== '')) }}" class="text-xs font-bold text-blue-600">Download {{ strtolower($heading) }} summary</a>@endif
                 </div>
                 <div class="max-h-[28rem] overflow-auto"><table class="min-w-full text-sm">
                     <thead class="sticky top-0 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500"><tr>
@@ -82,7 +82,7 @@
                         @foreach($groupTable($key) as $group)
                             <tr>
                                 <td class="px-6 py-2.5 font-bold text-slate-800">
-                                    @if($download)<a href="{{ route($download[1], array_filter(['event' => $event->id, $download[2] => $group['label'], 'day' => $selectedDay, 'session' => $selectedSession])) }}" title="Download this {{ strtolower($heading) }}'s list" class="hover:text-blue-600">{{ $group['label'] }}</a>@else{{ $group['label'] }}@endif
+                                    @if($download)<a href="{{ route($download[1], array_filter(['event' => $event->id, $download[2] => $group['label'], 'day' => $selectedDay, 'session' => $selectedSession], fn ($value) => $value !== null && $value !== '')) }}" title="Download this {{ strtolower($heading) }}'s list" class="hover:text-blue-600">{{ $group['label'] }}</a>@else{{ $group['label'] }}@endif
                                 </td>
                                 @if($download && $slots->count() > 1)
                                     @foreach($slots as $slot)<td class="px-3 py-2.5 text-right text-slate-600">{{ $group['rows']->filter(fn ($row) => ! in_array($row->cells[$slot['key']], ['', \App\Services\AttendanceGrid::NOT_PRESENT], true))->count() }}</td>@endforeach

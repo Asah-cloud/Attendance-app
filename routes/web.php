@@ -218,7 +218,8 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
     // Reporting & Exports — the live report view is standard, exports are the paid advanced_reports feature
     // Registered first: the report route below would read "registrations" as a day.
     Route::get('/reports/event/{event}/registrations', [RegistrationReportController::class, 'show'])->name('reports.registrations');
-    Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->name('reports.event');
+    // Day is 'all' or a number (0 = Arrival), so export URLs like .../country-summary never land here by mistake.
+    Route::get('/reports/event/{event}/{day?}', [ReportController::class, 'show'])->where('day', 'all|[0-9]+')->name('reports.event');
     // The old summary page is now the Simple view of the Reports page.
     Route::get('/events/{event}/summary', [ReportController::class, 'summary'])->name('reports.summary');
     Route::middleware('event.feature:advanced_reports')->group(function () {
