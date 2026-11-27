@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Meal Tickets &middot; {{ $event->title }}</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         :root { --ink: #0f172a; --muted: #64748b; --brand: #b45309; --line: #94a3b8; }
         body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #e2e8f0; color: var(--ink); }
         .panel { position: sticky; z-index: 10; top: 0; padding: 14px 24px; background: var(--ink); color: white; }
@@ -34,11 +34,21 @@
         .set-head strong { font-size: 3.4mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         .set-head span { flex-shrink: 0; color: var(--muted); font-size: 2.6mm; }
         .tickets { display: grid; flex: 1; }
-        .ticket { padding: 2.2mm 3mm; display: flex; flex-direction: column; justify-content: center; border-right: .5mm solid #000; border-bottom: .5mm solid #000; overflow: hidden; break-inside: avoid; }
+        .ticket { --meal: #475569; --tint: #f8fafc; position: relative; padding: 2.2mm 3mm 2.2mm 5mm; display: flex; flex-direction: column; justify-content: center; border-right: .5mm solid #000; border-bottom: .5mm solid #000; overflow: hidden; break-inside: avoid;
+            /* Light meal-coloured tint with a fine dot pattern, harder to copy convincingly than plain paper. */
+            background: radial-gradient(circle, rgba(15, 23, 42, .07) .22mm, transparent .28mm) 0 0 / 1.8mm 1.8mm, linear-gradient(135deg, white 0%, var(--tint) 100%); }
+        .ticket::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2mm; background: var(--meal); }
+        .ticket.meal-breakfast { --meal: #d97706; --tint: #fef3c7; }
+        .ticket.meal-lunch { --meal: #059669; --tint: #d1fae5; }
+        .ticket.meal-supper { --meal: #4f46e5; --tint: #e0e7ff; }
+        .ticket.blank { background: white; }
+        .ticket.blank::before { content: none; }
+        .ticket > span { position: relative; z-index: 1; }
+        .watermark { position: absolute; z-index: 0; top: 50%; left: 55%; width: 62%; height: 78%; transform: translate(-50%, -50%); object-fit: contain; opacity: .14; pointer-events: none; }
         .ticket.last-col { border-right: 0; }
         .ticket.last-row { border-bottom: 0; }
         .t-event { color: var(--brand); font-size: 2.3mm; font-weight: 800; letter-spacing: .05em; line-height: 1.25; text-transform: uppercase; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .t-meal { margin-top: .6mm; font-size: 4.6mm; font-weight: 900; text-transform: uppercase; line-height: 1.05; }
+        .t-meal { margin-top: .6mm; color: var(--meal); font-size: 4.6mm; font-weight: 900; text-transform: uppercase; line-height: 1.05; }
         .t-date { margin-top: .5mm; font-size: 3mm; font-weight: 700; }
         .t-time { font-size: 2.8mm; color: #334155; }
         .t-name { margin-top: 1mm; font-size: 2.6mm; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -110,6 +120,20 @@
                 <label class="check"><input type="checkbox" name="show_names" value="1" @checked($showNames) onchange="document.getElementById('sets-field').hidden = this.checked">Print attendee names</label>
                 <label id="sets-field" @if($showNames) hidden @endif>Number of sets<input type="number" name="sets" min="1" max="2000" value="{{ $settings['sets'] }}"></label>
             </fieldset>
+            <fieldset>
+                <legend>Watermark</legend>
+                <label>Logo behind each ticket
+                    <select name="watermark">
+                        @foreach($logos as $key => $logo)
+                            <option value="{{ $key }}" @selected($settings['watermark'] === $key)>{{ $logo['label'] }}</option>
+                        @endforeach
+                        <option value="none" @selected($settings['watermark'] === 'none')>None</option>
+                    </select>
+                </label>
+                @if($logos->isEmpty())
+                    <small style="color:#cbd5e1;font-size:11px;max-width:160px">Upload a company or event logo to use it as a watermark.</small>
+                @endif
+            </fieldset>
             <button type="submit" class="apply-btn">Update tickets</button>
         </form>
 
@@ -138,7 +162,8 @@
                                         @foreach($cells as $index => $slot)
                                             @php($edge = ($index % $layout['columns'] === $layout['columns'] - 1 ? ' last-col' : '').(intdiv($index, $layout['columns']) === $layout['rows'] - 1 ? ' last-row' : ''))
                                             @if($slot)
-                                                <article class="ticket{{ $edge }}">
+                                                <article class="ticket meal-{{ $slot['key'] }}{{ $edge }}">
+                                                    @if($watermarkUrl)<img class="watermark" src="{{ $watermarkUrl }}" alt="">@endif
                                                     <span class="t-event">{{ $event->title }}</span>
                                                     <span class="t-meal">{{ $slot['label'] }}</span>
                                                     <span class="t-date">{{ $slot['date']->format('D j M Y') }}</span>
