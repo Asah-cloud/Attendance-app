@@ -1,7 +1,7 @@
 {{-- Shared links preview with the form's first flyer and its own description, not the site's default card. --}}
 <x-public-layout :title="$form->title" :noindex="true" :branded-for="$event"
                  :description="$form->description ?: $event->title"
-                 :image="$form->flyers() ? url(Storage::url($form->flyers()[0])) : null">
+                 :image="$form->flyers() ? url(App\Support\FlyerPreview::url($form->flyers()[0])) : null">
     @php($flyers = $form->flyers())
     <section class="relative isolate min-h-[calc(100vh-8.5rem)] px-5 pb-20 pt-8 sm:pt-12">
         @include('forms.partials.backdrop')
@@ -37,8 +37,8 @@
                                class="absolute inset-0 flex items-center justify-center p-3 sm:p-4 {{ count($flyers) > 1 ? 'pb-11 sm:pb-12' : '' }}"
                                aria-label="Open flyer {{ $index + 1 }} of {{ count($flyers) }} full size">
                                 {{-- A blurred copy fills the frame behind flyers that aren't the frame's shape. --}}
-                                <img src="{{ Storage::url($flyer) }}" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl">
-                                <img src="{{ Storage::url($flyer) }}" alt="{{ $form->title }} flyer{{ count($flyers) > 1 ? ' '.($index + 1) : '' }}"
+                                <img src="{{ App\Support\FlyerPreview::url($flyer) }}" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl">
+                                <img src="{{ App\Support\FlyerPreview::url($flyer) }}" alt="{{ $form->title }} flyer{{ count($flyers) > 1 ? ' '.($index + 1) : '' }}"
                                      class="relative max-h-full max-w-full rounded-2xl object-contain shadow-xl transition duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100">
                             </a>
                         @endforeach

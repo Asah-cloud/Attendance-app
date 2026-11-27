@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\CollectsPayment;
+use App\Support\FlyerPreview;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -32,6 +33,7 @@ class Form extends Model
 
         static::deleted(function (Form $form): void {
             Storage::disk('public')->delete($form->flyers());
+            array_map(FlyerPreview::delete(...), $form->flyers());
         });
     }
 

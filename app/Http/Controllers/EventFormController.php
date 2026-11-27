@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Services\FormAttendeeImporter;
+use App\Support\FlyerPreview;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,9 +93,12 @@ class EventFormController extends Controller
         }
 
         foreach ($uploads as $upload) {
-            $kept[] = $upload->store('form-flyers', 'public');
+            $kept[] = $path = $upload->store('form-flyers', 'public');
+            // A small copy for WhatsApp link previews and phones (see FlyerPreview).
+            FlyerPreview::make($path);
         }
         Storage::disk('public')->delete($remove);
+        array_map(FlyerPreview::delete(...), $remove);
 
         unset($validated['flyers'], $validated['remove_flyers']);
         $form->update($validated + ['flyer_paths' => $kept ?: null]);
