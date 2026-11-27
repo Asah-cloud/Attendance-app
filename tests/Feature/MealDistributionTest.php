@@ -447,6 +447,72 @@ it('renders one printable voucher per confirmed attendee with the shared attenda
         ->assertSee('Food voucher');
 });
 
+it('prints dated meal tickets starting from the chosen first meal', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Camp Meeting', 'event_date' => '2026-12-02', 'end_date' => '2026-12-04']);
+    unlockAllEventFeatures($event);
+    mealRegistration($event, 'Ticket Guest', 'Delegate');
+
+    $response = $this->actingAs($manager)->get(route('events.meals.tickets', [
+        $event,
+        'start_date' => '2026-12-02', 'start_meal' => 'supper',
+        'end_date' => '2026-12-04', 'end_meal' => 'breakfast',
+        'meals' => ['breakfast', 'lunch', 'supper'],
+        'supper_from' => '18:30', 'supper_to' => '20:00',
+    ]))->assertOk();
+
+    // Wed supper, Thu breakfast/lunch/supper, Fri breakfast = 5 tickets
+    expect($response->viewData('slots'))->toHaveCount(5);
+    expect($response->viewData('slots')->first()['label'])->toBe('Supper');
+    expect($response->viewData('slots')->last()['label'])->toBe('Breakfast');
+    $response->assertSee('Ticket Guest')
+        ->assertSee('Delegate')
+        ->assertSee('Camp Meeting')
+        ->assertSee('Wed 2 Dec 2026')
+        ->assertSee('6:30 PM')
+        ->assertSee('Fri 4 Dec 2026');
+});
+
+it('defaults meal tickets to the event dates and skips unticked meals', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Retreat', 'event_date' => '2026-12-02', 'end_date' => '2026-12-03']);
+    unlockAllEventFeatures($event);
+    mealRegistration($event);
+
+    $default = $this->actingAs($manager)->get(route('events.meals.tickets', $event))->assertOk();
+    expect($default->viewData('slots'))->toHaveCount(6);
+
+    $noLunch = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'meals' => ['breakfast', 'supper']]))->assertOk();
+    expect($noLunch->viewData('slots')->pluck('label')->unique()->values()->all())->toBe(['Breakfast', 'Supper']);
+});
+
+it('explains invalid meal ticket ranges instead of printing', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Retreat', 'event_date' => '2026-12-02']);
+    unlockAllEventFeatures($event);
+    mealRegistration($event);
+
+    $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'start_date' => '2026-12-05', 'end_date' => '2026-12-02']))
+        ->assertOk()
+        ->assertSee('The last day must be on or after the first day.')
+        ->assertViewHas('slots', fn ($slots) => $slots->isEmpty());
+
+    $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'start_date' => '2026-12-02', 'start_meal' => 'supper', 'end_date' => '2026-12-02', 'end_meal' => 'breakfast']))
+        ->assertSee('the last meal cannot come before the first meal');
+});
+
+it('blocks ushers from printing meal tickets', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $usher = mealUser('usher', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Retreat', 'event_date' => now()]);
+    unlockAllEventFeatures($event);
+
+    $this->actingAs($usher)->get(route('events.meals.tickets', $event))->assertForbidden();
+});
+
 it('serves confirmed attendees even when legacy food signup flags are enabled', function () {
     $company = Company::create(['name' => 'Acme']);
     $manager = mealUser('manager', $company);

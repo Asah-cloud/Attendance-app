@@ -242,6 +242,7 @@ Route::middleware(['auth', 'verified', 'company.active'])->group(function () {
         Route::post('/events/{event}/meals/stations', [MealDistributionController::class, 'updateStations'])->name('events.meals.stations.update');
         Route::put('/events/{event}/meals/{meal}/stations', [MealDistributionController::class, 'updateStationAllocations'])->name('events.meals.stations.allocations.update');
         Route::get('/events/{event}/meals/vouchers', [MealDistributionController::class, 'vouchers'])->name('events.meals.vouchers');
+        Route::get('/events/{event}/meals/tickets', [MealDistributionController::class, 'tickets'])->name('events.meals.tickets');
         Route::get('/events/{event}/meals-report', [MealDistributionController::class, 'report'])->name('events.meals.report');
         Route::get('/events/{event}/meals-report.csv', [MealDistributionController::class, 'exportCsv'])->name('events.meals.report.csv');
         Route::get('/events/{event}/meals-report.pdf', [MealDistributionController::class, 'exportPdf'])->name('events.meals.report.pdf');

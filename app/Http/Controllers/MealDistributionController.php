@@ -407,6 +407,111 @@ class MealDistributionController extends Controller
         return view('meals.vouchers', compact('event', 'registrations', 'meals'));
     }
 
+    /** Meal types in serving order, with default serving windows. */
+    public const TICKET_MEALS = [
+        'breakfast' => ['label' => 'Breakfast', 'from' => '07:00', 'to' => '09:00'],
+        'lunch' => ['label' => 'Lunch', 'from' => '12:30', 'to' => '14:00'],
+        'supper' => ['label' => 'Supper', 'from' => '18:00', 'to' => '20:00'],
+    ];
+
+    private const TICKET_MAX_DAYS = 31;
+
+    /**
+     * Printable paper meal tickets: one sheet per confirmed attendee with a
+     * tear-off ticket for every meal between the chosen first and last meal.
+     */
+    public function tickets(Request $request, Event $event): View
+    {
+        $this->authorize('manageMeals', $event);
+
+        $mealKeys = array_keys(self::TICKET_MEALS);
+        $eventStart = Carbon::parse($event->event_date)->toDateString();
+        $eventEnd = Carbon::parse($event->end_date ?? $event->event_date)->toDateString();
+
+        $settings = [
+            'start_date' => $request->query('start_date', $eventStart),
+            'start_meal' => $request->query('start_meal', 'breakfast'),
+            'end_date' => $request->query('end_date', $eventEnd),
+            'end_meal' => $request->query('end_meal', 'supper'),
+            'meals' => (array) $request->query('meals', $mealKeys),
+        ];
+        foreach (self::TICKET_MEALS as $key => $meal) {
+            $settings["{$key}_from"] = $request->query("{$key}_from", $meal['from']);
+            $settings["{$key}_to"] = $request->query("{$key}_to", $meal['to']);
+        }
+
+        $timeRules = [];
+        foreach ($mealKeys as $key) {
+            $timeRules["{$key}_from"] = ['nullable', 'date_format:H:i'];
+            $timeRules["{$key}_to"] = ['nullable', 'date_format:H:i'];
+        }
+        $validator = validator($settings, [
+            'start_date' => ['required', 'date_format:Y-m-d'],
+            'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'start_meal' => ['required', Rule::in($mealKeys)],
+            'end_meal' => ['required', Rule::in($mealKeys)],
+            'meals' => ['required', 'array', 'min:1'],
+            'meals.*' => [Rule::in($mealKeys)],
+        ] + $timeRules, [
+            'end_date.after_or_equal' => 'The last day must be on or after the first day.',
+            'meals.required' => 'Tick at least one meal.',
+        ]);
+        $validator->after(function ($validator) use ($settings, $mealKeys): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+            $start = Carbon::parse($settings['start_date']);
+            $end = Carbon::parse($settings['end_date']);
+            if ($start->diffInDays($end) + 1 > self::TICKET_MAX_DAYS) {
+                $validator->errors()->add('end_date', 'Meal tickets can cover at most '.self::TICKET_MAX_DAYS.' days.');
+            }
+            if ($start->equalTo($end) && array_search($settings['end_meal'], $mealKeys) < array_search($settings['start_meal'], $mealKeys)) {
+                $validator->errors()->add('end_meal', 'On a one-day programme the last meal cannot come before the first meal.');
+            }
+        });
+
+        $slots = collect();
+        $registrations = collect();
+        if (! $validator->fails()) {
+            $startIndex = array_search($settings['start_meal'], $mealKeys);
+            $endIndex = array_search($settings['end_meal'], $mealKeys);
+            $date = Carbon::parse($settings['start_date']);
+            $last = Carbon::parse($settings['end_date']);
+            while ($date->lte($last)) {
+                foreach ($mealKeys as $index => $key) {
+                    if (! in_array($key, $settings['meals'], true)
+                        || ($date->toDateString() === $settings['start_date'] && $index < $startIndex)
+                        || ($date->toDateString() === $settings['end_date'] && $index > $endIndex)) {
+                        continue;
+                    }
+                    $slots->push([
+                        'label' => self::TICKET_MEALS[$key]['label'],
+                        'date' => $date->copy(),
+                        'from' => $settings["{$key}_from"] ? Carbon::createFromFormat('H:i', $settings["{$key}_from"]) : null,
+                        'to' => $settings["{$key}_to"] ? Carbon::createFromFormat('H:i', $settings["{$key}_to"]) : null,
+                    ]);
+                }
+                $date->addDay();
+            }
+
+            $registrations = $event->registrations()
+                ->where('status', EventRegistration::STATUS_CONFIRMED)
+                ->with('participant')
+                ->get()
+                ->sortBy(fn ($registration) => mb_strtolower($registration->participant->name))
+                ->values();
+        }
+
+        return view('meals.tickets', [
+            'event' => $event,
+            'settings' => $settings,
+            'mealTypes' => self::TICKET_MEALS,
+            'slots' => $slots,
+            'registrations' => $registrations,
+            'problems' => $validator->errors(),
+        ]);
+    }
+
     public function report(Event $event): View
     {
         $this->authorize('viewMeals', $event);
