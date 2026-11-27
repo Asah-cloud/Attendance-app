@@ -496,31 +496,26 @@ class MealDistributionController extends Controller
         $settings['sets'] = $settings['sets'] ?? (string) max(1, $registrations->count());
 
         $slots = collect();
-        $days = collect();
         $sets = collect();
         $layout = null;
         if (! $validator->fails()) {
-            $columns = array_values(array_filter($mealKeys, fn ($key) => in_array($key, $settings['meals'], true)));
             $startIndex = array_search($settings['start_meal'], $mealKeys);
             $endIndex = array_search($settings['end_meal'], $mealKeys);
             $date = Carbon::parse($settings['start_date']);
             $last = Carbon::parse($settings['end_date']);
             while ($date->lte($last)) {
-                $cells = [];
-                foreach ($columns as $key) {
-                    $index = array_search($key, $mealKeys);
-                    $outside = ($date->toDateString() === $settings['start_date'] && $index < $startIndex)
-                        || ($date->toDateString() === $settings['end_date'] && $index > $endIndex);
-                    $cells[$key] = $outside ? null : [
+                foreach ($mealKeys as $index => $key) {
+                    if (! in_array($key, $settings['meals'], true)
+                        || ($date->toDateString() === $settings['start_date'] && $index < $startIndex)
+                        || ($date->toDateString() === $settings['end_date'] && $index > $endIndex)) {
+                        continue;
+                    }
+                    $slots->push([
                         'label' => self::TICKET_MEALS[$key]['label'],
                         'date' => $date->copy(),
                         'from' => $settings["{$key}_from"] ? Carbon::createFromFormat('H:i', $settings["{$key}_from"]) : null,
                         'to' => $settings["{$key}_to"] ? Carbon::createFromFormat('H:i', $settings["{$key}_to"]) : null,
-                    ];
-                }
-                if (array_filter($cells)) {
-                    $days->push(['date' => $date->copy(), 'cells' => $cells]);
-                    $slots->push(...array_values(array_filter($cells)));
+                    ]);
                 }
                 $date->addDay();
             }
@@ -532,7 +527,10 @@ class MealDistributionController extends Controller
                 ])
                 : collect(range(1, (int) $settings['sets']))->map(fn ($number) => ['name' => null, 'category' => null]);
 
-            $layout = $this->ticketLayout(count($columns), $days->count(), $showNames);
+            $layout = $slots->isEmpty() ? null : $this->ticketLayout($slots->count(), $showNames);
+        }
+        if (! $validator->fails() && $slots->isEmpty()) {
+            $validator->errors()->add('meals', 'No meals fall between the first and last meal you chose.');
         }
 
         return view('meals.tickets', [
@@ -540,7 +538,8 @@ class MealDistributionController extends Controller
             'settings' => $settings,
             'mealTypes' => self::TICKET_MEALS,
             'slots' => $slots,
-            'days' => $days,
+            // Tickets fill each set in serving order; any spare cells (only when the count cannot be split evenly) come last.
+            'cells' => $layout ? $slots->pad($layout['columns'] * $layout['rows'], null) : collect(),
             'sets' => $sets,
             'layout' => $layout,
             'showNames' => $showNames,
@@ -551,20 +550,23 @@ class MealDistributionController extends Controller
 
     /**
      * Size each ticket set so a whole number of sets fills an A4 page.
-     * A set has one row per day and one column per meal type; a single-meal
-     * set is narrow, so three of those sit side by side.
+     * Tickets fill a set in serving order, in the column count (3, 4 or 2)
+     * that leaves the fewest empty cells; two-column sets sit two across.
      *
-     * @return array{columns: int, rows: int, across: int, down: int, perPage: int, setWidth: float, setHeight: float, headerHeight: float, ticketHeight: float, spansPages: bool}
+     * @return array{columns: int, rows: int, across: int, down: int, perPage: int, headerHeight: float, minSetHeight: float, spansPages: bool}
      */
-    private function ticketLayout(int $columns, int $rows, bool $showNames): array
+    private function ticketLayout(int $tickets, bool $showNames): array
     {
+        $candidates = array_values(array_filter([3, 4, 2], fn ($columns) => $columns <= $tickets)) ?: [$tickets];
+        $columns = collect($candidates)->sortBy(fn ($columns) => (int) (ceil($tickets / $columns) * $columns) - $tickets)->first();
+        $rows = (int) ceil($tickets / $columns);
+        $across = intdiv(4, $columns) ?: 1;
+
         $headerHeight = $showNames ? 7.0 : 0.0;
-        $minTicket = $showNames ? 24.0 : 20.0;
-        $across = $columns === 1 ? 3 : 1;
+        $minTicket = $showNames ? 26.0 : 22.0;
         $minSetHeight = $headerHeight + $rows * $minTicket;
         $spansPages = $minSetHeight > self::TICKET_PAGE_HEIGHT;
         $down = $spansPages ? 1 : (int) min(8, max(1, floor(self::TICKET_PAGE_HEIGHT / $minSetHeight)));
-        $setHeight = $spansPages ? $minSetHeight : self::TICKET_PAGE_HEIGHT / $down;
 
         return [
             'columns' => $columns,
@@ -572,10 +574,8 @@ class MealDistributionController extends Controller
             'across' => $across,
             'down' => $down,
             'perPage' => $across * $down,
-            'setWidth' => self::TICKET_PAGE_WIDTH / $across,
-            'setHeight' => $setHeight,
             'headerHeight' => $headerHeight,
-            'ticketHeight' => ($setHeight - $headerHeight) / $rows,
+            'minSetHeight' => $minSetHeight,
             'spansPages' => $spansPages,
         ];
     }
