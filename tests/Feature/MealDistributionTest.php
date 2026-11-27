@@ -9,6 +9,7 @@ use App\Models\Participant;
 use App\Models\User;
 use App\Notifications\MealStockLow;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
@@ -556,6 +557,28 @@ it('explains invalid meal ticket ranges instead of printing', function () {
 
     $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'start_date' => '2026-12-02', 'start_meal' => 'supper', 'end_date' => '2026-12-02', 'end_meal' => 'breakfast']))
         ->assertSee('the last meal cannot come before the first meal');
+});
+
+it('watermarks meal tickets with the company logo unless turned off', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('company-logos/acme.png', 'logo');
+    $company = Company::create(['name' => 'Acme', 'logo_path' => 'company-logos/acme.png']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Retreat', 'event_date' => '2026-12-02']);
+    unlockAllEventFeatures($event);
+    mealRegistration($event);
+
+    $default = $this->actingAs($manager)->get(route('events.meals.tickets', $event))->assertOk();
+    expect($default->viewData('watermarkUrl'))->toContain('company-logos/acme.png');
+    $default->assertSee('class="watermark"', false)->assertSee('meal-breakfast', false);
+
+    $off = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'watermark' => 'none']))->assertOk();
+    expect($off->viewData('watermarkUrl'))->toBeNull();
+    $off->assertDontSee('class="watermark"', false);
+
+    // No event logo uploaded, so it cannot be chosen
+    $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'watermark' => 'event']))
+        ->assertSee('That logo has not been uploaded yet.');
 });
 
 it('blocks ushers from printing meal tickets', function () {

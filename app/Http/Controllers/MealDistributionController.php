@@ -20,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -437,6 +438,14 @@ class MealDistributionController extends Controller
         $eventStart = Carbon::parse($event->event_date)->toDateString();
         $eventEnd = Carbon::parse($event->end_date ?? $event->event_date)->toDateString();
 
+        // Logos that can be printed faintly behind each ticket as a mark of authenticity.
+        $event->loadMissing('company');
+        $logos = collect([
+            'company' => ['label' => 'Company logo', 'path' => $event->company?->logo_path],
+            'event' => ['label' => 'Event logo', 'path' => $event->logo_path],
+        ])->filter(fn ($logo) => $logo['path'] && Storage::disk('public')->exists($logo['path']))
+            ->map(fn ($logo) => ['label' => $logo['label'], 'url' => Storage::url($logo['path'])]);
+
         $settings = [
             'start_date' => $request->query('start_date', $eventStart),
             'start_meal' => $request->query('start_meal', 'breakfast'),
@@ -445,6 +454,7 @@ class MealDistributionController extends Controller
             'meals' => (array) $request->query('meals', $mealKeys),
             'show_names' => $request->query('show_names', '0'),
             'sets' => $request->query('sets'),
+            'watermark' => $request->query('watermark', $logos->keys()->first() ?? 'none'),
         ];
         foreach (self::TICKET_MEALS as $key => $meal) {
             $settings["{$key}_from"] = $request->query("{$key}_from", $meal['from']);
@@ -465,7 +475,9 @@ class MealDistributionController extends Controller
             'meals.*' => [Rule::in($mealKeys)],
             'show_names' => ['required', Rule::in(['0', '1'])],
             'sets' => ['nullable', 'integer', 'min:1', 'max:'.self::TICKET_MAX_SETS],
+            'watermark' => ['required', Rule::in([...$logos->keys()->all(), 'none'])],
         ] + $timeRules, [
+            'watermark.in' => 'That logo has not been uploaded yet. Choose another watermark.',
             'end_date.after_or_equal' => 'The last day must be on or after the first day.',
             'meals.required' => 'Tick at least one meal.',
             'sets.integer' => 'The number of sets must be a whole number.',
@@ -511,6 +523,7 @@ class MealDistributionController extends Controller
                         continue;
                     }
                     $slots->push([
+                        'key' => $key,
                         'label' => self::TICKET_MEALS[$key]['label'],
                         'date' => $date->copy(),
                         'from' => $settings["{$key}_from"] ? Carbon::createFromFormat('H:i', $settings["{$key}_from"]) : null,
@@ -543,6 +556,8 @@ class MealDistributionController extends Controller
             'sets' => $sets,
             'layout' => $layout,
             'showNames' => $showNames,
+            'logos' => $logos,
+            'watermarkUrl' => $logos->get($settings['watermark'])['url'] ?? null,
             'registrations' => $registrations,
             'problems' => $validator->errors(),
         ]);
