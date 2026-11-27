@@ -37,6 +37,8 @@
                     <div data-tour="event-food-actions" class="flex flex-wrap gap-2 rounded-2xl bg-white/10 p-3">
                         <a href="{{ route('events.meals.vouchers', $event) }}" target="_blank" class="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-black text-white hover:bg-white/25">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['ticket'] }}"/></svg>Print vouchers</a>
+                        <a href="{{ route('events.meals.tickets', $event) }}" target="_blank" class="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-black text-white hover:bg-white/25">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['ticket'] }}"/></svg>Print meal tickets</a>
                         <a href="{{ route('events.meals.report', $event) }}" class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-rose-700 hover:bg-orange-50">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['report'] }}"/></svg>View food report</a>
                     </div>
