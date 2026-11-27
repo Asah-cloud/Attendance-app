@@ -15,6 +15,7 @@ class FormResponse extends Model
         'payment_status',
         'amount_paid_minor',
         'payment_option',
+        'event_registration_id',
     ];
 
     protected function casts(): array
@@ -33,5 +34,11 @@ class FormResponse extends Model
     public function form(): BelongsTo
     {
         return $this->belongsTo(Form::class);
+    }
+
+    /** The attendee registration this response was added to the event as, if any (FormAttendeeImporter). */
+    public function registration(): BelongsTo
+    {
+        return $this->belongsTo(EventRegistration::class, 'event_registration_id');
     }
 }

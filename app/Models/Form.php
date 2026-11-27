@@ -59,6 +59,8 @@ class Form extends Model
         'payment_payer_sets_amount',
         'payment_minimum_minor',
         'payment_options',
+        'attendee_mapping',
+        'auto_add_attendees',
     ];
 
     protected function casts(): array
@@ -73,6 +75,8 @@ class Form extends Model
             'payment_payer_sets_amount' => 'boolean',
             'payment_minimum_minor' => 'integer',
             'payment_options' => 'array',
+            'attendee_mapping' => 'array',
+            'auto_add_attendees' => 'boolean',
         ];
     }
 

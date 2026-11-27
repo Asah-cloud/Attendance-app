@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Form;
 use App\Models\FormResponse;
 use App\Services\AttendeePaymentService;
+use App\Services\FormAttendeeImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -42,6 +43,10 @@ class PublicFormController extends Controller
             'answers' => $validated['answers'] ?? [],
             'ip_address' => $request->ip(),
         ]);
+        // A paid response joins the attendee list once its payment goes through (AttendeePaymentService).
+        if (! $paid) {
+            app(FormAttendeeImporter::class)->addIfAutomatic($response);
+        }
 
         // The answers are kept either way; the response shows as unpaid until Paystack confirms.
         if ($paid) {

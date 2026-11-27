@@ -161,9 +161,16 @@ class AttendeePaymentService
         return true;
     }
 
-    /** A registration's "we've got your registration" message waits until it's paid for. */
+    /**
+     * A registration's "we've got your registration" message waits until it's paid for, and a
+     * paid form response joins the attendee list then (when the form adds respondents).
+     */
     private function afterPaid(?Model $payable): void
     {
+        if ($payable instanceof FormResponse) {
+            app(FormAttendeeImporter::class)->addIfAutomatic($payable);
+        }
+
         if ($payable instanceof EventRegistration) {
             $payable->load(['event.company', 'participant']);
             NotifiesPerChannel::send($payable->participant, new EventRegistrationSubmitted($payable), $payable->event->attendeeNotificationChannels());

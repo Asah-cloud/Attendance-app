@@ -5,6 +5,7 @@
     $backUrl ??= route('events.forms.edit', [$event, $form]);
     $backLabel ??= 'Back to form';
     $canDelete ??= true;
+    $canManageAttendees ??= false;
     // A payment column once the form has ever asked for payment.
     $showPayment = $form->payment_enabled || $form->responses()->whereNotNull('payment_status')->exists();
     $paidTotal = $showPayment ? (int) $form->responses()->where('payment_status', 'paid')->sum('amount_paid_minor') : 0;
@@ -41,6 +42,68 @@
         @if(session('success'))<p class="mb-5 rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800">{{ session('success') }}</p>@endif
         @if($errors->any())<p class="mb-5 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">{{ $errors->first() }}</p>@endif
 
+        @if($canManageAttendees)
+            @php $mapped = collect($attendeeMapping)->filter()->isNotEmpty(); @endphp
+            <details class="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5" @if($errors->has('mapping.*') || ! $form->attendee_mapping) open @endif data-form-attendees>
+                <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3">
+                    <span>
+                        <span class="block text-base font-black text-indigo-950">Add respondents to the attendee list</span>
+                        <span class="mt-1 block text-sm text-indigo-900/80">
+                            @if($form->auto_add_attendees)
+                                <span class="font-bold text-emerald-700">On:</span> new responses are added to the attendees automatically.
+                            @else
+                                People who fill this form can become attendees of {{ $event->title }}, so they can be checked in, get badges and be served food.
+                            @endif
+                            {{ $notYetAttendees }} response(s) not on the attendee list yet.
+                        </span>
+                    </span>
+                    <span class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">Set up</span>
+                </summary>
+
+                @if($attendeeFields->isEmpty())
+                    <p class="mt-4 rounded-xl bg-white p-4 text-sm font-bold text-slate-600">Add a question that asks for the person's name to this form first.</p>
+                @else
+                    <form method="POST" action="{{ route('events.forms.attendees', [$event, $form]) }}" class="mt-5 space-y-5">
+                        @csrf
+                        <div>
+                            <p class="text-sm font-bold text-slate-700">Which question gives each detail? {{ $form->attendee_mapping ? '' : 'We guessed from your question titles; check them.' }}</p>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                @foreach($attendeeTargets as $target => $info)
+                                    <label class="block text-xs font-black uppercase tracking-wider text-slate-500">
+                                        {{ $info['label'] }}@if($target === 'name') <span class="text-red-600">*</span>@endif
+                                        <select name="mapping[{{ $target }}]" class="mt-1 block w-full rounded-xl border-slate-300 text-sm font-normal normal-case tracking-normal text-slate-800">
+                                            <option value="">{{ $target === 'name' ? 'Choose a question' : 'Not asked' }}</option>
+                                            @foreach($attendeeFields as $field)
+                                                <option value="{{ $field->field_key }}" @selected(old("mapping.$target", $attendeeMapping[$target] ?? null) === $field->field_key)>{{ $field->label }}</option>
+                                            @endforeach
+                                        </select>
+                                        @isset($info['hint'])<span class="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500">{{ $info['hint'] }}</span>@endisset
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <label class="flex items-start gap-3 rounded-xl bg-white p-4">
+                            <input type="hidden" name="auto_add_attendees" value="0">
+                            <input type="checkbox" name="auto_add_attendees" value="1" @checked(old('auto_add_attendees', $form->auto_add_attendees)) class="mt-0.5 rounded border-slate-300 text-indigo-600">
+                            <span class="text-sm">
+                                <span class="block font-black text-slate-900">Keep adding new responses automatically</span>
+                                <span class="text-slate-600">Each new response joins the attendee list as soon as it is submitted{{ $form->collectsPayment() ? ' and paid for' : '' }}. No message is sent to them.</span>
+                            </span>
+                        </label>
+
+                        <p class="text-xs text-slate-500">Someone already on the attendee list (same phone or email) is linked, not added twice. Existing attendees' details are not changed.{{ $form->collectsPayment() ? ' Only paid responses are added.' : '' }}</p>
+
+                        <div class="flex flex-wrap gap-2">
+                            <button name="action" value="add_now" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:bg-indigo-700"
+                                    @disabled($notYetAttendees === 0)>Save and add {{ $notYetAttendees }} response(s) now</button>
+                            <button name="action" value="save" class="rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-black uppercase tracking-wider text-indigo-700 hover:bg-indigo-50">Save settings only</button>
+                        </div>
+                    </form>
+                @endif
+            </details>
+        @endif
+
         @if($canDelete && $responses->total() > 0)
             @php
                 $allPaid = $showPayment ? $form->responses()->where('payment_status', 'paid')->count() : 0;
@@ -71,6 +134,7 @@
                     @change="document.querySelectorAll('[data-response-pick]').forEach(box => box.checked = $event.target.checked); $store.responsePick.count = document.querySelectorAll('[data-response-pick]:checked').length" x-data></th>@endif
                 <th class="px-5 py-4">Submitted</th>
                 @if($showPayment)<th class="px-5 py-4">Payment</th>@endif
+                @if($canManageAttendees)<th class="px-5 py-4">Attendee</th>@endif
                 @foreach($fields as $field)<th class="px-5 py-4">{{ $field->label }}</th>@endforeach
             </tr></thead>
             <tbody class="divide-y divide-slate-100">@forelse($responses as $response)
@@ -79,9 +143,10 @@
                         x-data @change="$store.responsePick.count = document.querySelectorAll('[data-response-pick]:checked').length"></td>@endif
                     <td class="px-5 py-4 text-slate-500">{{ $response->created_at->format('M j, Y g:i A') }}</td>
                     @if($showPayment)<td class="whitespace-nowrap px-5 py-4">@include('partials.payment-badge', ['status' => $response->payment_status, 'amount' => $response->amount_paid_minor, 'option' => $response->payment_option])</td>@endif
+                    @if($canManageAttendees)<td class="whitespace-nowrap px-5 py-4">@if($response->event_registration_id)<span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">On list</span>@else<span class="text-xs text-slate-400">Not yet</span>@endif</td>@endif
                     @foreach($fields as $field)<td class="px-5 py-4 text-slate-700">{{ $response->answers[$field->field_key] ?? '—' }}</td>@endforeach
                 </tr>
-            @empty<tr><td colspan="{{ $fields->count() + ($showPayment ? 2 : 1) + ($canDelete ? 1 : 0) }}" class="px-5 py-12 text-center text-slate-500">No responses yet.</td></tr>@endforelse</tbody>
+            @empty<tr><td colspan="{{ $fields->count() + ($showPayment ? 2 : 1) + ($canDelete ? 1 : 0) + ($canManageAttendees ? 1 : 0) }}" class="px-5 py-12 text-center text-slate-500">No responses yet.</td></tr>@endforelse</tbody>
         </table></div></div><div class="mt-5">{{ $responses->links() }}</div>
     </div>
 </x-app-layout>

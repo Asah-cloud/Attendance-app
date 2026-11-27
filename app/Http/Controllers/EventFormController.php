@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\SavesPaymentSettings;
 use App\Models\Event;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Services\FormAttendeeImporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -189,8 +190,52 @@ class EventFormController extends Controller
         $this->authorizeForm($event, $form);
         $fields = $form->fields()->where('is_active', true)->get();
         $responses = $form->responses()->latest('created_at')->paginate(25);
+        $importer = app(FormAttendeeImporter::class);
 
-        return view('events.forms.responses', compact('event', 'form', 'fields', 'responses'));
+        return view('events.forms.responses', compact('event', 'form', 'fields', 'responses') + [
+            'canManageAttendees' => true,
+            'attendeeTargets' => FormAttendeeImporter::TARGETS,
+            'attendeeFields' => $importer->mappableFields($form),
+            'attendeeMapping' => $importer->mapping($form),
+            'notYetAttendees' => $form->responses()->whereNull('event_registration_id')->count(),
+        ]);
+    }
+
+    /**
+     * Save which questions hold each attendee detail and whether new responses join the
+     * attendee list automatically; "add_now" also adds every response not yet on it.
+     */
+    public function updateAttendees(Request $request, Event $event, Form $form, FormAttendeeImporter $importer): RedirectResponse
+    {
+        $this->authorize('update', $event);
+        $this->authorizeForm($event, $form);
+
+        $keys = $importer->mappableFields($form)->pluck('field_key')->all();
+        $rules = ['auto_add_attendees' => ['boolean'], 'action' => ['nullable', Rule::in(['save', 'add_now'])]];
+        foreach (array_keys(FormAttendeeImporter::TARGETS) as $target) {
+            $rules["mapping.$target"] = [$target === 'name' ? 'required' : 'nullable', Rule::in($keys)];
+        }
+        $validated = $request->validate($rules, ['mapping.name.required' => 'Choose the question that asks for the person\'s name.']);
+
+        $mapping = array_map(fn ($key) => $key ?: null, $validated['mapping']);
+        $form->update(['attendee_mapping' => $mapping, 'auto_add_attendees' => $request->boolean('auto_add_attendees')]);
+
+        if (($validated['action'] ?? 'save') !== 'add_now') {
+            return back()->with('success', $form->auto_add_attendees
+                ? 'Saved. New responses will be added to the attendee list automatically.'
+                : 'Saved.');
+        }
+
+        $counts = $importer->addAll($form);
+        $parts = array_filter([
+            $counts[FormAttendeeImporter::ADDED] ? $counts[FormAttendeeImporter::ADDED].' added to the attendee list' : null,
+            $counts[FormAttendeeImporter::EXISTING] ? $counts[FormAttendeeImporter::EXISTING].' already on the list' : null,
+            $counts[FormAttendeeImporter::NO_NAME] ? $counts[FormAttendeeImporter::NO_NAME].' skipped (no name given)' : null,
+            $counts[FormAttendeeImporter::UNPAID] ? $counts[FormAttendeeImporter::UNPAID].' waiting for payment' : null,
+            $counts[FormAttendeeImporter::CONFLICT] ? $counts[FormAttendeeImporter::CONFLICT].' skipped (email and phone belong to two different people on record)' : null,
+        ]);
+
+        return back()->with('success', $parts ? ucfirst(implode(', ', $parts)).'.' : 'Every response is already on the attendee list.');
     }
 
     /**

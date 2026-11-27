@@ -72,6 +72,18 @@ it('takes people to Paystack after a paid form and marks the response paid when 
         ->and($payment->fresh()->status)->toBe('paid')->and($payment->fresh()->channel)->toBe('mobile_money');
 });
 
+it('adds a paid form response to the attendee list only once the payment goes through', function () {
+    fakePaystack($this);
+    $this->form->fields()->create(['field_key' => 'name', 'label' => 'Full name', 'field_type' => 'text', 'display_order' => 1]);
+    $this->form->update(['attendee_mapping' => ['name' => 'name'], 'auto_add_attendees' => true]);
+
+    $this->post(route('forms.store', ['youth-camp', $this->form->slug]), ['answers' => ['name' => 'Kwame Asante'], 'payer_email' => 'kwame@example.com']);
+    expect(FormResponse::sole()->event_registration_id)->toBeNull();
+
+    $this->get(route('payments.return', AttendeePayment::sole()->reference));
+    expect(FormResponse::sole()->registration?->participant->name)->toBe('Kwame Asante');
+});
+
 it('takes the platform fee from each payment only while it is switched on', function () {
     fakePaystack($this);
     PlatformSetting::set(AttendeePaymentService::FEE_ENABLED, '1');
