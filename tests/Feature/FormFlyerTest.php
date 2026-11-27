@@ -3,6 +3,7 @@
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\User;
+use App\Support\FlyerPreview;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
@@ -23,6 +24,19 @@ beforeEach(function () {
 function flyerSettings(array $extra = []): array
 {
     return ['title' => 'AWC TOURS 2026', 'is_open' => '1'] + $extra;
+}
+
+/** PNG bytes of a busy picture (many random coloured dots), which compresses poorly like a photo-heavy flyer. */
+function busyPng(int $width, int $height): string
+{
+    $image = imagecreatetruecolor($width, $height);
+    for ($i = 0; $i < 6000; $i++) {
+        imagefilledellipse($image, random_int(0, $width), random_int(0, $height), 40, 40, imagecolorallocate($image, random_int(0, 255), random_int(0, 255), random_int(0, 255)));
+    }
+    ob_start();
+    imagepng($image);
+
+    return (string) ob_get_clean();
 }
 
 it('lets a manager add flyers that show above the questions on the public form', function () {
@@ -124,6 +138,44 @@ it('uses the first flyer and the form\'s own details for the shared-link preview
         ->assertSee('<meta name="twitter:image" content="'.$first.'">', false)
         ->assertSee('<meta property="og:description" content="Choose your tour">', false)
         ->assertDontSee('og-asah-apex-attendance', false);
+});
+
+it('gives WhatsApp and phones a small copy of a large flyer and keeps the original for full size', function () {
+    // A busy 2000x2500 PNG: well over the few hundred KB WhatsApp will show in a preview.
+    $file = tempnam(sys_get_temp_dir(), 'flyer').'.png';
+    file_put_contents($file, busyPng(2000, 2500));
+    expect(filesize($file))->toBeGreaterThan(300 * 1024);
+
+    $this->actingAs($this->manager)->patch(route('events.forms.update', [$this->event, $this->form]), flyerSettings([
+        'flyers' => [new UploadedFile($file, 'quiz.png', 'image/png', null, true)],
+    ]))->assertSessionHasNoErrors();
+
+    $original = $this->form->fresh()->flyers()[0];
+    $preview = FlyerPreview::pathFor($original);
+    Storage::disk('public')->assertExists($preview);
+    $size = getimagesize(Storage::disk('public')->path($preview));
+    expect(Storage::disk('public')->size($preview))->toBeLessThanOrEqual(290 * 1024)
+        ->and(max($size[0], $size[1]))->toBeLessThanOrEqual(1200)
+        ->and($size['mime'])->toBe('image/jpeg');
+
+    $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))
+        ->assertSee('<meta property="og:image" content="'.url(Storage::url($preview)).'">', false)
+        ->assertSee('<img src="'.Storage::url($preview).'" alt="AWC TOURS 2026 flyer"', false)
+        ->assertSee('<a href="'.Storage::url($original).'" target="_blank"', false);
+
+    // Removing the flyer removes its copy too
+    $this->actingAs($this->manager)->patch(route('events.forms.update', [$this->event, $this->form]), flyerSettings(['remove_flyers' => [$original]]));
+    Storage::disk('public')->assertMissing([$original, $preview]);
+    unlink($file);
+});
+
+it('makes the small copy the first time a flyer uploaded before this change is shown', function () {
+    Storage::disk('public')->put('form-flyers/old.png', busyPng(1800, 2200));
+    $this->form->update(['flyer_paths' => ['form-flyers/old.png']]);
+
+    $this->get(route('forms.show', [$this->event->slug, $this->form->slug]))->assertOk()
+        ->assertSee(Storage::url('form-flyers/previews/old.jpg'), false);
+    Storage::disk('public')->assertExists('form-flyers/previews/old.jpg');
 });
 
 it('falls back to the site preview image when a form has no flyers', function () {
