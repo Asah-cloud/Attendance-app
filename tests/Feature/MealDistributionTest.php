@@ -460,18 +460,66 @@ it('prints dated meal tickets starting from the chosen first meal', function () 
         'end_date' => '2026-12-04', 'end_meal' => 'breakfast',
         'meals' => ['breakfast', 'lunch', 'supper'],
         'supper_from' => '18:30', 'supper_to' => '20:00',
+        'show_names' => '1',
     ]))->assertOk();
 
     // Wed supper, Thu breakfast/lunch/supper, Fri breakfast = 5 tickets
     expect($response->viewData('slots'))->toHaveCount(5);
     expect($response->viewData('slots')->first()['label'])->toBe('Supper');
     expect($response->viewData('slots')->last()['label'])->toBe('Breakfast');
+    // One row per day; Wed breakfast/lunch and Fri lunch/supper are blank cells
+    expect($response->viewData('days'))->toHaveCount(3);
+    expect(array_values($response->viewData('days')[0]['cells']))->sequence(
+        fn ($cell) => $cell->toBeNull(),
+        fn ($cell) => $cell->toBeNull(),
+        fn ($cell) => $cell->not->toBeNull(),
+    );
     $response->assertSee('Ticket Guest')
         ->assertSee('Delegate')
         ->assertSee('Camp Meeting')
         ->assertSee('Wed 2 Dec 2026')
         ->assertSee('6:30 PM')
         ->assertSee('Fri 4 Dec 2026');
+});
+
+it('leaves names off meal tickets by default and prints the chosen number of sets', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Camp Meeting', 'event_date' => '2026-12-02', 'end_date' => '2026-12-03']);
+    unlockAllEventFeatures($event);
+    mealRegistration($event, 'Hidden Guest');
+    mealRegistration($event, 'Other Guest');
+
+    $default = $this->actingAs($manager)->get(route('events.meals.tickets', $event))->assertOk();
+    expect($default->viewData('showNames'))->toBeFalse();
+    expect($default->viewData('sets'))->toHaveCount(2);
+    $default->assertDontSee('Hidden Guest');
+
+    $extra = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'show_names' => '0', 'sets' => 25]))->assertOk();
+    expect($extra->viewData('sets'))->toHaveCount(25);
+
+    $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'sets' => 0]))
+        ->assertSee('Print at least 1 set.');
+});
+
+it('sizes ticket sets so whole sets fill each A4 page', function () {
+    $company = Company::create(['name' => 'Acme']);
+    $manager = mealUser('manager', $company);
+    $event = Event::create(['company_id' => $company->id, 'title' => 'Camp Meeting', 'event_date' => '2026-12-02', 'end_date' => '2026-12-05']);
+    unlockAllEventFeatures($event);
+    mealRegistration($event);
+
+    // Four days of three meals: 4 rows x 3 columns per set
+    $unnamed = $this->actingAs($manager)->get(route('events.meals.tickets', $event))->viewData('layout');
+    expect($unnamed)->toMatchArray(['rows' => 4, 'columns' => 3, 'across' => 1, 'down' => 3, 'spansPages' => false]);
+    expect($unnamed['setHeight'] * $unnamed['down'])->toBeLessThanOrEqual(279.0);
+
+    $named = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'show_names' => '1']))->viewData('layout');
+    expect($named)->toMatchArray(['rows' => 4, 'down' => 2]);
+
+    // One meal a day makes narrow sets, three side by side
+    $lunchOnly = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'meals' => ['lunch']]))->viewData('layout');
+    expect($lunchOnly)->toMatchArray(['columns' => 1, 'across' => 3]);
 });
 
 it('defaults meal tickets to the event dates and skips unticked meals', function () {

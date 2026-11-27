@@ -20,21 +20,28 @@
         label.check { flex-direction: row; align-items: center; gap: 5px; color: white; font-size: 13px; }
         input, select { padding: 6px 8px; border: 1px solid #475569; border-radius: 6px; background: #1e293b; color: white; font: inherit; }
         input[type=checkbox] { width: 16px; height: 16px; }
+        input[type=number] { width: 80px; }
         .apply-btn { padding: 8px 16px; border: 0; border-radius: 8px; background: white; color: var(--ink); font-weight: 800; cursor: pointer; }
         .problems { margin: 12px 0 0; padding: 10px 14px; border-radius: 8px; background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 13px; }
 
-        main { padding: 10mm; }
-        .sheet { max-width: 194mm; margin: 0 auto 8mm; padding: 5mm; background: white; border-radius: 3mm; break-inside: avoid-page; }
-        .sheet-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4mm; margin-bottom: 3mm; padding-bottom: 2mm; border-bottom: 1px solid #e2e8f0; }
-        .sheet-head strong { font-size: 4.2mm; }
-        .sheet-head span { color: var(--muted); font-size: 2.8mm; }
-        .tickets { display: grid; grid-template-columns: repeat(3, 1fr); }
-        .ticket { min-height: 30mm; padding: 3mm 3.5mm; border: 1px dashed var(--line); margin: -0.5px 0 0 -0.5px; display: flex; flex-direction: column; break-inside: avoid; page-break-inside: avoid; }
-        .t-event { color: var(--brand); font-size: 2.4mm; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; overflow-wrap: anywhere; }
-        .t-meal { margin-top: 1mm; font-size: 5mm; font-weight: 900; text-transform: uppercase; }
-        .t-date { margin-top: .5mm; font-size: 3.2mm; font-weight: 700; }
-        .t-time { font-size: 3mm; color: #334155; }
-        .t-name { margin-top: auto; padding-top: 1.5mm; font-size: 2.8mm; color: var(--muted); overflow-wrap: anywhere; }
+        main { padding: 10mm 0; }
+        /* On screen each page is drawn as a sheet of A4 paper. */
+        .sheet { width: 210mm; margin: 0 auto 8mm; padding: 8mm; background: white; box-shadow: 0 2px 10px rgba(15, 23, 42, .15); }
+        .page { display: grid; align-content: start; }
+        .set { position: relative; outline: .35mm solid var(--ink); display: flex; flex-direction: column; overflow: hidden; break-inside: avoid; }
+        .set-head { display: flex; justify-content: space-between; align-items: center; gap: 3mm; padding: 0 3mm; border-bottom: .2mm solid #cbd5e1; background: #f8fafc; }
+        .set-head strong { font-size: 3.4mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .set-head span { flex-shrink: 0; color: var(--muted); font-size: 2.6mm; }
+        .tickets { display: grid; flex: 1; }
+        .ticket { padding: 2.2mm 3mm; display: flex; flex-direction: column; justify-content: center; border-right: .25mm dashed var(--line); border-bottom: .25mm dashed var(--line); overflow: hidden; break-inside: avoid; }
+        .ticket.last-col { border-right: 0; }
+        .ticket.last-row { border-bottom: 0; }
+        .ticket.blank { background: repeating-linear-gradient(135deg, #f8fafc 0 2mm, #f1f5f9 2mm 4mm); }
+        .t-event { color: var(--brand); font-size: 2.3mm; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .t-meal { margin-top: .6mm; font-size: 4.6mm; font-weight: 900; text-transform: uppercase; line-height: 1.05; }
+        .t-date { margin-top: .5mm; font-size: 3mm; font-weight: 700; }
+        .t-time { font-size: 2.8mm; color: #334155; }
+        .t-name { margin-top: 1mm; font-size: 2.6mm; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .empty { max-width: 194mm; margin: 0 auto; padding: 30px; border-radius: 16px; background: white; text-align: center; }
 
         @page { size: A4 portrait; margin: 8mm; }
@@ -42,7 +49,8 @@
             body { background: white; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
             .panel { display: none; }
             main { padding: 0; }
-            .sheet { max-width: none; margin: 0 0 5mm; padding: 0; border-radius: 0; }
+            .sheet { width: auto; margin: 0; padding: 0; box-shadow: none; break-after: page; }
+            .sheet:last-child { break-after: auto; }
         }
     </style>
 </head>
@@ -52,14 +60,18 @@
             <div>
                 <strong>{{ $event->title }} &middot; Meal tickets</strong>
                 <small>
-                    @if($problems->isEmpty())
-                        {{ $registrations->count() }} attendee(s) &times; {{ $slots->count() }} ticket(s) each &mdash; servers tear off and keep the ticket for each meal.
+                    @if($problems->isEmpty() && $layout)
+                        {{ $sets->count() }} set(s) &times; {{ $slots->count() }} ticket(s) each
+                        @unless($layout['spansPages'])
+                            &middot; {{ $layout['perPage'] }} set(s) per page, {{ (int) ceil($sets->count() / $layout['perPage']) }} page(s)
+                        @endunless
+                        &mdash; cut along the solid lines between sets, then the dashed lines between tickets.
                     @else
                         Fix the settings below to see the tickets.
                     @endif
                 </small>
             </div>
-            <button type="button" class="print-btn" onclick="window.print()" @disabled($problems->isNotEmpty() || $slots->isEmpty() || $registrations->isEmpty())>Print tickets</button>
+            <button type="button" class="print-btn" onclick="window.print()" @disabled($problems->isNotEmpty() || $slots->isEmpty() || $sets->isEmpty())>Print tickets</button>
         </div>
 
         <form method="GET" action="{{ route('events.meals.tickets', $event) }}">
@@ -92,6 +104,12 @@
                     <label>To<input type="time" name="{{ $key }}_to" value="{{ $settings[$key.'_to'] }}"></label>
                 </fieldset>
             @endforeach
+            <fieldset>
+                <legend>Names</legend>
+                <input type="hidden" name="show_names" value="0">
+                <label class="check"><input type="checkbox" name="show_names" value="1" @checked($showNames) onchange="document.getElementById('sets-field').hidden = this.checked">Print attendee names</label>
+                <label id="sets-field" @if($showNames) hidden @endif>Number of sets<input type="number" name="sets" min="1" max="2000" value="{{ $settings['sets'] }}"></label>
+            </fieldset>
             <button type="submit" class="apply-btn">Update tickets</button>
         </form>
 
@@ -101,30 +119,48 @@
     </div>
 
     <main>
-        @if($problems->isEmpty())
-            @forelse($registrations as $registration)
-                <section class="sheet">
-                    <div class="sheet-head">
-                        <strong>{{ $registration->participant->name }}</strong>
-                        <span>{{ $registration->participant->category ?: 'Attendee' }} &middot; {{ $slots->count() }} meal ticket(s)</span>
-                    </div>
-                    <div class="tickets">
-                        @foreach($slots as $slot)
-                            <article class="ticket">
-                                <span class="t-event">{{ $event->title }}</span>
-                                <span class="t-meal">{{ $slot['label'] }}</span>
-                                <span class="t-date">{{ $slot['date']->format('D j M Y') }}</span>
-                                @if($slot['from'])
-                                    <span class="t-time">{{ $slot['from']->format('g:i A') }}@if($slot['to']) &ndash; {{ $slot['to']->format('g:i A') }}@endif</span>
+        @if($problems->isEmpty() && $layout)
+            @if($sets->isEmpty())
+                <p class="empty">No confirmed attendees yet. Untick "Print attendee names" to print unnamed sets.</p>
+            @endif
+            @foreach($sets->chunk($layout['spansPages'] ? 1 : $layout['perPage']) as $pageSets)
+                <div class="sheet">
+                    <div class="page" style="grid-template-columns: repeat({{ $layout['across'] }}, {{ round($layout['setWidth'], 2) }}mm); grid-auto-rows: {{ round($layout['setHeight'], 2) }}mm;">
+                        @foreach($pageSets as $set)
+                            <section class="set">
+                                @if($showNames)
+                                    <div class="set-head" style="height: {{ $layout['headerHeight'] }}mm;">
+                                        <strong>{{ $set['name'] }}</strong>
+                                        <span>{{ $set['category'] }}</span>
+                                    </div>
                                 @endif
-                                <span class="t-name">{{ $registration->participant->name }}</span>
-                            </article>
+                                <div class="tickets" style="grid-template-columns: repeat({{ $layout['columns'] }}, 1fr); grid-template-rows: repeat({{ $layout['rows'] }}, {{ round($layout['ticketHeight'], 2) }}mm);">
+                                    @foreach($days as $rowIndex => $day)
+                                        @foreach(array_values($day['cells']) as $colIndex => $slot)
+                                            @php($edge = ($colIndex === $layout['columns'] - 1 ? ' last-col' : '').($rowIndex === $layout['rows'] - 1 ? ' last-row' : ''))
+                                            @if($slot)
+                                                <article class="ticket{{ $edge }}">
+                                                    <span class="t-event">{{ $event->title }}</span>
+                                                    <span class="t-meal">{{ $slot['label'] }}</span>
+                                                    <span class="t-date">{{ $slot['date']->format('D j M Y') }}</span>
+                                                    @if($slot['from'])
+                                                        <span class="t-time">{{ $slot['from']->format('g:i A') }}@if($slot['to']) &ndash; {{ $slot['to']->format('g:i A') }}@endif</span>
+                                                    @endif
+                                                    @if($showNames)
+                                                        <span class="t-name">{{ $set['name'] }}</span>
+                                                    @endif
+                                                </article>
+                                            @else
+                                                <div class="ticket blank{{ $edge }}" aria-hidden="true"></div>
+                                            @endif
+                                        @endforeach
+                                    @endforeach
+                                </div>
+                            </section>
                         @endforeach
                     </div>
-                </section>
-            @empty
-                <p class="empty">No confirmed attendees yet.</p>
-            @endforelse
+                </div>
+            @endforeach
         @endif
     </main>
 </body>

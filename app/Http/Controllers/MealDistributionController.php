@@ -416,9 +416,18 @@ class MealDistributionController extends Controller
 
     private const TICKET_MAX_DAYS = 31;
 
+    private const TICKET_MAX_SETS = 2000;
+
+    /** Printable area of an A4 page inside the 8mm print margins, in mm (height kept a little short so rounding never spills a page). */
+    private const TICKET_PAGE_WIDTH = 194;
+
+    private const TICKET_PAGE_HEIGHT = 279;
+
     /**
-     * Printable paper meal tickets: one sheet per confirmed attendee with a
-     * tear-off ticket for every meal between the chosen first and last meal.
+     * Printable paper meal tickets: one set per attendee (named, or a chosen
+     * number of unnamed sets) with a tear-off ticket for every meal between
+     * the chosen first and last meal. Each set is a day-by-meal block sized
+     * so a whole number of sets fills each A4 page, for easy cutting.
      */
     public function tickets(Request $request, Event $event): View
     {
@@ -434,6 +443,8 @@ class MealDistributionController extends Controller
             'end_date' => $request->query('end_date', $eventEnd),
             'end_meal' => $request->query('end_meal', 'supper'),
             'meals' => (array) $request->query('meals', $mealKeys),
+            'show_names' => $request->query('show_names', '0'),
+            'sets' => $request->query('sets'),
         ];
         foreach (self::TICKET_MEALS as $key => $meal) {
             $settings["{$key}_from"] = $request->query("{$key}_from", $meal['from']);
@@ -452,9 +463,14 @@ class MealDistributionController extends Controller
             'end_meal' => ['required', Rule::in($mealKeys)],
             'meals' => ['required', 'array', 'min:1'],
             'meals.*' => [Rule::in($mealKeys)],
+            'show_names' => ['required', Rule::in(['0', '1'])],
+            'sets' => ['nullable', 'integer', 'min:1', 'max:'.self::TICKET_MAX_SETS],
         ] + $timeRules, [
             'end_date.after_or_equal' => 'The last day must be on or after the first day.',
             'meals.required' => 'Tick at least one meal.',
+            'sets.integer' => 'The number of sets must be a whole number.',
+            'sets.min' => 'Print at least 1 set.',
+            'sets.max' => 'You can print at most '.self::TICKET_MAX_SETS.' sets at a time.',
         ]);
         $validator->after(function ($validator) use ($settings, $mealKeys): void {
             if ($validator->errors()->isNotEmpty()) {
@@ -470,36 +486,53 @@ class MealDistributionController extends Controller
             }
         });
 
+        $registrations = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CONFIRMED)
+            ->with('participant')
+            ->get()
+            ->sortBy(fn ($registration) => mb_strtolower($registration->participant->name))
+            ->values();
+        $showNames = $settings['show_names'] === '1';
+        $settings['sets'] = $settings['sets'] ?? (string) max(1, $registrations->count());
+
         $slots = collect();
-        $registrations = collect();
+        $days = collect();
+        $sets = collect();
+        $layout = null;
         if (! $validator->fails()) {
+            $columns = array_values(array_filter($mealKeys, fn ($key) => in_array($key, $settings['meals'], true)));
             $startIndex = array_search($settings['start_meal'], $mealKeys);
             $endIndex = array_search($settings['end_meal'], $mealKeys);
             $date = Carbon::parse($settings['start_date']);
             $last = Carbon::parse($settings['end_date']);
             while ($date->lte($last)) {
-                foreach ($mealKeys as $index => $key) {
-                    if (! in_array($key, $settings['meals'], true)
-                        || ($date->toDateString() === $settings['start_date'] && $index < $startIndex)
-                        || ($date->toDateString() === $settings['end_date'] && $index > $endIndex)) {
-                        continue;
-                    }
-                    $slots->push([
+                $cells = [];
+                foreach ($columns as $key) {
+                    $index = array_search($key, $mealKeys);
+                    $outside = ($date->toDateString() === $settings['start_date'] && $index < $startIndex)
+                        || ($date->toDateString() === $settings['end_date'] && $index > $endIndex);
+                    $cells[$key] = $outside ? null : [
                         'label' => self::TICKET_MEALS[$key]['label'],
                         'date' => $date->copy(),
                         'from' => $settings["{$key}_from"] ? Carbon::createFromFormat('H:i', $settings["{$key}_from"]) : null,
                         'to' => $settings["{$key}_to"] ? Carbon::createFromFormat('H:i', $settings["{$key}_to"]) : null,
-                    ]);
+                    ];
+                }
+                if (array_filter($cells)) {
+                    $days->push(['date' => $date->copy(), 'cells' => $cells]);
+                    $slots->push(...array_values(array_filter($cells)));
                 }
                 $date->addDay();
             }
 
-            $registrations = $event->registrations()
-                ->where('status', EventRegistration::STATUS_CONFIRMED)
-                ->with('participant')
-                ->get()
-                ->sortBy(fn ($registration) => mb_strtolower($registration->participant->name))
-                ->values();
+            $sets = $showNames
+                ? $registrations->map(fn ($registration) => [
+                    'name' => $registration->participant->name,
+                    'category' => $registration->participant->category ?: 'Attendee',
+                ])
+                : collect(range(1, (int) $settings['sets']))->map(fn ($number) => ['name' => null, 'category' => null]);
+
+            $layout = $this->ticketLayout(count($columns), $days->count(), $showNames);
         }
 
         return view('meals.tickets', [
@@ -507,9 +540,44 @@ class MealDistributionController extends Controller
             'settings' => $settings,
             'mealTypes' => self::TICKET_MEALS,
             'slots' => $slots,
+            'days' => $days,
+            'sets' => $sets,
+            'layout' => $layout,
+            'showNames' => $showNames,
             'registrations' => $registrations,
             'problems' => $validator->errors(),
         ]);
+    }
+
+    /**
+     * Size each ticket set so a whole number of sets fills an A4 page.
+     * A set has one row per day and one column per meal type; a single-meal
+     * set is narrow, so three of those sit side by side.
+     *
+     * @return array{columns: int, rows: int, across: int, down: int, perPage: int, setWidth: float, setHeight: float, headerHeight: float, ticketHeight: float, spansPages: bool}
+     */
+    private function ticketLayout(int $columns, int $rows, bool $showNames): array
+    {
+        $headerHeight = $showNames ? 7.0 : 0.0;
+        $minTicket = $showNames ? 24.0 : 20.0;
+        $across = $columns === 1 ? 3 : 1;
+        $minSetHeight = $headerHeight + $rows * $minTicket;
+        $spansPages = $minSetHeight > self::TICKET_PAGE_HEIGHT;
+        $down = $spansPages ? 1 : (int) min(8, max(1, floor(self::TICKET_PAGE_HEIGHT / $minSetHeight)));
+        $setHeight = $spansPages ? $minSetHeight : self::TICKET_PAGE_HEIGHT / $down;
+
+        return [
+            'columns' => $columns,
+            'rows' => $rows,
+            'across' => $across,
+            'down' => $down,
+            'perPage' => $across * $down,
+            'setWidth' => self::TICKET_PAGE_WIDTH / $across,
+            'setHeight' => $setHeight,
+            'headerHeight' => $headerHeight,
+            'ticketHeight' => ($setHeight - $headerHeight) / $rows,
+            'spansPages' => $spansPages,
+        ];
     }
 
     public function report(Event $event): View
