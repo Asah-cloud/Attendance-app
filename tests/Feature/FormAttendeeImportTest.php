@@ -163,3 +163,37 @@ it('needs a name question and only lets managers set it up', function () {
         ->post(route('events.forms.attendees', [$this->event, $this->form]), ['mapping' => ['name' => 'full_name']])
         ->assertForbidden();
 });
+
+it('adds someone under her own name when her phone is on record for a different person', function () {
+    // An older list has Janet on this number; Regina now uses it on the form.
+    $janet = Participant::create(['company_id' => $this->company->id, 'name' => 'LADY JANET AVORKPO', 'phone' => '248417296', 'category' => 'Member']);
+    $this->form->update(['attendee_mapping' => ['name' => 'full_name', 'phone' => 'phone']]);
+    formResponse($this->form, ['full_name' => 'Deaconess Regina Lawer', 'phone' => '0248417296']);
+    // A leader fills the form for herself and a member with her own number
+    formResponse($this->form, ['full_name' => 'Deaconess Rebecca Tetteh', 'phone' => '024 745 5355']);
+    formResponse($this->form, ['full_name' => 'Deaconess Abigail Adjei', 'phone' => '024 745 5355']);
+    // The same person again, and a known person with the title written differently
+    formResponse($this->form, ['full_name' => 'DEACONESS REGINA LAWER', 'phone' => '0248417296']);
+    $grace = Participant::create(['company_id' => $this->company->id, 'name' => 'Grace Ofosua', 'phone' => '246807657', 'category' => 'Member']);
+    formResponse($this->form, ['full_name' => 'Dns Grace Ofosua', 'phone' => '0246807657']);
+
+    $counts = app(FormAttendeeImporter::class)->addAll($this->form);
+
+    $names = EventRegistration::where('event_id', $this->event->id)->with('participant')->get()->pluck('participant.name')->sort()->values()->all();
+    expect($names)->toBe(['Deaconess Abigail Adjei', 'Deaconess Rebecca Tetteh', 'Deaconess Regina Lawer', 'Grace Ofosua'])
+        ->and($counts)->toMatchArray([FormAttendeeImporter::ADDED => 4, FormAttendeeImporter::EXISTING => 1])
+        ->and($janet->fresh()->name)->toBe('LADY JANET AVORKPO')
+        ->and($grace->registrations()->where('event_id', $this->event->id)->exists())->toBeTrue();
+});
+
+it('links a person who sent the form again with her own number to her first entry', function () {
+    $this->form->update(['attendee_mapping' => ['name' => 'full_name', 'phone' => 'phone']]);
+    formResponse($this->form, ['full_name' => 'Deaconess Rebecca Tetteh', 'phone' => '0247455355']);
+    formResponse($this->form, ['full_name' => 'Abigail Adjei', 'phone' => '0541111003']);
+    formResponse($this->form, ['full_name' => 'Deaconess Abigail Adjei', 'phone' => '0247455355']);
+
+    app(FormAttendeeImporter::class)->addAll($this->form);
+
+    expect(EventRegistration::where('event_id', $this->event->id)->count())->toBe(2)
+        ->and($this->form->responses()->whereNull('event_registration_id')->count())->toBe(0);
+});

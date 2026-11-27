@@ -146,7 +146,24 @@ class ParticipantRegistrationService
 
     /** Titles left out when looking for possible duplicates, so "Pastor Kofi Mensah" is checked as "Kofi Mensah". */
     private const NAME_TITLES = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof', 'rev', 'revd', 'reverend', 'pastor', 'ps', 'pst', 'pr',
-        'apostle', 'apst', 'prophet', 'prophetess', 'bishop', 'evangelist', 'evang', 'elder', 'deacon', 'deaconess', 'overseer', 'sister', 'brother', 'sis', 'bro'];
+        'apostle', 'apst', 'prophet', 'prophetess', 'bishop', 'evangelist', 'evang', 'elder', 'deacon', 'deaconess', 'dns', 'dcns', 'overseer', 'sister', 'brother', 'sis', 'bro', 'lady', 'madam'];
+
+    /**
+     * Whether two names could be the same person: titles and case ignored, and either one name's
+     * words all appear in the other ("Grace Ofosua" / "Deaconess Grace Esi Ofosua") or they share
+     * at least two words (a misspelt third name). "Regina Lawer" and "Janet Avorkpo" do not agree.
+     */
+    public function namesAgree(?string $a, ?string $b): bool
+    {
+        $a = array_unique(explode(' ', $this->nameKey($a)));
+        $b = array_unique(explode(' ', $this->nameKey($b)));
+        if ($a === [''] || $b === ['']) {
+            return true;
+        }
+        $shared = count(array_intersect($a, $b));
+
+        return $shared === min(count($a), count($b)) || $shared >= 2;
+    }
 
     /**
      * A name reduced for spotting possible duplicates: same words in any order, ignoring case,

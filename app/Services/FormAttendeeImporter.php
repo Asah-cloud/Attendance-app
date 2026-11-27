@@ -171,8 +171,21 @@ class FormAttendeeImporter
                     'room_group' => $answer('room_group'),
                 ], fn ($value) => $value !== null);
 
-                $participant = $this->participants->resolveParticipant($event, $details, trusted: false);
-                $registration = EventRegistration::query()->where('event_id', $event->id)->where('participant_id', $participant->id)->first();
+                // A phone or email already on record under a clearly different name is someone else's:
+                // a leader often fills the form for others with her own number, and older lists carry
+                // wrong numbers. Joining them would put this person on the list under the other name.
+                $match = $this->participants->findMatch($event, $details, trusted: false);
+                $registration = null;
+                if ($match && ! $this->participants->namesAgree($match->name, $name)) {
+                    // Unless this person (same name) is on this event's list already, e.g. sent the form
+                    // again later with her own number.
+                    $registration = EventRegistration::query()->where('event_id', $event->id)->with('participant')->get()
+                        ->first(fn (EventRegistration $existing) => $this->participants->nameKey($existing->participant?->name) === $this->participants->nameKey($name));
+                    $details['force_new'] = true;
+                }
+
+                $participant = $registration?->participant ?? $this->participants->resolveParticipant($event, $details, trusted: false);
+                $registration ??= EventRegistration::query()->where('event_id', $event->id)->where('participant_id', $participant->id)->first();
                 $outcome = $registration ? self::EXISTING : self::ADDED;
 
                 $registration ??= EventRegistration::create([
