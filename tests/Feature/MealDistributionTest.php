@@ -467,13 +467,8 @@ it('prints dated meal tickets starting from the chosen first meal', function () 
     expect($response->viewData('slots'))->toHaveCount(5);
     expect($response->viewData('slots')->first()['label'])->toBe('Supper');
     expect($response->viewData('slots')->last()['label'])->toBe('Breakfast');
-    // One row per day; Wed breakfast/lunch and Fri lunch/supper are blank cells
-    expect($response->viewData('days'))->toHaveCount(3);
-    expect(array_values($response->viewData('days')[0]['cells']))->sequence(
-        fn ($cell) => $cell->toBeNull(),
-        fn ($cell) => $cell->toBeNull(),
-        fn ($cell) => $cell->not->toBeNull(),
-    );
+    // Tickets fill the set in serving order with no gap before the first supper
+    expect($response->viewData('cells')->pluck('label')->all())->toBe(['Supper', 'Breakfast', 'Lunch', 'Supper', 'Breakfast', null]);
     $response->assertSee('Ticket Guest')
         ->assertSee('Delegate')
         ->assertSee('Camp Meeting')
@@ -509,17 +504,28 @@ it('sizes ticket sets so whole sets fill each A4 page', function () {
     unlockAllEventFeatures($event);
     mealRegistration($event);
 
-    // Four days of three meals: 4 rows x 3 columns per set
+    // Four days of three meals: 12 tickets, 4 rows x 3 columns per set
     $unnamed = $this->actingAs($manager)->get(route('events.meals.tickets', $event))->viewData('layout');
     expect($unnamed)->toMatchArray(['rows' => 4, 'columns' => 3, 'across' => 1, 'down' => 3, 'spansPages' => false]);
-    expect($unnamed['setHeight'] * $unnamed['down'])->toBeLessThanOrEqual(279.0);
+    expect($unnamed['minSetHeight'] * $unnamed['down'])->toBeLessThanOrEqual(279.0);
 
     $named = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'show_names' => '1']))->viewData('layout');
     expect($named)->toMatchArray(['rows' => 4, 'down' => 2]);
 
-    // One meal a day makes narrow sets, three side by side
-    $lunchOnly = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'meals' => ['lunch']]))->viewData('layout');
-    expect($lunchOnly)->toMatchArray(['columns' => 1, 'across' => 3]);
+    // Supper to supper over two days: 4 tickets in one row, no empty cells
+    $short = $this->actingAs($manager)->get(route('events.meals.tickets', [$event,
+        'start_date' => '2026-12-02', 'start_meal' => 'supper', 'end_date' => '2026-12-03', 'end_meal' => 'supper']));
+    expect($short->viewData('layout'))->toMatchArray(['columns' => 4, 'rows' => 1]);
+    expect($short->viewData('cells')->pluck('label')->all())->toBe(['Supper', 'Breakfast', 'Lunch', 'Supper']);
+
+    // Supper to breakfast over four days: 8 tickets fill 2 rows of 4 rather than leaving a gap in rows of 3
+    $eight = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'start_meal' => 'supper', 'end_meal' => 'breakfast']));
+    expect($eight->viewData('layout'))->toMatchArray(['columns' => 4, 'rows' => 2]);
+    expect($eight->viewData('cells'))->not->toContain(null);
+
+    // Two tickets make small sets, two side by side
+    $two = $this->actingAs($manager)->get(route('events.meals.tickets', [$event, 'meals' => ['lunch'], 'end_date' => '2026-12-03']))->viewData('layout');
+    expect($two)->toMatchArray(['columns' => 2, 'across' => 2]);
 });
 
 it('defaults meal tickets to the event dates and skips unticked meals', function () {

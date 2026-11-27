@@ -27,17 +27,17 @@
         main { padding: 10mm 0; }
         /* On screen each page is drawn as a sheet of A4 paper. */
         .sheet { width: 210mm; margin: 0 auto 8mm; padding: 8mm; background: white; box-shadow: 0 2px 10px rgba(15, 23, 42, .15); }
-        .page { display: grid; align-content: start; }
-        .set { position: relative; outline: .35mm solid var(--ink); display: flex; flex-direction: column; overflow: hidden; break-inside: avoid; }
-        .set-head { display: flex; justify-content: space-between; align-items: center; gap: 3mm; padding: 0 3mm; border-bottom: .2mm solid #cbd5e1; background: #f8fafc; }
+        /* Sets overlap by their border width so neighbouring sets share one thick black cutting line. */
+        .page { display: grid; align-content: start; padding: 1.2mm 0 0 1.2mm; }
+        .set { margin: -1.2mm 0 0 -1.2mm; border: 1.2mm solid #000; display: flex; flex-direction: column; overflow: hidden; break-inside: avoid; }
+        .set-head { display: flex; justify-content: space-between; align-items: center; gap: 3mm; padding: 0 3mm; border-bottom: .5mm solid #000; background: #f8fafc; }
         .set-head strong { font-size: 3.4mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         .set-head span { flex-shrink: 0; color: var(--muted); font-size: 2.6mm; }
         .tickets { display: grid; flex: 1; }
-        .ticket { padding: 2.2mm 3mm; display: flex; flex-direction: column; justify-content: center; border-right: .25mm dashed var(--line); border-bottom: .25mm dashed var(--line); overflow: hidden; break-inside: avoid; }
+        .ticket { padding: 2.2mm 3mm; display: flex; flex-direction: column; justify-content: center; border-right: .5mm solid #000; border-bottom: .5mm solid #000; overflow: hidden; break-inside: avoid; }
         .ticket.last-col { border-right: 0; }
         .ticket.last-row { border-bottom: 0; }
-        .ticket.blank { background: repeating-linear-gradient(135deg, #f8fafc 0 2mm, #f1f5f9 2mm 4mm); }
-        .t-event { color: var(--brand); font-size: 2.3mm; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .t-event { color: var(--brand); font-size: 2.3mm; font-weight: 800; letter-spacing: .05em; line-height: 1.25; text-transform: uppercase; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .t-meal { margin-top: .6mm; font-size: 4.6mm; font-weight: 900; text-transform: uppercase; line-height: 1.05; }
         .t-date { margin-top: .5mm; font-size: 3mm; font-weight: 700; }
         .t-time { font-size: 2.8mm; color: #334155; }
@@ -65,7 +65,7 @@
                         @unless($layout['spansPages'])
                             &middot; {{ $layout['perPage'] }} set(s) per page, {{ (int) ceil($sets->count() / $layout['perPage']) }} page(s)
                         @endunless
-                        &mdash; cut along the solid lines between sets, then the dashed lines between tickets.
+                        &mdash; cut along the thick lines between sets, then the thin lines between tickets.
                     @else
                         Fix the settings below to see the tickets.
                     @endif
@@ -125,7 +125,7 @@
             @endif
             @foreach($sets->chunk($layout['spansPages'] ? 1 : $layout['perPage']) as $pageSets)
                 <div class="sheet">
-                    <div class="page" style="grid-template-columns: repeat({{ $layout['across'] }}, {{ round($layout['setWidth'], 2) }}mm); grid-auto-rows: {{ round($layout['setHeight'], 2) }}mm;">
+                    <div class="page" style="grid-template-columns: repeat({{ $layout['across'] }}, 1fr); grid-auto-rows: {{ $layout['spansPages'] ? 'minmax('.$layout['minSetHeight'].'mm, auto)' : round((279 - 1.2) / $layout['down'], 2).'mm' }};">
                         @foreach($pageSets as $set)
                             <section class="set">
                                 @if($showNames)
@@ -134,10 +134,9 @@
                                         <span>{{ $set['category'] }}</span>
                                     </div>
                                 @endif
-                                <div class="tickets" style="grid-template-columns: repeat({{ $layout['columns'] }}, 1fr); grid-template-rows: repeat({{ $layout['rows'] }}, {{ round($layout['ticketHeight'], 2) }}mm);">
-                                    @foreach($days as $rowIndex => $day)
-                                        @foreach(array_values($day['cells']) as $colIndex => $slot)
-                                            @php($edge = ($colIndex === $layout['columns'] - 1 ? ' last-col' : '').($rowIndex === $layout['rows'] - 1 ? ' last-row' : ''))
+                                <div class="tickets" style="grid-template-columns: repeat({{ $layout['columns'] }}, 1fr); grid-template-rows: repeat({{ $layout['rows'] }}, 1fr);">
+                                        @foreach($cells as $index => $slot)
+                                            @php($edge = ($index % $layout['columns'] === $layout['columns'] - 1 ? ' last-col' : '').(intdiv($index, $layout['columns']) === $layout['rows'] - 1 ? ' last-row' : ''))
                                             @if($slot)
                                                 <article class="ticket{{ $edge }}">
                                                     <span class="t-event">{{ $event->title }}</span>
@@ -154,7 +153,6 @@
                                                 <div class="ticket blank{{ $edge }}" aria-hidden="true"></div>
                                             @endif
                                         @endforeach
-                                    @endforeach
                                 </div>
                             </section>
                         @endforeach
