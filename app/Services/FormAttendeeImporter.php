@@ -6,6 +6,7 @@ use App\Models\EventRegistration;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormResponse;
+use App\Models\Participant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -176,15 +177,23 @@ class FormAttendeeImporter
                 // wrong numbers. Joining them would put this person on the list under the other name.
                 $match = $this->participants->findMatch($event, $details, trusted: false);
                 $registration = null;
+                $sameContact = null;
                 if ($match && ! $this->participants->namesAgree($match->name, $name)) {
-                    // Unless this person (same name) is on this event's list already, e.g. sent the form
+                    // Several people can share the number: the one whose name agrees is this person.
+                    $phone = $this->participants->normalizePhone($details['phone'] ?? null);
+                    $sameContact = Participant::query()->where('company_id', $event->company_id)
+                        ->where(fn ($query) => $query
+                            ->when($phone, fn ($q) => $q->orWhere('phone', $phone)->orWhere('secondary_phone', $phone))
+                            ->when($details['email'] ?? null, fn ($q, $email) => $q->orWhereRaw('lower(email) = ?', [mb_strtolower($email)])))
+                        ->get()->first(fn (Participant $candidate) => $this->participants->namesAgree($candidate->name, $name));
+                    // Or this person (same name) is on this event's list already, e.g. sent the form
                     // again later with her own number.
-                    $registration = EventRegistration::query()->where('event_id', $event->id)->with('participant')->get()
+                    $registration = $sameContact ? null : EventRegistration::query()->where('event_id', $event->id)->with('participant')->get()
                         ->first(fn (EventRegistration $existing) => $this->participants->nameKey($existing->participant?->name) === $this->participants->nameKey($name));
                     $details['force_new'] = true;
                 }
 
-                $participant = $registration?->participant ?? $this->participants->resolveParticipant($event, $details, trusted: false);
+                $participant = $sameContact ?? $registration?->participant ?? $this->participants->resolveParticipant($event, $details, trusted: false);
                 $registration ??= EventRegistration::query()->where('event_id', $event->id)->where('participant_id', $participant->id)->first();
                 $outcome = $registration ? self::EXISTING : self::ADDED;
 
