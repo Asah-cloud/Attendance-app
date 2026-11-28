@@ -151,16 +151,18 @@ class ParticipantRegistrationService
     /**
      * Whether two names could be the same person: titles and case ignored, and either one name's
      * words all appear in the other ("Grace Ofosua" / "Deaconess Grace Esi Ofosua") or they share
-     * at least two words (a misspelt third name). "Regina Lawer" and "Janet Avorkpo" do not agree.
+     * at least two words (a misspelt third name). A word one letter off still counts ("Awatey" /
+     * "Awaitey") when it is four letters or more. "Regina Lawer" and "Janet Avorkpo" do not agree.
      */
     public function namesAgree(?string $a, ?string $b): bool
     {
-        $a = array_unique(explode(' ', $this->nameKey($a)));
-        $b = array_unique(explode(' ', $this->nameKey($b)));
+        $a = array_values(array_unique(explode(' ', $this->nameKey($a))));
+        $b = array_values(array_unique(explode(' ', $this->nameKey($b))));
         if ($a === [''] || $b === ['']) {
             return true;
         }
-        $shared = count(array_intersect($a, $b));
+        $alike = fn (string $x, string $y) => $x === $y || (min(mb_strlen($x), mb_strlen($y)) >= 4 && levenshtein($x, $y) <= 1);
+        $shared = count(array_filter($a, fn (string $x) => collect($b)->contains(fn (string $y) => $alike($x, $y))));
 
         return $shared === min(count($a), count($b)) || $shared >= 2;
     }

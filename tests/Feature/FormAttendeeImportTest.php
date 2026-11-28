@@ -197,3 +197,18 @@ it('links a person who sent the form again with her own number to her first entr
     expect(EventRegistration::where('event_id', $this->event->id)->count())->toBe(2)
         ->and($this->form->responses()->whereNull('event_registration_id')->count())->toBe(0);
 });
+
+it('treats a one-letter spelling difference as the same person and picks the right one of several on a shared phone', function () {
+    $this->form->update(['attendee_mapping' => ['name' => 'full_name', 'phone' => 'phone']]);
+    formResponse($this->form, ['full_name' => 'Deaconess Ophelia Ama Awatey', 'phone' => '0244186597']);
+    formResponse($this->form, ['full_name' => 'Deaconess Ophelia Awaitey', 'phone' => '0244186597']);
+    // A leader's number used for herself and a member, then the member again with her full name
+    formResponse($this->form, ['full_name' => 'Sylvia', 'phone' => '0242202882']);
+    formResponse($this->form, ['full_name' => 'Deaconess Elizabeth Kwaku Acquaye', 'phone' => '0242202882']);
+    formResponse($this->form, ['full_name' => 'Deaconess Sylvia Agyemang', 'phone' => '0242202882']);
+
+    app(FormAttendeeImporter::class)->addAll($this->form);
+
+    $names = EventRegistration::where('event_id', $this->event->id)->with('participant')->get()->pluck('participant.name')->sort()->values()->all();
+    expect($names)->toBe(['Deaconess Elizabeth Kwaku Acquaye', 'Deaconess Ophelia Ama Awatey', 'Sylvia']);
+});
